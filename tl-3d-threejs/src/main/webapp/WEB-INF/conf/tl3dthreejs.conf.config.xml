@@ -10,6 +10,17 @@
 			</instance>
 		</config>
 		
+		<config service-class="com.top_logic.gui.JSFileCompiler">
+			<instance>
+				<additional-files>
+					<file resource="webjar:org.webjars.npm/three:/webjars/three:build/three.module.js" type="module" as="three" />
+					<file resource="webjar:org.webjars.npm/three:/webjars/three:examples/jsm/controls/OrbitControls.js" type="module" as="OrbitControls" />
+
+					<file resource="tl/ThreeJsControl.js" type="module" />
+				</additional-files>
+			</instance>
+		</config>
+		
 		<config service-class="com.top_logic.knowledge.service.migration.MigrationService">
 			<instance>
 				<modules>
