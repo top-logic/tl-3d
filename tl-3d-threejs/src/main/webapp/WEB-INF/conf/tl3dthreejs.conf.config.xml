@@ -15,6 +15,7 @@
 				<additional-files>
 					<file resource="webjar:org.webjars.npm/three:/webjars/three:build/three.module.js" type="module" as="three" />
 					<file resource="webjar:org.webjars.npm/three:/webjars/three:examples/jsm/controls/OrbitControls.js" type="module" as="OrbitControls" />
+					<file resource="webjar:org.webjars.npm/three:/webjars/three:examples/jsm/loaders/GLTFLoader.js" type="module" as="GLTFLoader" />
 
 					<file resource="tl/ThreeJsControl.js" type="module" />
 				</additional-files>
