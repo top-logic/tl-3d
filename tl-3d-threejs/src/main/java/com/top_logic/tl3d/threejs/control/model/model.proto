@@ -1,0 +1,46 @@
+package com.top_logic.tl3d.threejs.control.model;
+
+option NoInterfaces;
+option NoXml;
+option NoBinary;
+option SharedGraph;
+
+/** Base class for objects that can be rendered in a 3D context. */
+abstract message Asset {
+}
+
+/** A glTF artifact loaded from an URL. */
+message GltfAsset extends Asset {
+	/** The URL from which to retrieve glTF data. */
+	string url;
+}
+
+message Cube extends Asset {
+	float width;
+	float height;
+	float depth;
+}
+
+/** Base class for a node in a {@link SceneGraph} */
+abstract message SceneNode {
+	/** Optional transformation applied to this and all potential sub-nodes. */
+	repeated float transform;
+}
+
+/** A collection of {@link SceneNode}s. */
+message GroupNode extends SceneNode {
+	/** The {@link SceneNode}s grouped together. */
+	repeated SceneNode contents;
+}
+
+/** An atomic {@link SceneNode} displaying an {@link Asset}. */
+message PartNode extends SceneNode {
+	/** The {@link Asset} to display. */
+	Asset asset;
+}
+
+/** The top-level object of a scene. */
+message SceneGraph {
+	/** The top-level {@link SceneNode} of the scene. */
+	SceneNode root;
+}
