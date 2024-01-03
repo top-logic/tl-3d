@@ -1,0 +1,77 @@
+/*
+ * SPDX-FileCopyrightText: 2023 (c) Business Operation Systems GmbH <info@top-logic.com>
+ * 
+ * SPDX-License-Identifier: LicenseRef-BOS-TopLogic-1.0
+ */
+package com.top_logic.tl3d.threejs.script;
+
+import com.top_logic.basic.config.ConfigurationException;
+import com.top_logic.basic.config.InstantiationContext;
+import com.top_logic.model.search.expr.GenericMethod;
+import com.top_logic.model.search.expr.SearchExpression;
+import com.top_logic.model.search.expr.config.dom.Expr;
+import com.top_logic.model.search.expr.config.operations.AbstractSimpleMethodBuilder;
+import com.top_logic.model.search.expr.config.operations.ArgumentDescriptor;
+import com.top_logic.tl3d.threejs.scene.GltfAsset;
+import com.top_logic.tl3d.threejs.scene.PartNode;
+
+/**
+ * TL-Script constructor function for an {@link PartNode}.
+ */
+public class ThreejsGltf extends ThreejsSceneNode<PartNode> {
+
+	/**
+	 * Creates a {@link ThreejsGltf} method.
+	 */
+	protected ThreejsGltf(String name, SearchExpression[] arguments) {
+		super(name, arguments);
+	}
+
+	@Override
+	public GenericMethod copy(SearchExpression[] arguments) {
+		return new ThreejsGltf(getName(), arguments);
+	}
+
+	@Override
+	protected PartNode allocate() {
+		return PartNode.create();
+	}
+
+	@Override
+	protected PartNode createNode(Object[] arguments) {
+		String url = (String) arguments[2];
+		return super.createNode(arguments)
+			.setAsset(GltfAsset.create().setUrl(url));
+	}
+
+	/**
+	 * Factory for {@link ThreejsGltf} methods.
+	 */
+	public static final class Builder extends AbstractSimpleMethodBuilder<ThreejsGltf> {
+
+		private static final ArgumentDescriptor DESCRIPTOR = ArgumentDescriptor.builder()
+			.optional("name")
+			.optional("tx")
+			.optional("url")
+			.build();
+
+		/**
+		 * Creates a {@link Builder}.
+		 */
+		public Builder(InstantiationContext context, Config<?> config) {
+			super(context, config);
+		}
+
+		@Override
+		public ArgumentDescriptor descriptor() {
+			return ThreejsGltf.Builder.DESCRIPTOR;
+		}
+
+		@Override
+		public ThreejsGltf build(Expr expr, SearchExpression[] args)
+				throws ConfigurationException {
+			return new ThreejsGltf(getConfig().getName(), args);
+		}
+
+	}
+}

@@ -7,7 +7,7 @@ package com.top_logic.tl3d.threejs.component;
 
 import com.top_logic.mig.html.ModelBuilder;
 import com.top_logic.mig.html.layout.LayoutComponent;
-import com.top_logic.tl3d.threejs.scene.SceneGraph;
+import com.top_logic.tl3d.threejs.scene.SceneNode;
 
 /**
  * {@link ModelBuilder} for {@link ThreeJsComponent}s.
@@ -15,6 +15,6 @@ import com.top_logic.tl3d.threejs.scene.SceneGraph;
 public interface SceneBuilder extends ModelBuilder {
 
 	@Override
-	SceneGraph getModel(Object businessModel, LayoutComponent aComponent);
+	SceneNode getModel(Object businessModel, LayoutComponent aComponent);
 
 }

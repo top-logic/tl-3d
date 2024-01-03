@@ -11,11 +11,13 @@ import com.top_logic.basic.config.InstantiationContext;
 import com.top_logic.basic.config.PolymorphicConfiguration;
 import com.top_logic.basic.config.annotation.defaults.BooleanDefault;
 import com.top_logic.basic.config.annotation.defaults.ItemDefault;
+import com.top_logic.layout.DisplayContext;
 import com.top_logic.layout.structure.ContentLayoutControlProvider;
 import com.top_logic.layout.structure.LayoutControlProvider;
 import com.top_logic.layout.table.component.BuilderComponent;
 import com.top_logic.mig.html.layout.LayoutComponent;
 import com.top_logic.tl3d.threejs.control.ThreeJsControl;
+import com.top_logic.tl3d.threejs.scene.SceneGraph;
 
 /**
  * 3D-Viewer using the <code>Three.js</code> library.
@@ -54,16 +56,50 @@ public class ThreeJsComponent extends BuilderComponent {
 
 		@Override
 		protected HTMLFragment createView(LayoutComponent component) {
-			return new ThreeJsControl();
+			return new ThreeJsControl(((ThreeJsComponent) component).getScene());
 		}
 
 	}
+
+	private SceneGraph _scene = SceneGraph.create();
+
+	private boolean _sceneValid;
 
 	/**
 	 * Creates a {@link ThreeJsComponent}.
 	 */
 	public ThreeJsComponent(InstantiationContext context, Config config) throws ConfigurationException {
 		super(context, config);
+	}
+
+	@Override
+	protected void afterModelSet(Object oldModel, Object newModel) {
+		super.afterModelSet(oldModel, newModel);
+
+		_sceneValid = false;
+	}
+
+	@Override
+	protected boolean doValidateModel(DisplayContext context) {
+		boolean result = super.doValidateModel(context);
+
+		if (!_sceneValid) {
+			_scene.setRoot(builder().getModel(getModel(), this));
+			_sceneValid = true;
+		}
+
+		return result;
+	}
+
+	private SceneBuilder builder() {
+		return (SceneBuilder) getBuilder();
+	}
+
+	/**
+	 * The currently displayed {@link SceneGraph}.
+	 */
+	public SceneGraph getScene() {
+		return _scene;
 	}
 
 }

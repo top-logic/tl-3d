@@ -24,6 +24,11 @@
 		</dependency>
 
 		<dependency>
+			<groupId>com.top-logic</groupId>
+			<artifactId>tl-model-search</artifactId>
+		</dependency>
+
+		<dependency>
 		    <groupId>org.webjars.npm</groupId>
 		    <artifactId>three</artifactId>
 		    <version>0.132.2</version>

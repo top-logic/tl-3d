@@ -4,6 +4,7 @@ import {
   Mesh,
   MeshBasicMaterial,
   PerspectiveCamera,
+  Matrix4,
   Group,
   Scene,
   DirectionalLight,
@@ -28,7 +29,7 @@ window.services.threejs = {
 		const fov = 35; // AKA Field of View
 		const aspect = container.clientWidth / container.clientHeight;
 		const near = 10; // the near clipping plane
-		const far = 10000; // the far clipping plane
+		const far = 50000; // the far clipping plane
 		
 		const camera = new PerspectiveCamera(fov, aspect, near, far);
 		camera.position.set(0, 0, 5000);
@@ -144,17 +145,72 @@ class SceneGraph {
 	}
 }
 
+function matrix(
+	a, b, c, d,
+	e, f, g, h,
+	i, j, k, l,
+	m, n, o, p
+) {
+	const result = new Matrix4();
+	result.set(
+		a, b, c, d,
+		e, f, g, h,
+		i, j, k, l,
+		m, n, o, p
+	);
+	return result;
+}
+
+function toMatrix(tx) {
+	switch (tx.length) {
+	case 3:
+		return matrix(
+			1, 0, 0, tx[0],
+			0, 1, 0, tx[1],
+			0, 0, 1, tx[2],
+			0, 0, 0, 1);
+	case 9:
+		return matrix(
+			tx[0], tx[1], tx[2], 0,
+			tx[3], tx[4], tx[5], 0,
+			tx[6], tx[7], tx[8], 0,
+			0,     0,     0,     1);
+	case 12:
+		return matrix(
+			tx[0], tx[1], tx[2], tx[9],
+			tx[3], tx[4], tx[5], tx[10],
+			tx[6], tx[7], tx[8], tx[11],
+			0,     0,     0,     1);
+	case 16:
+		return matrix(
+			tx[0],  tx[1],  tx[2],  tx[3],
+			tx[4],  tx[5],  tx[6],  tx[7],
+			tx[8],  tx[9],  tx[10], tx[11],
+			tx[12], tx[13], tx[14], tx[15]);
+	default: 
+		throw new Error("Invalid transform array: " + tx);
+	}
+}
+
+function transform(scene, tx) {
+	if (tx != null && tx.length > 0) {
+		const group = new Group();
+		scene.add(group);
+
+		if (tx.length == 3) {
+			group.position.set(tx[0], tx[1], tx[2]);
+		} else {
+			group.applyMatrix4(toMatrix(tx));
+		}
+		return group;
+	} else {
+		return scene;
+	}
+}
+
 class GroupNode {
 	build(scene) {
-		var group;
-		const tx = this.transform;
-		if (tx != null && tx.length > 0) {
-			group = new Group();
-			group.position.set(tx[0], tx[1], tx[2]);
-			scene.add(group);
-		} else {
-			group = scene;
-		}
+		var group = transform(scene, this.transform);
 		this.contents.forEach((c) => c.build(group));
 	}
 	
@@ -167,16 +223,7 @@ class GroupNode {
 class PartNode {
 	build(scene) {
 		const node = this.asset.build(scene);
-		
-		var group;
-		const tx = this.transform;
-		if (tx != null && tx.length > 0) {
-			group = new Group();
-			group.position.set(tx[0], tx[1], tx[2]);
-			scene.add(group);
-		} else {
-			group = scene;
-		}
+		var group = transform(scene, this.transform);
 		group.add(node);
 	}
 	

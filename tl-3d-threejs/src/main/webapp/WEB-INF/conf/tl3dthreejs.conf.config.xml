@@ -22,6 +22,15 @@
 			</instance>
 		</config>
 		
+		<config service-class="com.top_logic.model.search.expr.config.SearchBuilder">
+			<instance>
+				<methods>
+					<method name="threejsGltf" class="com.top_logic.tl3d.threejs.script.ThreejsGltf$Builder"/>
+					<method name="threejsGroup" class="com.top_logic.tl3d.threejs.script.ThreejsGroup$Builder"/>
+				</methods>
+			</instance>
+		</config>
+		
 		<config service-class="com.top_logic.knowledge.service.migration.MigrationService">
 			<instance>
 				<modules>

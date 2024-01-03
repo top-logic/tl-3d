@@ -6,7 +6,6 @@
 package com.top_logic.tl3d.threejs.control;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -14,46 +13,34 @@ import javax.servlet.http.HttpServletResponse;
 
 import com.top_logic.basic.xml.TagWriter;
 import com.top_logic.layout.ContentHandler;
+import com.top_logic.layout.Control;
 import com.top_logic.layout.DisplayContext;
 import com.top_logic.layout.URLParser;
 import com.top_logic.layout.UpdateQueue;
 import com.top_logic.layout.basic.AbstractControlBase;
 import com.top_logic.mig.html.HTMLUtil;
-import com.top_logic.tl3d.threejs.control.model.GltfAsset;
-import com.top_logic.tl3d.threejs.control.model.GroupNode;
-import com.top_logic.tl3d.threejs.control.model.PartNode;
-import com.top_logic.tl3d.threejs.control.model.SceneGraph;
+import com.top_logic.tl3d.threejs.scene.SceneGraph;
 
 import de.haumacher.msgbuf.graph.Scope;
 import de.haumacher.msgbuf.graph.SharedGraphNode;
 import de.haumacher.msgbuf.json.JsonReader;
 import de.haumacher.msgbuf.json.JsonWriter;
+import de.haumacher.msgbuf.observer.Listener;
+import de.haumacher.msgbuf.observer.Observable;
 import de.haumacher.msgbuf.server.io.WriterAdapter;
 
 /**
- * @author bhu
- *
+ * {@link Control} displaying a 3D scene using <code>three.js</code>.
  */
-public class ThreeJsControl extends AbstractControlBase implements ContentHandler {
+public class ThreeJsControl extends AbstractControlBase implements ContentHandler, Listener {
 
 	private SceneGraph _model;
 
 	/**
 	 * Creates a {@link ThreeJsControl}.
 	 */
-	public ThreeJsControl() {
-		GltfAsset werker = GltfAsset.create().setUrl("/assets/library/Werker/Werker_sitzend.glb");
-		_model = SceneGraph.create()
-			.setRoot(GroupNode.create()
-				.addContent(PartNode.create()
-					.setAsset(GltfAsset.create().setUrl("/assets/library/F1/KR_300_R2500_ultra/KR300R2500ultra_.glb"))
-					.setTransform(Arrays.asList(0f, 0f, 0f)))
-				.addContent(PartNode.create()
-					.setAsset(werker)
-					.setTransform(Arrays.asList(1500f, 0f, 0f)))
-				.addContent(PartNode.create()
-					.setAsset(werker)
-					.setTransform(Arrays.asList(-1500f, 0f, 0f))));
+	public ThreeJsControl(SceneGraph model) {
+		_model = model;
 	}
 
 	@Override
@@ -75,6 +62,8 @@ public class ThreeJsControl extends AbstractControlBase implements ContentHandle
 	protected void internalAttach() {
 		super.internalAttach();
 
+		_model.registerListener(this);
+
 		getFrameScope().registerContentHandler(getID(), this);
 	}
 
@@ -82,7 +71,14 @@ public class ThreeJsControl extends AbstractControlBase implements ContentHandle
 	protected void internalDetach() {
 		getFrameScope().deregisterContentHandler(this);
 
+		_model.unregisterListener(this);
+
 		super.internalDetach();
+	}
+
+	@Override
+	public void beforeSet(Observable obj, String property, Object value) {
+		requestRepaint();
 	}
 
 	@Override
