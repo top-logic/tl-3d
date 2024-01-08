@@ -8,7 +8,9 @@ import {
   Group,
   Scene,
   DirectionalLight,
-  WebGLRenderer
+  AmbientLight,
+  WebGLRenderer,
+  AxesHelper
 } from 'three';
 
 import {
@@ -32,11 +34,18 @@ window.services.threejs = {
 		const far = 100000; // the far clipping plane
 		
 		const camera = new PerspectiveCamera(fov, aspect, near, far);
-		camera.position.set(0, 0, 5000);
+		camera.position.set(0, 5000, 5000);
 		
-		const light = new DirectionalLight('white', 8);
-		light.position.set(0, 0, 5500);
-		scene.add(light);
+		const light1 = new DirectionalLight('white', 8);
+		light1.position.set(0, 5500, 5500);
+		scene.add(light1);
+		
+		// soft white light
+		const light2 = new AmbientLight( 0x404040 );
+		scene.add( light2 );		
+		
+		const axesHelper = new AxesHelper(500);
+		scene.add(axesHelper);		
 		
 		const renderer = new WebGLRenderer();
 		renderer.setSize(container.clientWidth, container.clientHeight);
