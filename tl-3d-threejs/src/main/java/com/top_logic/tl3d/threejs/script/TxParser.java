@@ -105,7 +105,7 @@ public class TxParser {
 			return Double.parseDouble(num);
 		} catch (NumberFormatException ex) {
 			throw new IllegalArgumentException(
-				"Invalid number format in '" + num + "' at position " + (_offset - _len + _idx) + ": "
+				"Invalid number format in '" + num + "' at position " + (_idx - _offset) + ": "
 					+ ex.getMessage());
 		}
 	}
@@ -118,11 +118,11 @@ public class TxParser {
 	private void expectLookingAt(char ch) {
 		if (!hasNext()) {
 			throw new IllegalArgumentException(
-				"Missing character in transformation at position " + (_offset - _len + _idx) + ".");
+				"Missing character in transformation at position " + (_idx - _offset) + ".");
 		}
 		if (lookingAt() != ch) {
 			throw new IllegalArgumentException(
-				"Expected character '" + ch + "' in transformation at position " + (_offset - _len + _idx) + ".");
+				"Expected character '" + ch + "' in transformation at position " + (_idx - _offset) + ".");
 		}
 	}
 
