@@ -29,7 +29,7 @@ window.services.threejs = {
 		const fov = 35; // AKA Field of View
 		const aspect = container.clientWidth / container.clientHeight;
 		const near = 10; // the near clipping plane
-		const far = 50000; // the far clipping plane
+		const far = 100000; // the far clipping plane
 		
 		const camera = new PerspectiveCamera(fov, aspect, near, far);
 		camera.position.set(0, 0, 5000);
@@ -67,7 +67,15 @@ window.services.threejs = {
 		// controls.update();
 		
 		const gltfLoader = new GLTFLoader();
-		const load = (url) => new Promise((resolve, reject) => gltfLoader.load(url, resolve, null, reject));
+		const load = (url) => new Promise((resolve, reject) => {
+			try {
+				gltfLoader.load(url, resolve, null, reject);
+			} catch (err) {
+				const msg = "Failed to load '" + url + "': " + err;
+				console.log(msg);
+				reject(msg);
+			}
+		});
 		
 		const dataResponse = await fetch(dataUrl);
 		const dataJson = await dataResponse.json();
