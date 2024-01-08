@@ -95,6 +95,12 @@ public class ThreeJsComponent extends BuilderComponent {
 		return (SceneBuilder) getBuilder();
 	}
 
+	@Override
+	public void invalidate() {
+		super.invalidate();
+		_sceneValid = false;
+	}
+
 	/**
 	 * The currently displayed {@link SceneGraph}.
 	 */
