@@ -1,4 +1,4 @@
-package com.top_logic.tl3d.threejs.control.model;
+package com.top_logic.tl3d.threejs.scene;
 
 option NoInterfaces;
 option NoXml;
