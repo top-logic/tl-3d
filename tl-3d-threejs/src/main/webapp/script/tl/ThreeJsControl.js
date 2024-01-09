@@ -10,14 +10,12 @@ import {
   DirectionalLight,
   AmbientLight,
   WebGLRenderer,
-  AxesHelper
+  AxesHelper,
+  Vector3
 } from 'three';
 
 import { OrbitControls } from 'OrbitControls';
-
-import {
-	GLTFLoader
-} from 'GLTFLoader';
+import { GLTFLoader } from 'GLTFLoader';
 
 window.services.threejs = {
 	init: async function(controlId, contextPath, dataUrl) {
@@ -67,6 +65,29 @@ window.services.threejs = {
 				renderer.render(scene, camera);
 			});
 		});
+		
+		function onMouseWheel(event) {
+			event.preventDefault();
+			
+			const target = controls.target;
+			const position = camera.position;
+			
+			const offset = new Vector3();
+			offset.copy(position);
+			offset.sub(target);
+			
+			const factor = event.deltaY < 0 ? 0.888888889 : 1.125;
+			offset.multiplyScalar(factor);
+			offset.add(target);
+			
+			camera.position.copy(offset);
+			
+			requestAnimationFrame(function() {
+				renderer.render(scene, camera);
+			});
+		}
+		
+		canvas.addEventListener('wheel', onMouseWheel, { passive: false });
 		
 		const gltfLoader = new GLTFLoader();
 		const load = (url) => new Promise((resolve, reject) => {
