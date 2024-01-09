@@ -13,9 +13,7 @@ import {
   AxesHelper
 } from 'three';
 
-import {
-	OrbitControls
-} from 'OrbitControls';
+import { OrbitControls } from 'OrbitControls';
 
 import {
 	GLTFLoader
@@ -34,7 +32,7 @@ window.services.threejs = {
 		const far = 100000; // the far clipping plane
 		
 		const camera = new PerspectiveCamera(fov, aspect, near, far);
-		camera.position.set(0, 5000, 5000);
+		camera.position.set(0, 10000, 5000);
 		
 		const light1 = new DirectionalLight('white', 8);
 		light1.position.set(0, 5500, 5500);
@@ -61,19 +59,14 @@ window.services.threejs = {
 		const canvas = renderer.domElement;
 		container.append(canvas);
 		const controls = new OrbitControls(camera, canvas);
+		controls.enableZoom = false;
+		controls.screenSpacePanning = false;
 		
 		controls.addEventListener("change", function() {
 			requestAnimationFrame(function() {
 				renderer.render(scene, camera);
 			});
 		});
-		
-		// const geometry = new BoxBufferGeometry(2, 2, 2);
-		// const material = new MeshBasicMaterial();
-		// const cube = new Mesh(geometry, material);
-		// scene.add(cube);
-		// controls.target.copy(cube.position);
-		// controls.update();
 		
 		const gltfLoader = new GLTFLoader();
 		const load = (url) => new Promise((resolve, reject) => {
