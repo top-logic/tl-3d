@@ -5,29 +5,51 @@
  */
 package com.top_logic.tl3d.threejs.component;
 
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
 import com.top_logic.base.services.simpleajax.HTMLFragment;
+import com.top_logic.basic.CollectionUtil;
+import com.top_logic.basic.Log;
 import com.top_logic.basic.config.ConfigurationException;
 import com.top_logic.basic.config.InstantiationContext;
 import com.top_logic.basic.config.PolymorphicConfiguration;
+import com.top_logic.basic.config.annotation.Name;
 import com.top_logic.basic.config.annotation.defaults.BooleanDefault;
 import com.top_logic.basic.config.annotation.defaults.ItemDefault;
 import com.top_logic.layout.DisplayContext;
+import com.top_logic.layout.channel.ComponentChannel;
+import com.top_logic.layout.channel.ComponentChannel.ChannelListener;
+import com.top_logic.layout.component.Selectable;
+import com.top_logic.layout.component.model.SelectionListener;
 import com.top_logic.layout.structure.ContentLayoutControlProvider;
 import com.top_logic.layout.structure.LayoutControlProvider;
 import com.top_logic.layout.table.component.BuilderComponent;
+import com.top_logic.mig.html.DefaultMultiSelectionModel;
+import com.top_logic.mig.html.DefaultSingleSelectionModel;
+import com.top_logic.mig.html.SelectionModel;
+import com.top_logic.mig.html.SelectionModelOwner;
 import com.top_logic.mig.html.layout.LayoutComponent;
 import com.top_logic.tl3d.threejs.control.ThreeJsControl;
+import com.top_logic.tl3d.threejs.scene.GroupNode;
+import com.top_logic.tl3d.threejs.scene.PartNode;
 import com.top_logic.tl3d.threejs.scene.SceneGraph;
+import com.top_logic.tl3d.threejs.scene.SceneNode;
 
 /**
  * 3D-Viewer using the <code>Three.js</code> library.
  */
-public class ThreeJsComponent extends BuilderComponent {
+public class ThreeJsComponent extends BuilderComponent
+		implements SelectionModelOwner, Selectable, ChannelListener, SelectionListener,
+		SceneNode.Visitor<Void, Map<Object, SceneNode>, RuntimeException> {
 
 	/**
 	 * {@link ThreeJsComponent} configuration.
 	 */
-	public interface Config extends BuilderComponent.Config {
+	public interface Config extends BuilderComponent.Config, Selectable.SelectableConfig {
 
 		@Override
 		PolymorphicConfiguration<? extends SceneBuilder> getModelBuilder();
@@ -39,6 +61,12 @@ public class ThreeJsComponent extends BuilderComponent {
 		@Override
 		@BooleanDefault(true)
 		boolean hasToolbar();
+
+		@Name("canSelect")
+		boolean canSelect();
+
+		@Name("multiSelection")
+		boolean hasMultiSelection();
 
 	}
 
@@ -56,20 +84,37 @@ public class ThreeJsComponent extends BuilderComponent {
 
 		@Override
 		protected HTMLFragment createView(LayoutComponent component) {
-			return new ThreeJsControl(((ThreeJsComponent) component).getScene());
+			ThreeJsComponent viewer = (ThreeJsComponent) component;
+			return new ThreeJsControl(viewer.getScene(), viewer.getSelectionModel());
 		}
 
 	}
 
 	private SceneGraph _scene = SceneGraph.create();
 
+	private final SelectionModel _selectionModel;
+
+	private final Map<Object, SceneNode> _nodeByModel = new HashMap<>();
+
 	private boolean _sceneValid;
+
+	private boolean _multiSelect;
 
 	/**
 	 * Creates a {@link ThreeJsComponent}.
 	 */
 	public ThreeJsComponent(InstantiationContext context, Config config) throws ConfigurationException {
 		super(context, config);
+
+		_multiSelect = config.hasMultiSelection();
+		_selectionModel = _multiSelect ? new DefaultMultiSelectionModel(this) : new DefaultSingleSelectionModel(this);
+
+		_selectionModel.addSelectionListener(this);
+	}
+
+	@Override
+	public SelectionModel getSelectionModel() {
+		return _selectionModel;
 	}
 
 	@Override
@@ -84,7 +129,10 @@ public class ThreeJsComponent extends BuilderComponent {
 		boolean result = super.doValidateModel(context);
 
 		if (!_sceneValid) {
-			_scene.setRoot(builder().getModel(getModel(), this));
+			_nodeByModel.clear();
+			SceneNode root = builder().getModel(getModel(), this);
+			root.visit(this, _nodeByModel);
+			_scene.setRoot(root);
 			_sceneValid = true;
 		}
 
@@ -108,4 +156,76 @@ public class ThreeJsComponent extends BuilderComponent {
 		return _scene;
 	}
 
+	@Override
+	public void linkChannels(Log log) {
+		super.linkChannels(log);
+
+		linkSelectionChannel(log);
+
+		selectionChannel().addListener(this);
+	}
+
+	@Override
+	public void handleNewValue(ComponentChannel sender, Object oldValue, Object newValue) {
+		// Component received a new selection.
+		Set<SceneNode> newSelection = new HashSet<>();
+
+		if (newValue instanceof Collection) {
+			for (Object selected : ((Collection<?>) newValue)) {
+				SceneNode node = _nodeByModel.get(selected);
+				if (node != null) {
+					newSelection.add(node);
+				}
+			}
+		} else {
+			SceneNode node = _nodeByModel.get(newValue);
+			if (node != null) {
+				newSelection.add(node);
+			}
+		}
+
+		_selectionModel.setSelection(newSelection);
+	}
+
+	@Override
+	public void notifySelectionChanged(SelectionModel model, Set<?> formerlySelectedObjects, Set<?> selectedObjects) {
+		// Selection was changed in the UI.
+		if (_multiSelect) {
+			Set<Object> newSelection = new HashSet<>();
+			for (Object selectedNode : selectedObjects) {
+				Object nodeModel = ((SceneNode) selectedNode).getUserData();
+				newSelection.add(nodeModel);
+			}
+			selectionChannel().set(newSelection);
+		} else {
+			Object selectedNode = CollectionUtil.getSingleValueFromCollection(selectedObjects);
+			if (selectedNode == null) {
+				selectionChannel().set(null);
+			} else {
+				selectionChannel().set(((SceneNode) selectedNode).getUserData());
+			}
+		}
+	}
+
+	@Override
+	public Void visit(GroupNode self, Map<Object, SceneNode> arg) {
+		index(self, arg);
+		for (SceneNode child : self.getContents()) {
+			child.visit(this, arg);
+		}
+		return null;
+	}
+
+	@Override
+	public Void visit(PartNode self, Map<Object, SceneNode> arg) {
+		index(self, arg);
+		return null;
+	}
+
+	private void index(SceneNode self, Map<Object, SceneNode> arg) {
+		Object userData = self.getUserData();
+		if (userData != null) {
+			arg.put(userData, self);
+		}
+	}
 }

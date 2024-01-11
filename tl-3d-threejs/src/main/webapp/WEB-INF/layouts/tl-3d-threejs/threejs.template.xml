@@ -26,6 +26,13 @@
 		>
 			<mandatory/>
 		</property>
+		<property name="selection"
+			instance-type="com.top_logic.layout.channel.linking.impl.ChannelLinking"
+			type="com.top_logic.layout.ModelSpec"
+		/>
+		<property name="multiSelection"
+			type="boolean"
+		/>
 		<property name="securityObject"
 			instance-type="com.top_logic.tool.boundsec.SecurityObjectProvider"
 			type="com.top_logic.basic.config.PolymorphicConfiguration"
@@ -54,6 +61,8 @@
 		defaultFor="${defaultFor}"
 		dialogs="${dialogs}"
 		model="${model}"
+		selection="${selection}"
+		multiSelection="${multiSelection}"
 	>
 		<buttons>
 			${buttons}

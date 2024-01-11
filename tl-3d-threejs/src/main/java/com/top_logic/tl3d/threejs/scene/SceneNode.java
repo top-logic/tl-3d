@@ -28,8 +28,13 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 
 	}
 
+	/** @see #getUserData() */
+	public static final String USER_DATA__PROP = "userData";
+
 	/** @see #getTransform() */
 	public static final String TRANSFORM__PROP = "transform";
+
+	private transient java.lang.Object _userData = null;
 
 	private final java.util.List<Float> _transform = new de.haumacher.msgbuf.util.ReferenceList<>() {
 		@Override
@@ -52,6 +57,34 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 
 	/** The type code of this instance. */
 	public abstract TypeKind kind();
+
+	/**
+	 * Reference to a custom object that is represented by this scene node.
+	 */
+	public final java.lang.Object getUserData() {
+		return _userData;
+	}
+
+	/**
+	 * @see #getUserData()
+	 */
+	public com.top_logic.tl3d.threejs.scene.SceneNode setUserData(java.lang.Object value) {
+		internalSetUserData(value);
+		return this;
+	}
+
+	/** Internal setter for {@link #getUserData()} without chain call utility. */
+	protected final void internalSetUserData(java.lang.Object value) {
+		_listener.beforeSet(this, USER_DATA__PROP, value);
+		_userData = value;
+	}
+
+	/**
+	 * Checks, whether {@link #getUserData()} has a value.
+	 */
+	public final boolean hasUserData() {
+		return _userData != null;
+	}
 
 	/**
 	 * Optional transformation applied to this and all potential sub-nodes.
@@ -96,6 +129,7 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 
 	private static java.util.List<String> PROPERTIES = java.util.Collections.unmodifiableList(
 		java.util.Arrays.asList(
+			USER_DATA__PROP, 
 			TRANSFORM__PROP));
 
 	@Override
@@ -106,6 +140,7 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 	@Override
 	public Object get(String field) {
 		switch (field) {
+			case USER_DATA__PROP: return getUserData();
 			case TRANSFORM__PROP: return getTransform();
 			default: return super.get(field);
 		}
@@ -114,6 +149,7 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 	@Override
 	public void set(String field, Object value) {
 		switch (field) {
+			case USER_DATA__PROP: internalSetUserData((java.lang.Object) value); break;
 			case TRANSFORM__PROP: internalSetTransform(de.haumacher.msgbuf.util.Conversions.asList(Float.class, value)); break;
 		}
 	}
@@ -153,6 +189,13 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 	@Override
 	public void writeFieldValue(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonWriter out, String field) throws java.io.IOException {
 		switch (field) {
+			case USER_DATA__PROP: {
+				if (hasUserData()) {
+				} else {
+					out.nullValue();
+				}
+				break;
+			}
 			case TRANSFORM__PROP: {
 				out.beginArray();
 				for (float x : getTransform()) {

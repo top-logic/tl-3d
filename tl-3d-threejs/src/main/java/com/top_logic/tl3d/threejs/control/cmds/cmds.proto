@@ -1,0 +1,14 @@
+package com.top_logic.tl3d.threejs.control.cmds;
+
+option NoInterfaces;
+option NoXml;
+option NoBinary;
+
+enum SelectionChange {
+	ADD;
+	REMOVE;
+}
+
+message SelectionChanged {
+	map<int, SelectionChange> changed;
+}

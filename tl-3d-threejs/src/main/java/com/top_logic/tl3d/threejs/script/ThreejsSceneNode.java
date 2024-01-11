@@ -43,9 +43,11 @@ public abstract class ThreejsSceneNode<T extends SceneNode> extends GenericMetho
 	 */
 	protected T createNode(Object[] arguments) {
 		Transformation tx = TransformationConstructor.asTx(getArguments()[1], arguments[1]);
+		Object userData = arguments[2];
 
 		T node = allocate();
 		node.setTransform(asTx(tx));
+		node.setUserData(userData);
 		return node;
 	}
 

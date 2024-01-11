@@ -87,6 +87,12 @@ public class GroupNode extends SceneNode {
 	}
 
 	@Override
+	public com.top_logic.tl3d.threejs.scene.GroupNode setUserData(java.lang.Object value) {
+		internalSetUserData(value);
+		return this;
+	}
+
+	@Override
 	public com.top_logic.tl3d.threejs.scene.GroupNode setTransform(java.util.List<? extends Float> value) {
 		internalSetTransform(value);
 		return this;

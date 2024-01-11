@@ -63,6 +63,12 @@ public class PartNode extends SceneNode {
 	}
 
 	@Override
+	public com.top_logic.tl3d.threejs.scene.PartNode setUserData(java.lang.Object value) {
+		internalSetUserData(value);
+		return this;
+	}
+
+	@Override
 	public com.top_logic.tl3d.threejs.scene.PartNode setTransform(java.util.List<? extends Float> value) {
 		internalSetTransform(value);
 		return this;

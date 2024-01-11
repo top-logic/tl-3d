@@ -19,6 +19,22 @@ import {
 import { OrbitControls } from 'OrbitControls';
 import { GLTFLoader } from 'GLTFLoader';
 
+// For sever communication written in legacy JS.
+window.services.threejs = {
+	init: async function(controlId, contextPath, dataUrl) {
+		const control = new ThreeJsControl(controlId, contextPath, dataUrl);
+		control.attach();
+	},
+	
+	
+	selectionChanged: function(container, changes) {
+		const control = ThreeJsControl.control(container);
+		if (control != null) {
+			control.selectionChanged(changes);
+		}
+	}
+}
+
 class ThreeJsControl {
 
 	constructor(controlId, contextPath, dataUrl) {
@@ -107,8 +123,66 @@ class ThreeJsControl {
 		this.render();
 	}
 	
+	/** Applies the changes to the current selection as received from the server. */
+	selectionChanged(changes) {
+		const cmd = JSON.parse(changes);
+		for (const change of cmd.changed) {
+			const sharedNode = this.scope.getNode(change.key);
+			if (sharedNode == null) {
+				continue;
+			}
+			
+			switch (change.value) {
+				case "ADD":
+					this.setSelected(sharedNode, true);
+					break;
+				case "REMOVE": 
+					this.setSelected(sharedNode, false);
+					break;
+			}
+		}
+		
+		this.render();
+	}
+	
+	/** Changes the selected state of the given shared node to the given value. */
+	setSelected(sharedNode, value) {
+		const index = this.selection.indexOf(sharedNode);
+		if (index >= 0) {
+			// Currently selected.
+			if (value) {
+				// Do not select again.
+				return;
+			}
+			this.setColor(sharedNode.node, 0xffffff);
+			this.selection.splice(index, 1);
+		} else {
+			// Currently not selected.
+			if (!value) {
+				// Cannot remove from selection.
+				return;
+			}
+			this.setColor(sharedNode.node, 0xff0000);
+			this.selection.push(sharedNode);
+		}
+	}
+	
+	setColor(node, color) {
+		if (node.material) {
+			node.material.color.set(color);
+		} else {
+			for (const child of node.children) {
+				this.setColor(child, color);
+			}
+		}	
+	}
+	
 	get container() {
 		return document.getElementById(this.controlId);
+	}
+	
+	static control(container) {
+		return container.tlControl;
 	}
 	
 	attach() {
@@ -166,8 +240,14 @@ class ThreeJsControl {
 		this.render();
 	}
 
+	/** Updates the selection from a click on the canvas. */
 	updateSelection(intersects, toggleMode) {
+		const changes = {};
+	
 		if (!toggleMode) {
+			for (const sharedNode of this.selection) {
+				changes[sharedNode.id] = "REMOVE";
+			}
 			this.clearSelection();
 		}
 
@@ -176,31 +256,29 @@ class ThreeJsControl {
 			
 			var candidate = clicked;
 			while (candidate != null) {
-				if (candidate.userData instanceof SharedObject) {
-					if (toggleMode) {
-						const index = this.selection.indexOf(clicked);
-						if (index >= 0) {
-							clicked.material.color.set(0xffffff);
-							this.selection.splice(index, 1);
-						} else {
-							clicked.material.color.set(0xff0000);
-							this.selection.push(clicked);
-						}
-					} else {
-						clicked.material.color.set(0xff0000);
-						this.selection.push(clicked);
-					}
+				const sharedNode = candidate.userData;
+				if (sharedNode instanceof SharedObject) {
+					const value = toggleMode ? !this.selection.includes(sharedNode) : true;
+					this.setSelected(sharedNode, value);
+					
+					changes[sharedNode.id] = value ? "ADD" : "REMOVE";
+					
+					this.sendCommand("updateSelection", {"changes": changes});
 					return;
 				}
 				
 				candidate = candidate.parent;
 			}
 		}
+		
+		if (Object.keys(changes).length > 0) {
+			this.sendCommand("updateSelection", {"changes": changes});
+		}
 	}
 
 	clearSelection() {
-		for (const selected of this.selection) {
-			selected.material.color.set(0xffffff);
+		for (const sharedNode of this.selection) {
+			this.setColor(sharedNode.node, 0xffffff);
 		}
 		
 		this.selection.length = 0;
@@ -211,14 +289,20 @@ class ThreeJsControl {
 		requestAnimationFrame(() => this.renderer.render(this.scene, this.camera));
 	}
 	
-}
-
-// For sever communication written in legacy JS.
-window.services.threejs = {
-	init: async function(controlId, contextPath, dataUrl) {
-		const control = new ThreeJsControl(controlId, contextPath, dataUrl);
-		control.attach();
+	
+	sendCommand(command, args) {
+		const message = {
+			controlCommand : command,
+			controlID : this.controlId
+		};
+		
+		for (const key in args) {
+			message[key] = args[key];
+		}
+		
+		services.ajax.execute("dispatchControlCommand", message);
 	}
+	
 }
 
 class Scope {
@@ -228,6 +312,10 @@ class Scope {
 	
 	get assets() {
 		return this.objects.filter((obj) => obj instanceof GltfAsset);
+	}
+	
+	getNode(id) {
+		return this.objects[id];
 	}
 
 	loadAll(json) {

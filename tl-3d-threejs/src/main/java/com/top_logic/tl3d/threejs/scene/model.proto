@@ -23,6 +23,9 @@ message Cube extends Asset {
 
 /** Base class for a node in a {@link SceneGraph} */
 abstract message SceneNode {
+	/** Reference to a custom object that is represented by this scene node. */
+	transient java.lang.Object userData;
+
 	/** Optional transformation applied to this and all potential sub-nodes. */
 	repeated float transform;
 }
