@@ -53,15 +53,15 @@ public class TxParser {
 				case 'M': {
 					expect('('); ws();
 					a = readNum(); comma();
-					b = readNum(); comma();
-					c = readNum(); comma();
-
 					d = readNum(); comma();
-					e = readNum(); comma();
-					f = readNum(); comma();
-
 					g = readNum(); comma();
+					
+					b = readNum(); comma();
+					e = readNum(); comma();
 					h = readNum(); comma();
+					
+					c = readNum(); comma();
+					f = readNum(); comma();
 					i = readNum(); ws();
 					expect(')'); ws();
 					break;
@@ -77,7 +77,12 @@ public class TxParser {
 			}
 		}
 		
-		return new Transformation(a, b, c, d, e, f, g, h, i, x, y, z);
+		return new Transformation(
+			a, b, c,
+			d, e, f,
+			g, h, i,
+
+			x, y, z);
 	}
 
 	private void comma() {

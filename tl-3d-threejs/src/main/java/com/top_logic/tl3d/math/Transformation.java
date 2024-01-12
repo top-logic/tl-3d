@@ -268,9 +268,9 @@ public class Transformation extends MapLike {
 	@Override
 	public String toString() {
 		return "M(" +
-			_a + ", " + _b + ", " + _c + ", " + 
-			_d + ", " + _e + ", " + _f + ", " + 
-			_g + ", " + _h + ", " + _i + ") " +
+			_a + ", " + _d + ", " + _g + ", " +
+			_b + ", " + _e + ", " + _h + ", " +
+			_c + ", " + _f + ", " + _i + ") " +
 			"T(" + 
 			_x + ", " + _y + ", " + _z + ")";
 	}
