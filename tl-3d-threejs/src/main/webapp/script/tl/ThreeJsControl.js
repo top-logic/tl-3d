@@ -14,10 +14,10 @@ import {
   Raycaster,
   Vector3,
   Vector2
-} from './three';
+} from 'three';
 
-import { OrbitControls } from './OrbitControls';
-import { GLTFLoader } from './GLTFLoader';
+import { OrbitControls } from 'OrbitControls';
+import { GLTFLoader } from 'GLTFLoader';
 
 // For sever communication written in legacy JS.
 window.services.threejs = {
