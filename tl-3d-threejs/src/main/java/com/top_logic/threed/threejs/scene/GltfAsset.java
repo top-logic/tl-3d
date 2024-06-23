@@ -1,4 +1,4 @@
-package com.top_logic.tl3d.threejs.scene;
+package com.top_logic.threed.threejs.scene;
 
 /**
  * A glTF artifact loaded from an URL.
@@ -6,13 +6,13 @@ package com.top_logic.tl3d.threejs.scene;
 public class GltfAsset extends Asset {
 
 	/**
-	 * Creates a {@link com.top_logic.tl3d.threejs.scene.GltfAsset} instance.
+	 * Creates a {@link com.top_logic.threed.threejs.scene.GltfAsset} instance.
 	 */
-	public static com.top_logic.tl3d.threejs.scene.GltfAsset create() {
-		return new com.top_logic.tl3d.threejs.scene.GltfAsset();
+	public static com.top_logic.threed.threejs.scene.GltfAsset create() {
+		return new com.top_logic.threed.threejs.scene.GltfAsset();
 	}
 
-	/** Identifier for the {@link com.top_logic.tl3d.threejs.scene.GltfAsset} type in JSON format. */
+	/** Identifier for the {@link com.top_logic.threed.threejs.scene.GltfAsset} type in JSON format. */
 	public static final String GLTF_ASSET__TYPE = "GltfAsset";
 
 	/** @see #getUrl() */
@@ -23,7 +23,7 @@ public class GltfAsset extends Asset {
 	/**
 	 * Creates a {@link GltfAsset} instance.
 	 *
-	 * @see com.top_logic.tl3d.threejs.scene.GltfAsset#create()
+	 * @see com.top_logic.threed.threejs.scene.GltfAsset#create()
 	 */
 	protected GltfAsset() {
 		super();
@@ -44,7 +44,7 @@ public class GltfAsset extends Asset {
 	/**
 	 * @see #getUrl()
 	 */
-	public com.top_logic.tl3d.threejs.scene.GltfAsset setUrl(String value) {
+	public com.top_logic.threed.threejs.scene.GltfAsset setUrl(String value) {
 		internalSetUrl(value);
 		return this;
 	}
@@ -86,15 +86,15 @@ public class GltfAsset extends Asset {
 	}
 
 	/** Reads a new instance from the given reader. */
-	public static com.top_logic.tl3d.threejs.scene.GltfAsset readGltfAsset(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in) throws java.io.IOException {
+	public static com.top_logic.threed.threejs.scene.GltfAsset readGltfAsset(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in) throws java.io.IOException {
 		if (in.peek() == de.haumacher.msgbuf.json.JsonToken.NUMBER) {
-			return (com.top_logic.tl3d.threejs.scene.GltfAsset) scope.resolveOrFail(in.nextInt());
+			return (com.top_logic.threed.threejs.scene.GltfAsset) scope.resolveOrFail(in.nextInt());
 		}
 		in.beginArray();
 		String type = in.nextString();
 		assert GLTF_ASSET__TYPE.equals(type);
 		int id = in.nextInt();
-		com.top_logic.tl3d.threejs.scene.GltfAsset result = new com.top_logic.tl3d.threejs.scene.GltfAsset();
+		com.top_logic.threed.threejs.scene.GltfAsset result = new com.top_logic.threed.threejs.scene.GltfAsset();
 		scope.readData(result, id, in);
 		in.endArray();
 		return result;
@@ -127,7 +127,7 @@ public class GltfAsset extends Asset {
 	}
 
 	@Override
-	public <R,A,E extends Throwable> R visit(com.top_logic.tl3d.threejs.scene.Asset.Visitor<R,A,E> v, A arg) throws E {
+	public <R,A,E extends Throwable> R visit(com.top_logic.threed.threejs.scene.Asset.Visitor<R,A,E> v, A arg) throws E {
 		return v.visit(this, arg);
 	}
 

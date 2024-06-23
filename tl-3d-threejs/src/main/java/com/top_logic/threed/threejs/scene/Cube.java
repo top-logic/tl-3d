@@ -1,15 +1,15 @@
-package com.top_logic.tl3d.threejs.scene;
+package com.top_logic.threed.threejs.scene;
 
 public class Cube extends Asset {
 
 	/**
-	 * Creates a {@link com.top_logic.tl3d.threejs.scene.Cube} instance.
+	 * Creates a {@link com.top_logic.threed.threejs.scene.Cube} instance.
 	 */
-	public static com.top_logic.tl3d.threejs.scene.Cube create() {
-		return new com.top_logic.tl3d.threejs.scene.Cube();
+	public static com.top_logic.threed.threejs.scene.Cube create() {
+		return new com.top_logic.threed.threejs.scene.Cube();
 	}
 
-	/** Identifier for the {@link com.top_logic.tl3d.threejs.scene.Cube} type in JSON format. */
+	/** Identifier for the {@link com.top_logic.threed.threejs.scene.Cube} type in JSON format. */
 	public static final String CUBE__TYPE = "Cube";
 
 	/** @see #getWidth() */
@@ -30,7 +30,7 @@ public class Cube extends Asset {
 	/**
 	 * Creates a {@link Cube} instance.
 	 *
-	 * @see com.top_logic.tl3d.threejs.scene.Cube#create()
+	 * @see com.top_logic.threed.threejs.scene.Cube#create()
 	 */
 	protected Cube() {
 		super();
@@ -48,7 +48,7 @@ public class Cube extends Asset {
 	/**
 	 * @see #getWidth()
 	 */
-	public com.top_logic.tl3d.threejs.scene.Cube setWidth(float value) {
+	public com.top_logic.threed.threejs.scene.Cube setWidth(float value) {
 		internalSetWidth(value);
 		return this;
 	}
@@ -66,7 +66,7 @@ public class Cube extends Asset {
 	/**
 	 * @see #getHeight()
 	 */
-	public com.top_logic.tl3d.threejs.scene.Cube setHeight(float value) {
+	public com.top_logic.threed.threejs.scene.Cube setHeight(float value) {
 		internalSetHeight(value);
 		return this;
 	}
@@ -84,7 +84,7 @@ public class Cube extends Asset {
 	/**
 	 * @see #getDepth()
 	 */
-	public com.top_logic.tl3d.threejs.scene.Cube setDepth(float value) {
+	public com.top_logic.threed.threejs.scene.Cube setDepth(float value) {
 		internalSetDepth(value);
 		return this;
 	}
@@ -132,15 +132,15 @@ public class Cube extends Asset {
 	}
 
 	/** Reads a new instance from the given reader. */
-	public static com.top_logic.tl3d.threejs.scene.Cube readCube(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in) throws java.io.IOException {
+	public static com.top_logic.threed.threejs.scene.Cube readCube(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in) throws java.io.IOException {
 		if (in.peek() == de.haumacher.msgbuf.json.JsonToken.NUMBER) {
-			return (com.top_logic.tl3d.threejs.scene.Cube) scope.resolveOrFail(in.nextInt());
+			return (com.top_logic.threed.threejs.scene.Cube) scope.resolveOrFail(in.nextInt());
 		}
 		in.beginArray();
 		String type = in.nextString();
 		assert CUBE__TYPE.equals(type);
 		int id = in.nextInt();
-		com.top_logic.tl3d.threejs.scene.Cube result = new com.top_logic.tl3d.threejs.scene.Cube();
+		com.top_logic.threed.threejs.scene.Cube result = new com.top_logic.threed.threejs.scene.Cube();
 		scope.readData(result, id, in);
 		in.endArray();
 		return result;
@@ -187,7 +187,7 @@ public class Cube extends Asset {
 	}
 
 	@Override
-	public <R,A,E extends Throwable> R visit(com.top_logic.tl3d.threejs.scene.Asset.Visitor<R,A,E> v, A arg) throws E {
+	public <R,A,E extends Throwable> R visit(com.top_logic.threed.threejs.scene.Asset.Visitor<R,A,E> v, A arg) throws E {
 		return v.visit(this, arg);
 	}
 

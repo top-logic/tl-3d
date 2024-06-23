@@ -3,7 +3,7 @@
  * 
  * SPDX-License-Identifier: LicenseRef-BOS-TopLogic-1.0
  */
-package com.top_logic.tl3d.threejs.script;
+package com.top_logic.threed.threejs.script;
 
 import java.util.Collections;
 import java.util.List;
@@ -16,8 +16,8 @@ import com.top_logic.model.search.expr.SearchExpression;
 import com.top_logic.model.search.expr.config.dom.Expr;
 import com.top_logic.model.search.expr.config.operations.AbstractSimpleMethodBuilder;
 import com.top_logic.model.search.expr.config.operations.ArgumentDescriptor;
-import com.top_logic.tl3d.threejs.scene.GroupNode;
-import com.top_logic.tl3d.threejs.scene.SceneNode;
+import com.top_logic.threed.threejs.scene.GroupNode;
+import com.top_logic.threed.threejs.scene.SceneNode;
 
 /**
  * TL-Script constructor function for an {@link GroupNode}.

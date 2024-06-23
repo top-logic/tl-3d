@@ -3,7 +3,7 @@
  * 
  * SPDX-License-Identifier: LicenseRef-BOS-TopLogic-1.0
  */
-package com.top_logic.tl3d.threejs.script;
+package com.top_logic.threed.threejs.script;
 
 import com.top_logic.basic.config.ConfigurationException;
 import com.top_logic.basic.config.InstantiationContext;
@@ -12,8 +12,8 @@ import com.top_logic.model.search.expr.SearchExpression;
 import com.top_logic.model.search.expr.config.dom.Expr;
 import com.top_logic.model.search.expr.config.operations.AbstractSimpleMethodBuilder;
 import com.top_logic.model.search.expr.config.operations.ArgumentDescriptor;
-import com.top_logic.tl3d.threejs.scene.GltfAsset;
-import com.top_logic.tl3d.threejs.scene.PartNode;
+import com.top_logic.threed.threejs.scene.GltfAsset;
+import com.top_logic.threed.threejs.scene.PartNode;
 
 /**
  * TL-Script constructor function for an {@link PartNode}.

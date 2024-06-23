@@ -3,7 +3,7 @@
  * 
  * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-BOS-TopLogic-1.0
  */
-package com.top_logic.tl3d.threejs.component;
+package com.top_logic.threed.threejs.component;
 
 import com.top_logic.basic.CalledByReflection;
 import com.top_logic.basic.config.AbstractConfiguredInstance;
@@ -13,7 +13,7 @@ import com.top_logic.basic.config.annotation.Name;
 import com.top_logic.mig.html.layout.LayoutComponent;
 import com.top_logic.model.search.expr.config.dom.Expr;
 import com.top_logic.model.search.expr.query.QueryExecutor;
-import com.top_logic.tl3d.threejs.scene.SceneNode;
+import com.top_logic.threed.threejs.scene.SceneNode;
 
 /**
  * {@link SceneBuilder} that can be parameterized with TL-Script.

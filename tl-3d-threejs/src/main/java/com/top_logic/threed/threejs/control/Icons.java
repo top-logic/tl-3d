@@ -3,7 +3,7 @@
  * 
  * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-BOS-TopLogic-1.0
  */
-package com.top_logic.tl3d.threejs.control;
+package com.top_logic.threed.threejs.control;
 
 import com.top_logic.gui.ThemeVar;
 import com.top_logic.html.template.HTMLTemplateFragment;

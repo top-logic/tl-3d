@@ -1,28 +1,28 @@
-package com.top_logic.tl3d.threejs.control.cmds;
+package com.top_logic.threed.threejs.control.cmds;
 
 public class SelectionChanged extends de.haumacher.msgbuf.data.AbstractDataObject implements de.haumacher.msgbuf.observer.Observable {
 
 	/**
-	 * Creates a {@link com.top_logic.tl3d.threejs.control.cmds.SelectionChanged} instance.
+	 * Creates a {@link com.top_logic.threed.threejs.control.cmds.SelectionChanged} instance.
 	 */
-	public static com.top_logic.tl3d.threejs.control.cmds.SelectionChanged create() {
-		return new com.top_logic.tl3d.threejs.control.cmds.SelectionChanged();
+	public static com.top_logic.threed.threejs.control.cmds.SelectionChanged create() {
+		return new com.top_logic.threed.threejs.control.cmds.SelectionChanged();
 	}
 
-	/** Identifier for the {@link com.top_logic.tl3d.threejs.control.cmds.SelectionChanged} type in JSON format. */
+	/** Identifier for the {@link com.top_logic.threed.threejs.control.cmds.SelectionChanged} type in JSON format. */
 	public static final String SELECTION_CHANGED__TYPE = "SelectionChanged";
 
 	/** @see #getChanged() */
 	public static final String CHANGED__PROP = "changed";
 
-	private final java.util.Map<Integer, com.top_logic.tl3d.threejs.control.cmds.SelectionChange> _changed = new de.haumacher.msgbuf.util.ReferenceMap<>() {
+	private final java.util.Map<Integer, com.top_logic.threed.threejs.control.cmds.SelectionChange> _changed = new de.haumacher.msgbuf.util.ReferenceMap<>() {
 		@Override
-		protected void beforeAdd(Integer index, com.top_logic.tl3d.threejs.control.cmds.SelectionChange element) {
+		protected void beforeAdd(Integer index, com.top_logic.threed.threejs.control.cmds.SelectionChange element) {
 			_listener.beforeAdd(SelectionChanged.this, CHANGED__PROP, index, element);
 		}
 
 		@Override
-		protected void afterRemove(Integer index, com.top_logic.tl3d.threejs.control.cmds.SelectionChange element) {
+		protected void afterRemove(Integer index, com.top_logic.threed.threejs.control.cmds.SelectionChange element) {
 			_listener.afterRemove(SelectionChanged.this, CHANGED__PROP, index, element);
 		}
 	};
@@ -30,26 +30,26 @@ public class SelectionChanged extends de.haumacher.msgbuf.data.AbstractDataObjec
 	/**
 	 * Creates a {@link SelectionChanged} instance.
 	 *
-	 * @see com.top_logic.tl3d.threejs.control.cmds.SelectionChanged#create()
+	 * @see com.top_logic.threed.threejs.control.cmds.SelectionChanged#create()
 	 */
 	protected SelectionChanged() {
 		super();
 	}
 
-	public final java.util.Map<Integer, com.top_logic.tl3d.threejs.control.cmds.SelectionChange> getChanged() {
+	public final java.util.Map<Integer, com.top_logic.threed.threejs.control.cmds.SelectionChange> getChanged() {
 		return _changed;
 	}
 
 	/**
 	 * @see #getChanged()
 	 */
-	public com.top_logic.tl3d.threejs.control.cmds.SelectionChanged setChanged(java.util.Map<Integer, com.top_logic.tl3d.threejs.control.cmds.SelectionChange> value) {
+	public com.top_logic.threed.threejs.control.cmds.SelectionChanged setChanged(java.util.Map<Integer, com.top_logic.threed.threejs.control.cmds.SelectionChange> value) {
 		internalSetChanged(value);
 		return this;
 	}
 
 	/** Internal setter for {@link #getChanged()} without chain call utility. */
-	protected final void internalSetChanged(java.util.Map<Integer, com.top_logic.tl3d.threejs.control.cmds.SelectionChange> value) {
+	protected final void internalSetChanged(java.util.Map<Integer, com.top_logic.threed.threejs.control.cmds.SelectionChange> value) {
 		if (value == null) throw new IllegalArgumentException("Property 'changed' cannot be null.");
 		_changed.clear();
 		_changed.putAll(value);
@@ -58,13 +58,13 @@ public class SelectionChanged extends de.haumacher.msgbuf.data.AbstractDataObjec
 	/**
 	 * Adds a key value pair to the {@link #getChanged()} map.
 	 */
-	public com.top_logic.tl3d.threejs.control.cmds.SelectionChanged putChanged(int key, com.top_logic.tl3d.threejs.control.cmds.SelectionChange value) {
+	public com.top_logic.threed.threejs.control.cmds.SelectionChanged putChanged(int key, com.top_logic.threed.threejs.control.cmds.SelectionChange value) {
 		internalPutChanged(key, value);
 		return this;
 	}
 
-	/** Implementation of {@link #putChanged(int, com.top_logic.tl3d.threejs.control.cmds.SelectionChange)} without chain call utility. */
-	protected final void  internalPutChanged(int key, com.top_logic.tl3d.threejs.control.cmds.SelectionChange value) {
+	/** Implementation of {@link #putChanged(int, com.top_logic.threed.threejs.control.cmds.SelectionChange)} without chain call utility. */
+	protected final void  internalPutChanged(int key, com.top_logic.threed.threejs.control.cmds.SelectionChange value) {
 		if (_changed.containsKey(key)) {
 			throw new IllegalArgumentException("Property 'changed' already contains a value for key '" + key + "'.");
 		}
@@ -81,7 +81,7 @@ public class SelectionChanged extends de.haumacher.msgbuf.data.AbstractDataObjec
 	protected de.haumacher.msgbuf.observer.Listener _listener = de.haumacher.msgbuf.observer.Listener.NONE;
 
 	@Override
-	public com.top_logic.tl3d.threejs.control.cmds.SelectionChanged registerListener(de.haumacher.msgbuf.observer.Listener l) {
+	public com.top_logic.threed.threejs.control.cmds.SelectionChanged registerListener(de.haumacher.msgbuf.observer.Listener l) {
 		internalRegisterListener(l);
 		return this;
 	}
@@ -91,7 +91,7 @@ public class SelectionChanged extends de.haumacher.msgbuf.data.AbstractDataObjec
 	}
 
 	@Override
-	public com.top_logic.tl3d.threejs.control.cmds.SelectionChanged unregisterListener(de.haumacher.msgbuf.observer.Listener l) {
+	public com.top_logic.threed.threejs.control.cmds.SelectionChanged unregisterListener(de.haumacher.msgbuf.observer.Listener l) {
 		internalUnregisterListener(l);
 		return this;
 	}
@@ -125,13 +125,13 @@ public class SelectionChanged extends de.haumacher.msgbuf.data.AbstractDataObjec
 	@Override
 	public void set(String field, Object value) {
 		switch (field) {
-			case CHANGED__PROP: internalSetChanged((java.util.Map<Integer, com.top_logic.tl3d.threejs.control.cmds.SelectionChange>) value); break;
+			case CHANGED__PROP: internalSetChanged((java.util.Map<Integer, com.top_logic.threed.threejs.control.cmds.SelectionChange>) value); break;
 		}
 	}
 
 	/** Reads a new instance from the given reader. */
-	public static com.top_logic.tl3d.threejs.control.cmds.SelectionChanged readSelectionChanged(de.haumacher.msgbuf.json.JsonReader in) throws java.io.IOException {
-		com.top_logic.tl3d.threejs.control.cmds.SelectionChanged result = new com.top_logic.tl3d.threejs.control.cmds.SelectionChanged();
+	public static com.top_logic.threed.threejs.control.cmds.SelectionChanged readSelectionChanged(de.haumacher.msgbuf.json.JsonReader in) throws java.io.IOException {
+		com.top_logic.threed.threejs.control.cmds.SelectionChanged result = new com.top_logic.threed.threejs.control.cmds.SelectionChanged();
 		result.readContent(in);
 		return result;
 	}
@@ -146,7 +146,7 @@ public class SelectionChanged extends de.haumacher.msgbuf.data.AbstractDataObjec
 		super.writeFields(out);
 		out.name(CHANGED__PROP);
 		out.beginArray();
-		for (java.util.Map.Entry<Integer,com.top_logic.tl3d.threejs.control.cmds.SelectionChange> entry : getChanged().entrySet()) {
+		for (java.util.Map.Entry<Integer,com.top_logic.threed.threejs.control.cmds.SelectionChange> entry : getChanged().entrySet()) {
 			out.beginObject();
 			out.name("key");
 			out.value(entry.getKey());
@@ -165,11 +165,11 @@ public class SelectionChanged extends de.haumacher.msgbuf.data.AbstractDataObjec
 				while (in.hasNext()) {
 					in.beginObject();
 					int key = 0;
-					com.top_logic.tl3d.threejs.control.cmds.SelectionChange value = com.top_logic.tl3d.threejs.control.cmds.SelectionChange.ADD;
+					com.top_logic.threed.threejs.control.cmds.SelectionChange value = com.top_logic.threed.threejs.control.cmds.SelectionChange.ADD;
 					while (in.hasNext()) {
 						switch (in.nextName()) {
 							case "key": key = in.nextInt(); break;
-							case "value": value = com.top_logic.tl3d.threejs.control.cmds.SelectionChange.readSelectionChange(in); break;
+							case "value": value = com.top_logic.threed.threejs.control.cmds.SelectionChange.readSelectionChange(in); break;
 							default: in.skipValue(); break;
 						}
 					}

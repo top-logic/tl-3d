@@ -3,7 +3,7 @@
  * 
  * SPDX-License-Identifier: LicenseRef-BOS-TopLogic-1.0
  */
-package com.top_logic.tl3d.threejs.script;
+package com.top_logic.threed.threejs.script;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -15,7 +15,7 @@ import com.top_logic.model.search.expr.GenericMethod;
 import com.top_logic.model.search.expr.SearchExpression;
 import com.top_logic.threed.core.math.Transformation;
 import com.top_logic.threed.core.math.script.TransformationConstructor;
-import com.top_logic.tl3d.threejs.scene.SceneNode;
+import com.top_logic.threed.threejs.scene.SceneNode;
 
 /**
  * Base class for TL-Script {@link SceneNode} constructor functions.

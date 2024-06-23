@@ -1,30 +1,30 @@
-package com.top_logic.tl3d.threejs.scene;
+package com.top_logic.threed.threejs.scene;
 
 /**
  * Base class for a node in a {@link SceneGraph}
  */
 public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractSharedGraphNode {
 
-	/** Type codes for the {@link com.top_logic.tl3d.threejs.scene.SceneNode} hierarchy. */
+	/** Type codes for the {@link com.top_logic.threed.threejs.scene.SceneNode} hierarchy. */
 	public enum TypeKind {
 
-		/** Type literal for {@link com.top_logic.tl3d.threejs.scene.GroupNode}. */
+		/** Type literal for {@link com.top_logic.threed.threejs.scene.GroupNode}. */
 		GROUP_NODE,
 
-		/** Type literal for {@link com.top_logic.tl3d.threejs.scene.PartNode}. */
+		/** Type literal for {@link com.top_logic.threed.threejs.scene.PartNode}. */
 		PART_NODE,
 		;
 
 	}
 
-	/** Visitor interface for the {@link com.top_logic.tl3d.threejs.scene.SceneNode} hierarchy.*/
+	/** Visitor interface for the {@link com.top_logic.threed.threejs.scene.SceneNode} hierarchy.*/
 	public interface Visitor<R,A,E extends Throwable> {
 
-		/** Visit case for {@link com.top_logic.tl3d.threejs.scene.GroupNode}.*/
-		R visit(com.top_logic.tl3d.threejs.scene.GroupNode self, A arg) throws E;
+		/** Visit case for {@link com.top_logic.threed.threejs.scene.GroupNode}.*/
+		R visit(com.top_logic.threed.threejs.scene.GroupNode self, A arg) throws E;
 
-		/** Visit case for {@link com.top_logic.tl3d.threejs.scene.PartNode}.*/
-		R visit(com.top_logic.tl3d.threejs.scene.PartNode self, A arg) throws E;
+		/** Visit case for {@link com.top_logic.threed.threejs.scene.PartNode}.*/
+		R visit(com.top_logic.threed.threejs.scene.PartNode self, A arg) throws E;
 
 	}
 
@@ -68,7 +68,7 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 	/**
 	 * @see #getUserData()
 	 */
-	public com.top_logic.tl3d.threejs.scene.SceneNode setUserData(java.lang.Object value) {
+	public com.top_logic.threed.threejs.scene.SceneNode setUserData(java.lang.Object value) {
 		internalSetUserData(value);
 		return this;
 	}
@@ -96,7 +96,7 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 	/**
 	 * @see #getTransform()
 	 */
-	public com.top_logic.tl3d.threejs.scene.SceneNode setTransform(java.util.List<? extends Float> value) {
+	public com.top_logic.threed.threejs.scene.SceneNode setTransform(java.util.List<? extends Float> value) {
 		internalSetTransform(value);
 		return this;
 	}
@@ -110,7 +110,7 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 	/**
 	 * Adds a value to the {@link #getTransform()} list.
 	 */
-	public com.top_logic.tl3d.threejs.scene.SceneNode addTransform(float value) {
+	public com.top_logic.threed.threejs.scene.SceneNode addTransform(float value) {
 		internalAddTransform(value);
 		return this;
 	}
@@ -155,17 +155,17 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 	}
 
 	/** Reads a new instance from the given reader. */
-	public static com.top_logic.tl3d.threejs.scene.SceneNode readSceneNode(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in) throws java.io.IOException {
+	public static com.top_logic.threed.threejs.scene.SceneNode readSceneNode(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in) throws java.io.IOException {
 		if (in.peek() == de.haumacher.msgbuf.json.JsonToken.NUMBER) {
-			return (com.top_logic.tl3d.threejs.scene.SceneNode) scope.resolveOrFail(in.nextInt());
+			return (com.top_logic.threed.threejs.scene.SceneNode) scope.resolveOrFail(in.nextInt());
 		}
-		com.top_logic.tl3d.threejs.scene.SceneNode result;
+		com.top_logic.threed.threejs.scene.SceneNode result;
 		in.beginArray();
 		String type = in.nextString();
 		int id = in.nextInt();
 		switch (type) {
-			case GroupNode.GROUP_NODE__TYPE: result = com.top_logic.tl3d.threejs.scene.GroupNode.create(); break;
-			case PartNode.PART_NODE__TYPE: result = com.top_logic.tl3d.threejs.scene.PartNode.create(); break;
+			case GroupNode.GROUP_NODE__TYPE: result = com.top_logic.threed.threejs.scene.GroupNode.create(); break;
+			case PartNode.PART_NODE__TYPE: result = com.top_logic.threed.threejs.scene.PartNode.create(); break;
 			default: in.skipValue(); result = null; break;
 		}
 		if (result != null) {

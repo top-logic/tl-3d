@@ -3,11 +3,11 @@
  * 
  * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-BOS-TopLogic-1.0
  */
-package com.top_logic.tl3d.threejs.component;
+package com.top_logic.threed.threejs.component;
 
 import com.top_logic.mig.html.ModelBuilder;
 import com.top_logic.mig.html.layout.LayoutComponent;
-import com.top_logic.tl3d.threejs.scene.SceneNode;
+import com.top_logic.threed.threejs.scene.SceneNode;
 
 /**
  * {@link ModelBuilder} for {@link ThreeJsComponent}s.

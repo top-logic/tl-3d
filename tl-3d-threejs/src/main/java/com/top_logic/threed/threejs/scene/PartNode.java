@@ -1,4 +1,4 @@
-package com.top_logic.tl3d.threejs.scene;
+package com.top_logic.threed.threejs.scene;
 
 /**
  * An atomic {@link SceneNode} displaying an {@link Asset}.
@@ -6,24 +6,24 @@ package com.top_logic.tl3d.threejs.scene;
 public class PartNode extends SceneNode {
 
 	/**
-	 * Creates a {@link com.top_logic.tl3d.threejs.scene.PartNode} instance.
+	 * Creates a {@link com.top_logic.threed.threejs.scene.PartNode} instance.
 	 */
-	public static com.top_logic.tl3d.threejs.scene.PartNode create() {
-		return new com.top_logic.tl3d.threejs.scene.PartNode();
+	public static com.top_logic.threed.threejs.scene.PartNode create() {
+		return new com.top_logic.threed.threejs.scene.PartNode();
 	}
 
-	/** Identifier for the {@link com.top_logic.tl3d.threejs.scene.PartNode} type in JSON format. */
+	/** Identifier for the {@link com.top_logic.threed.threejs.scene.PartNode} type in JSON format. */
 	public static final String PART_NODE__TYPE = "PartNode";
 
 	/** @see #getAsset() */
 	public static final String ASSET__PROP = "asset";
 
-	private com.top_logic.tl3d.threejs.scene.Asset _asset = null;
+	private com.top_logic.threed.threejs.scene.Asset _asset = null;
 
 	/**
 	 * Creates a {@link PartNode} instance.
 	 *
-	 * @see com.top_logic.tl3d.threejs.scene.PartNode#create()
+	 * @see com.top_logic.threed.threejs.scene.PartNode#create()
 	 */
 	protected PartNode() {
 		super();
@@ -37,20 +37,20 @@ public class PartNode extends SceneNode {
 	/**
 	 * The {@link Asset} to display.
 	 */
-	public final com.top_logic.tl3d.threejs.scene.Asset getAsset() {
+	public final com.top_logic.threed.threejs.scene.Asset getAsset() {
 		return _asset;
 	}
 
 	/**
 	 * @see #getAsset()
 	 */
-	public com.top_logic.tl3d.threejs.scene.PartNode setAsset(com.top_logic.tl3d.threejs.scene.Asset value) {
+	public com.top_logic.threed.threejs.scene.PartNode setAsset(com.top_logic.threed.threejs.scene.Asset value) {
 		internalSetAsset(value);
 		return this;
 	}
 
 	/** Internal setter for {@link #getAsset()} without chain call utility. */
-	protected final void internalSetAsset(com.top_logic.tl3d.threejs.scene.Asset value) {
+	protected final void internalSetAsset(com.top_logic.threed.threejs.scene.Asset value) {
 		_listener.beforeSet(this, ASSET__PROP, value);
 		_asset = value;
 	}
@@ -63,19 +63,19 @@ public class PartNode extends SceneNode {
 	}
 
 	@Override
-	public com.top_logic.tl3d.threejs.scene.PartNode setUserData(java.lang.Object value) {
+	public com.top_logic.threed.threejs.scene.PartNode setUserData(java.lang.Object value) {
 		internalSetUserData(value);
 		return this;
 	}
 
 	@Override
-	public com.top_logic.tl3d.threejs.scene.PartNode setTransform(java.util.List<? extends Float> value) {
+	public com.top_logic.threed.threejs.scene.PartNode setTransform(java.util.List<? extends Float> value) {
 		internalSetTransform(value);
 		return this;
 	}
 
 	@Override
-	public com.top_logic.tl3d.threejs.scene.PartNode addTransform(float value) {
+	public com.top_logic.threed.threejs.scene.PartNode addTransform(float value) {
 		internalAddTransform(value);
 		return this;
 	}
@@ -105,21 +105,21 @@ public class PartNode extends SceneNode {
 	@Override
 	public void set(String field, Object value) {
 		switch (field) {
-			case ASSET__PROP: internalSetAsset((com.top_logic.tl3d.threejs.scene.Asset) value); break;
+			case ASSET__PROP: internalSetAsset((com.top_logic.threed.threejs.scene.Asset) value); break;
 			default: super.set(field, value); break;
 		}
 	}
 
 	/** Reads a new instance from the given reader. */
-	public static com.top_logic.tl3d.threejs.scene.PartNode readPartNode(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in) throws java.io.IOException {
+	public static com.top_logic.threed.threejs.scene.PartNode readPartNode(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in) throws java.io.IOException {
 		if (in.peek() == de.haumacher.msgbuf.json.JsonToken.NUMBER) {
-			return (com.top_logic.tl3d.threejs.scene.PartNode) scope.resolveOrFail(in.nextInt());
+			return (com.top_logic.threed.threejs.scene.PartNode) scope.resolveOrFail(in.nextInt());
 		}
 		in.beginArray();
 		String type = in.nextString();
 		assert PART_NODE__TYPE.equals(type);
 		int id = in.nextInt();
-		com.top_logic.tl3d.threejs.scene.PartNode result = new com.top_logic.tl3d.threejs.scene.PartNode();
+		com.top_logic.threed.threejs.scene.PartNode result = new com.top_logic.threed.threejs.scene.PartNode();
 		scope.readData(result, id, in);
 		in.endArray();
 		return result;
@@ -152,13 +152,13 @@ public class PartNode extends SceneNode {
 	@Override
 	public void readField(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in, String field) throws java.io.IOException {
 		switch (field) {
-			case ASSET__PROP: setAsset(com.top_logic.tl3d.threejs.scene.Asset.readAsset(scope, in)); break;
+			case ASSET__PROP: setAsset(com.top_logic.threed.threejs.scene.Asset.readAsset(scope, in)); break;
 			default: super.readField(scope, in, field);
 		}
 	}
 
 	@Override
-	public <R,A,E extends Throwable> R visit(com.top_logic.tl3d.threejs.scene.SceneNode.Visitor<R,A,E> v, A arg) throws E {
+	public <R,A,E extends Throwable> R visit(com.top_logic.threed.threejs.scene.SceneNode.Visitor<R,A,E> v, A arg) throws E {
 		return v.visit(this, arg);
 	}
 

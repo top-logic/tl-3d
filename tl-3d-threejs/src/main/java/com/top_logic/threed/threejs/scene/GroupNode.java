@@ -1,4 +1,4 @@
-package com.top_logic.tl3d.threejs.scene;
+package com.top_logic.threed.threejs.scene;
 
 /**
  * A collection of {@link SceneNode}s.
@@ -6,26 +6,26 @@ package com.top_logic.tl3d.threejs.scene;
 public class GroupNode extends SceneNode {
 
 	/**
-	 * Creates a {@link com.top_logic.tl3d.threejs.scene.GroupNode} instance.
+	 * Creates a {@link com.top_logic.threed.threejs.scene.GroupNode} instance.
 	 */
-	public static com.top_logic.tl3d.threejs.scene.GroupNode create() {
-		return new com.top_logic.tl3d.threejs.scene.GroupNode();
+	public static com.top_logic.threed.threejs.scene.GroupNode create() {
+		return new com.top_logic.threed.threejs.scene.GroupNode();
 	}
 
-	/** Identifier for the {@link com.top_logic.tl3d.threejs.scene.GroupNode} type in JSON format. */
+	/** Identifier for the {@link com.top_logic.threed.threejs.scene.GroupNode} type in JSON format. */
 	public static final String GROUP_NODE__TYPE = "GroupNode";
 
 	/** @see #getContents() */
 	public static final String CONTENTS__PROP = "contents";
 
-	private final java.util.List<com.top_logic.tl3d.threejs.scene.SceneNode> _contents = new de.haumacher.msgbuf.util.ReferenceList<>() {
+	private final java.util.List<com.top_logic.threed.threejs.scene.SceneNode> _contents = new de.haumacher.msgbuf.util.ReferenceList<>() {
 		@Override
-		protected void beforeAdd(int index, com.top_logic.tl3d.threejs.scene.SceneNode element) {
+		protected void beforeAdd(int index, com.top_logic.threed.threejs.scene.SceneNode element) {
 			_listener.beforeAdd(GroupNode.this, CONTENTS__PROP, index, element);
 		}
 
 		@Override
-		protected void afterRemove(int index, com.top_logic.tl3d.threejs.scene.SceneNode element) {
+		protected void afterRemove(int index, com.top_logic.threed.threejs.scene.SceneNode element) {
 			_listener.afterRemove(GroupNode.this, CONTENTS__PROP, index, element);
 		}
 	};
@@ -33,7 +33,7 @@ public class GroupNode extends SceneNode {
 	/**
 	 * Creates a {@link GroupNode} instance.
 	 *
-	 * @see com.top_logic.tl3d.threejs.scene.GroupNode#create()
+	 * @see com.top_logic.threed.threejs.scene.GroupNode#create()
 	 */
 	protected GroupNode() {
 		super();
@@ -47,20 +47,20 @@ public class GroupNode extends SceneNode {
 	/**
 	 * The {@link SceneNode}s grouped together.
 	 */
-	public final java.util.List<com.top_logic.tl3d.threejs.scene.SceneNode> getContents() {
+	public final java.util.List<com.top_logic.threed.threejs.scene.SceneNode> getContents() {
 		return _contents;
 	}
 
 	/**
 	 * @see #getContents()
 	 */
-	public com.top_logic.tl3d.threejs.scene.GroupNode setContents(java.util.List<? extends com.top_logic.tl3d.threejs.scene.SceneNode> value) {
+	public com.top_logic.threed.threejs.scene.GroupNode setContents(java.util.List<? extends com.top_logic.threed.threejs.scene.SceneNode> value) {
 		internalSetContents(value);
 		return this;
 	}
 
 	/** Internal setter for {@link #getContents()} without chain call utility. */
-	protected final void internalSetContents(java.util.List<? extends com.top_logic.tl3d.threejs.scene.SceneNode> value) {
+	protected final void internalSetContents(java.util.List<? extends com.top_logic.threed.threejs.scene.SceneNode> value) {
 		if (value == null) throw new IllegalArgumentException("Property 'contents' cannot be null.");
 		_contents.clear();
 		_contents.addAll(value);
@@ -69,37 +69,37 @@ public class GroupNode extends SceneNode {
 	/**
 	 * Adds a value to the {@link #getContents()} list.
 	 */
-	public com.top_logic.tl3d.threejs.scene.GroupNode addContent(com.top_logic.tl3d.threejs.scene.SceneNode value) {
+	public com.top_logic.threed.threejs.scene.GroupNode addContent(com.top_logic.threed.threejs.scene.SceneNode value) {
 		internalAddContent(value);
 		return this;
 	}
 
-	/** Implementation of {@link #addContent(com.top_logic.tl3d.threejs.scene.SceneNode)} without chain call utility. */
-	protected final void internalAddContent(com.top_logic.tl3d.threejs.scene.SceneNode value) {
+	/** Implementation of {@link #addContent(com.top_logic.threed.threejs.scene.SceneNode)} without chain call utility. */
+	protected final void internalAddContent(com.top_logic.threed.threejs.scene.SceneNode value) {
 		_contents.add(value);
 	}
 
 	/**
 	 * Removes a value from the {@link #getContents()} list.
 	 */
-	public final void removeContent(com.top_logic.tl3d.threejs.scene.SceneNode value) {
+	public final void removeContent(com.top_logic.threed.threejs.scene.SceneNode value) {
 		_contents.remove(value);
 	}
 
 	@Override
-	public com.top_logic.tl3d.threejs.scene.GroupNode setUserData(java.lang.Object value) {
+	public com.top_logic.threed.threejs.scene.GroupNode setUserData(java.lang.Object value) {
 		internalSetUserData(value);
 		return this;
 	}
 
 	@Override
-	public com.top_logic.tl3d.threejs.scene.GroupNode setTransform(java.util.List<? extends Float> value) {
+	public com.top_logic.threed.threejs.scene.GroupNode setTransform(java.util.List<? extends Float> value) {
 		internalSetTransform(value);
 		return this;
 	}
 
 	@Override
-	public com.top_logic.tl3d.threejs.scene.GroupNode addTransform(float value) {
+	public com.top_logic.threed.threejs.scene.GroupNode addTransform(float value) {
 		internalAddTransform(value);
 		return this;
 	}
@@ -129,21 +129,21 @@ public class GroupNode extends SceneNode {
 	@Override
 	public void set(String field, Object value) {
 		switch (field) {
-			case CONTENTS__PROP: internalSetContents(de.haumacher.msgbuf.util.Conversions.asList(com.top_logic.tl3d.threejs.scene.SceneNode.class, value)); break;
+			case CONTENTS__PROP: internalSetContents(de.haumacher.msgbuf.util.Conversions.asList(com.top_logic.threed.threejs.scene.SceneNode.class, value)); break;
 			default: super.set(field, value); break;
 		}
 	}
 
 	/** Reads a new instance from the given reader. */
-	public static com.top_logic.tl3d.threejs.scene.GroupNode readGroupNode(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in) throws java.io.IOException {
+	public static com.top_logic.threed.threejs.scene.GroupNode readGroupNode(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in) throws java.io.IOException {
 		if (in.peek() == de.haumacher.msgbuf.json.JsonToken.NUMBER) {
-			return (com.top_logic.tl3d.threejs.scene.GroupNode) scope.resolveOrFail(in.nextInt());
+			return (com.top_logic.threed.threejs.scene.GroupNode) scope.resolveOrFail(in.nextInt());
 		}
 		in.beginArray();
 		String type = in.nextString();
 		assert GROUP_NODE__TYPE.equals(type);
 		int id = in.nextInt();
-		com.top_logic.tl3d.threejs.scene.GroupNode result = new com.top_logic.tl3d.threejs.scene.GroupNode();
+		com.top_logic.threed.threejs.scene.GroupNode result = new com.top_logic.threed.threejs.scene.GroupNode();
 		scope.readData(result, id, in);
 		in.endArray();
 		return result;
@@ -154,7 +154,7 @@ public class GroupNode extends SceneNode {
 		super.writeFields(scope, out);
 		out.name(CONTENTS__PROP);
 		out.beginArray();
-		for (com.top_logic.tl3d.threejs.scene.SceneNode x : getContents()) {
+		for (com.top_logic.threed.threejs.scene.SceneNode x : getContents()) {
 			x.writeTo(scope, out);
 		}
 		out.endArray();
@@ -165,7 +165,7 @@ public class GroupNode extends SceneNode {
 		switch (field) {
 			case CONTENTS__PROP: {
 				out.beginArray();
-				for (com.top_logic.tl3d.threejs.scene.SceneNode x : getContents()) {
+				for (com.top_logic.threed.threejs.scene.SceneNode x : getContents()) {
 					x.writeTo(scope, out);
 				}
 				out.endArray();
@@ -181,7 +181,7 @@ public class GroupNode extends SceneNode {
 			case CONTENTS__PROP: {
 				in.beginArray();
 				while (in.hasNext()) {
-					addContent(com.top_logic.tl3d.threejs.scene.SceneNode.readSceneNode(scope, in));
+					addContent(com.top_logic.threed.threejs.scene.SceneNode.readSceneNode(scope, in));
 				}
 				in.endArray();
 			}
@@ -194,7 +194,7 @@ public class GroupNode extends SceneNode {
 	public void writeElement(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonWriter out, String field, Object element) throws java.io.IOException {
 		switch (field) {
 			case CONTENTS__PROP: {
-				((com.top_logic.tl3d.threejs.scene.SceneNode) element).writeTo(scope, out);
+				((com.top_logic.threed.threejs.scene.SceneNode) element).writeTo(scope, out);
 				break;
 			}
 			default: super.writeElement(scope, out, field, element);
@@ -205,14 +205,14 @@ public class GroupNode extends SceneNode {
 	public Object readElement(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in, String field) throws java.io.IOException {
 		switch (field) {
 			case CONTENTS__PROP: {
-				return com.top_logic.tl3d.threejs.scene.SceneNode.readSceneNode(scope, in);
+				return com.top_logic.threed.threejs.scene.SceneNode.readSceneNode(scope, in);
 			}
 			default: return super.readElement(scope, in, field);
 		}
 	}
 
 	@Override
-	public <R,A,E extends Throwable> R visit(com.top_logic.tl3d.threejs.scene.SceneNode.Visitor<R,A,E> v, A arg) throws E {
+	public <R,A,E extends Throwable> R visit(com.top_logic.threed.threejs.scene.SceneNode.Visitor<R,A,E> v, A arg) throws E {
 		return v.visit(this, arg);
 	}
 

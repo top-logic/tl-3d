@@ -3,7 +3,7 @@
  * 
  * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-BOS-TopLogic-1.0
  */
-package com.top_logic.tl3d.threejs.control;
+package com.top_logic.threed.threejs.control;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -26,9 +26,9 @@ import com.top_logic.layout.basic.ControlCommand;
 import com.top_logic.layout.component.model.SelectionListener;
 import com.top_logic.mig.html.HTMLUtil;
 import com.top_logic.mig.html.SelectionModel;
-import com.top_logic.tl3d.threejs.control.cmds.SelectionChange;
-import com.top_logic.tl3d.threejs.control.cmds.SelectionChanged;
-import com.top_logic.tl3d.threejs.scene.SceneGraph;
+import com.top_logic.threed.threejs.control.cmds.SelectionChange;
+import com.top_logic.threed.threejs.control.cmds.SelectionChanged;
+import com.top_logic.threed.threejs.scene.SceneGraph;
 import com.top_logic.tool.boundsec.HandlerResult;
 
 import de.haumacher.msgbuf.graph.DefaultScope;

@@ -1,4 +1,4 @@
-package com.top_logic.tl3d.threejs.control.cmds;
+package com.top_logic.threed.threejs.control.cmds;
 
 public enum SelectionChange implements de.haumacher.msgbuf.data.ProtocolEnum {
 
