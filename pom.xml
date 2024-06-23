@@ -11,6 +11,7 @@
 	<modules>
 		<module>tl-3d-core</module>
 		<module>tl-3d-threejs</module>
+		<module>tl-3d-demo</module>
 	</modules>	
 
 </project>
