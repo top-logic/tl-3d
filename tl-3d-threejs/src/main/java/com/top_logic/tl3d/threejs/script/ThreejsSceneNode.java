@@ -13,7 +13,8 @@ import com.top_logic.model.TLType;
 import com.top_logic.model.search.expr.EvalContext;
 import com.top_logic.model.search.expr.GenericMethod;
 import com.top_logic.model.search.expr.SearchExpression;
-import com.top_logic.tl3d.math.Transformation;
+import com.top_logic.threed.core.math.Transformation;
+import com.top_logic.threed.core.math.script.TransformationConstructor;
 import com.top_logic.tl3d.threejs.scene.SceneNode;
 
 /**
