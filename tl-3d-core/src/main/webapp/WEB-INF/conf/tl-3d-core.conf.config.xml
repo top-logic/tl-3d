@@ -20,6 +20,15 @@
 		<config service-class="com.top_logic.model.search.expr.config.SearchBuilder">
 			<instance>
 				<methods>
+					<method name="transform" class="com.top_logic.threed.math.script.TransformationConstructor$Builder"/>
+					<method name="composeTransformation" class="com.top_logic.threed.math.script.Compose$Builder"/>
+					<method name="identityTransformation" class="com.top_logic.threed.math.script.Identity$Builder"/>
+					<method name="rotation" class="com.top_logic.threed.math.script.Rotation$Builder"/>
+					<method name="rotationX" class="com.top_logic.threed.math.script.RotationX$Builder"/>
+					<method name="rotationY" class="com.top_logic.threed.math.script.RotationY$Builder"/>
+					<method name="rotationZ" class="com.top_logic.threed.math.script.RotationZ$Builder"/>
+					<method name="translation" class="com.top_logic.threed.math.script.Translation$Builder"/>
+					<method name="inverseTransformation" class="com.top_logic.threed.math.script.Inverse$Builder"/>
 				</methods>
 			</instance>
 		</config>
