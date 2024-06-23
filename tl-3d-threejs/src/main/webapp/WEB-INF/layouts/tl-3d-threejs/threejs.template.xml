@@ -21,7 +21,7 @@
 			type="com.top_logic.layout.ModelSpec"
 		/>
 		<property name="modelBuilder"
-			instance-type="com.top_logic.tl3d.threejs.component.SceneBuilder"
+			instance-type="com.top_logic.threed.threejs.component.SceneBuilder"
 			type="PolymorphicConfiguration"
 		>
 			<mandatory/>
@@ -52,7 +52,7 @@
 		</property>
 	</properties>
 
-	<component class="com.top_logic.tl3d.threejs.component.ThreeJsComponent"
+	<component class="com.top_logic.threed.threejs.component.ThreeJsComponent"
 		name="3DView"
 		securityObject="${securityObject}"
 		securityProviderClass="${securityProviderClass}"
