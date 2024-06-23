@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<config:template-call
+	xmlns:config="http://www.top-logic.com/ns/config/6.0"
+	final="true"
+	template="com.top_logic.element/treegrid.template.xml"
+>
+	<arguments
+		defaultColumns="name,asset,tx"
+		model="selection(tl-3d-demo/scenes/szenenTable.layout.xml#Table)"
+		type="tl.threed.demo:Assembly"
+	>
+		<name key="dynamic.8b044645-28b7-4a76-b9bc-b831b1abec37">
+			<de>Scene-Graph</de>
+		</name>
+		<modelBuilder class="com.top_logic.model.search.providers.TreeModelByExpression"
+			children="node->$node.get(`tl.element:StructuredElementContainer#children`)"
+			nodePredicate="node->$node.instanceOf(`tl.threed.demo:Assembly`)"
+			parents="node->$node.referers(`tl.element:StructuredElementContainer#children`)"
+			rootNode="model -> $model.get(`tl.threed.demo:Scene#root`)"
+		/>
+		<buttons>
+			<button id="exportExcelGrid"
+				class="com.top_logic.layout.table.export.StreamingExcelExportHandler"
+			/>
+			<button id="createNewRow"
+				class="com.top_logic.model.search.providers.GridCreateHandlerByExpression"
+				createContext="model -> $model"
+				initOperation="createContext -> newObject -> target -> $createContext.add(`tl.element:StructuredElementContainer#children`, $newObject)"
+				target="selection(self())"
+			>
+				<checkScopeProvider/>
+				<type-options class="com.top_logic.element.layout.create.AttributeBasedCreateTypeOptions"
+					attribute="tl.element:StructuredElementContainer#children"
+					owner="tl.threed.demo:Assembly"
+				/>
+			</button>
+		</buttons>
+		<dialogs>
+			<layout-reference resource="tl-3d-demo/scenes/eigenschaften/dialog.layout.xml"/>
+		</dialogs>
+	</arguments>
+</config:template-call>

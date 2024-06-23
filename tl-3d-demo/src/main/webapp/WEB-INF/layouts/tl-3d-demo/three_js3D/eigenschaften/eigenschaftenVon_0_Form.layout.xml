@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<config:template-call
+	xmlns:config="http://www.top-logic.com/ns/config/6.0"
+	final="true"
+	template="com.top_logic.element/form.template.xml"
+>
+	<arguments model="selection(tl-3d-demo/three_js3D/projektSelector.layout.xml#Selector)">
+		<name key="dynamic.351a5718-7c0d-4cb8-b9da-0405ffb8571b">
+			<de>Eigenschaften von {0}</de>
+		</name>
+	</arguments>
+</config:template-call>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<config:template-call
+	xmlns:config="http://www.top-logic.com/ns/config/6.0"
+	final="true"
+	template="com.top_logic/dialog.template.xml"
+>
+	<arguments helpID="ID_6e70201a_ad66_4c45_997a_f8775ce560df">
+		<title>
+			<title key="dynamic.548ae22f-90f0-43fe-9fef-05ae0c707330">
+				<de>Eigenschaften</de>
+			</title>
+		</title>
+		<open-handler id="ID_e781458b_c445_4595_8751_3658c3c15ed0"
+			config:interface="com.top_logic.layout.editor.config.DialogOpenHandlerConfig"
+			image="css:fas fa-cog"
+			target="selection(self())"
+			targetComponent="tl-3d-demo/scenes/eigenschaften/dialog.layout.xml#Dialog"
+		>
+			<resourceKey key="dynamic.548ae22f-90f0-43fe-9fef-05ae0c707330">
+				<de>Eigenschaften</de>
+			</resourceKey>
+		</open-handler>
+		<components>
+			<layout-reference resource="tl-3d-demo/scenes/eigenschaften/innerLayout.layout.xml"/>
+		</components>
+	</arguments>
+</config:template-call>

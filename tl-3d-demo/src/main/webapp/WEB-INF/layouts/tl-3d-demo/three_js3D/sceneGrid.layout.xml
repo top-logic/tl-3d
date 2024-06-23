@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<config:template-call
+	xmlns:config="http://www.top-logic.com/ns/config/6.0"
+	final="true"
+	template="com.top_logic.element/treegrid.template.xml"
+>
+	<arguments
+		defaultColumns="name,tx,asset"
+		defaultSelection="false"
+		expandSelected="false"
+		model="selection(tl-3d-demo/three_js3D/projektSelector.layout.xml#Selector)"
+		multiSelection="true"
+		type="tl.threed.demo:Node"
+	>
+		<name key="dynamic.e534fe8f-98eb-4cf2-bfa2-aa25ddf981a9">
+			<de>Scene</de>
+		</name>
+		<modelBuilder class="com.top_logic.model.search.providers.TreeModelByExpression"
+			children="node->$node.get(`tl.element:StructuredElementContainer#children`)"
+			nodePredicate="node->$node.instanceOf(`tl.threed.demo:Node`)"
+			parents="node->$node.referers(`tl.element:StructuredElementContainer#children`)"
+			rootNode="scene -> $scene.get(`tl.threed.demo:Scene#root`)"
+		/>
+		<buttons>
+			<button id="exportExcelGrid"
+				class="com.top_logic.layout.table.export.StreamingExcelExportHandler"
+			/>
+			<button id="createNewRow"
+				class="com.top_logic.model.search.providers.GridCreateHandlerByExpression"
+				createContext="model -> $model"
+				initOperation="createContext -> newObject -> target -> $createContext.add(`tl.element:StructuredElementContainer#children`, $newObject)"
+			>
+				<target class="com.top_logic.model.search.providers.TransformLinkingByExpression"
+					function="s -> $s.size() == 1 ? $s.singleElement() : null"
+					input="selection(self())"
+				/>
+				<checkScopeProvider/>
+				<type-options class="com.top_logic.element.layout.create.AttributeBasedCreateTypeOptions"
+					attribute="tl.element:StructuredElementContainer#children"
+					owner="tl.threed.demo:Node"
+				/>
+			</button>
+			<button id="ID_46d8ef9d_bd95_4d73_95b6_8ed4a7aef8a8"
+				class="com.top_logic.model.search.providers.CommandHandlerByExpression"
+				image="css:far fa-object-group"
+				target="selection(self())"
+			>
+				<resourceKey key="dynamic.5afcd5ae-112a-4dfc-99e8-576ac1b1f953">
+					<de>Gruppieren</de>
+				</resourceKey>
+				<executability>
+					<rule-by-expression show-disabled="true">
+						<decision>sel -&gt; $sel.size() &gt; 0 || #("Es ist nichts selektiert."@de)</decision>
+					</rule-by-expression>
+				</executability>
+				<operation><![CDATA[sel -> {
+    parent = $sel.firstElement().referers(`tl.threed.demo:Assembly#children`);
+    remove = p -> n -> $p.set(`tl.threed.demo:Assembly#children`, $p.get(`tl.threed.demo:Assembly#children`).filter(c -> $c != $n));
+    $sel.foreach(n -> $remove($n.referers(`tl.threed.demo:Assembly#children`), $n));
+    group = new(`tl.threed.demo:Assembly`);
+    $group.set(`tl.threed.demo:Assembly#children`, $sel);
+    $parent.add(`tl.threed.demo:Assembly#children`, $group);
+}]]></operation>
+			</button>
+			<button id="ID_b588a7d7_840a_43e1_ab00_7f48ec70b69e"
+				class="com.top_logic.model.search.providers.CommandHandlerByExpression"
+				image="colored:tl-icon file-create"
+				target="selection(self())"
+			>
+				<resourceKey key="dynamic.49d7eb5a-3068-4fe3-95f9-263ace934ef4">
+					<de>Projekt aus Selektion</de>
+				</resourceKey>
+				<executability>
+					<rule-by-expression show-disabled="true">
+						<decision>sel -&gt; $sel.size() &gt; 0 || #("Es ist nichts selektiert."@de)</decision>
+					</rule-by-expression>
+				</executability>
+				<operation><![CDATA[selection -> {
+    new(`tl.threed.demo:Scene`)
+    ..set(`tl.threed.demo:Scene#name`, 
+        $selection.firstElement().get(`tl.threed.demo:Node#name`) || "New Project")
+    ..set(`tl.threed.demo:Scene#root`, 
+        new(`tl.threed.demo:Assembly`)
+        ..set(`tl.threed.demo:Assembly#children`, $selection.copy()));
+
+}]]></operation>
+			</button>
+			<button id="ID_38e16012_e1b7_44e3_8776_eccfd8bbf060"
+				class="com.top_logic.layout.component.GenericDeleteCommandHandler"
+				target="selection(self())"
+			/>
+		</buttons>
+	</arguments>
+</config:template-call>

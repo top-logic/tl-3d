@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<model xmlns="http://www.top-logic.com/ns/dynamic-types/6.0">
+	<module name="tl.threed.demo">
+		<annotations>
+			<package-binding
+				implementation-package="com.top_logic.threed.demo.model.impl"
+				interface-package="com.top_logic.threed.demo.model"
+			/>
+			<singletons>
+				<singleton name="CATALOGUE"
+					type="AssetCatalogue"
+				/>
+			</singletons>
+		</annotations>
+		<class name="Asset3D">
+			<generalizations>
+				<generalization type="tl.model:TLObject"/>
+			</generalizations>
+			<attributes>
+				<property name="jtFile"
+					type="tl.core:String"
+				/>
+				<property name="gltfUrl"
+					type="tl.core:String"
+				>
+					<annotations>
+						<storage-algorithm>
+							<query>
+								<expr><![CDATA[a -> {
+    jt = $a.get(`tl.threed.demo:Asset3D#jtFile`);
+    "/assets/" + regex(".jt$").regexReplace(
+        regex("[\\\\]").regexReplace($jt, "/"), ".glb")
+}]]></expr>
+							</query>
+						</storage-algorithm>
+					</annotations>
+				</property>
+				<property name="name"
+					type="tl.core:String"
+				>
+					<annotations>
+						<storage-algorithm>
+							<query>
+								<expr><![CDATA[asset -> {
+  jt = $asset.get(`tl.threed.demo:Asset3D#jtFile`);
+  gltf = $asset.get(`tl.threed.demo:Asset3D#gltfUrl`);
+  res = $jt || $gltf;
+  regex("([^/\\\\]*)(\\.[^\\./\\\\]*)$").regexSearch($res).firstElement().regexGroup(1)
+}]]></expr>
+							</query>
+						</storage-algorithm>
+					</annotations>
+				</property>
+			</attributes>
+		</class>
+		<class name="AssetCollection">
+			<generalizations>
+				<generalization type="tl.model:TLObject"/>
+			</generalizations>
+			<attributes>
+				<reference name="assets"
+					composite="true"
+					kind="forwards"
+					multiple="true"
+					navigate="true"
+					type="Asset3D"
+				/>
+				<reference name="subFolders"
+					composite="true"
+					kind="forwards"
+					multiple="true"
+					navigate="true"
+					type="AssetFolder"
+				/>
+			</attributes>
+		</class>
+		<class name="AssetCatalogue">
+			<generalizations>
+				<generalization type="AssetCollection"/>
+			</generalizations>
+		</class>
+		<class name="AssetFolder">
+			<generalizations>
+				<generalization type="AssetCollection"/>
+			</generalizations>
+			<attributes>
+				<property name="name"
+					mandatory="true"
+					type="tl.core:String"
+				/>
+			</attributes>
+		</class>
+		<interface name="ScenePart">
+			<generalizations>
+				<generalization type="tl.element:StructuredElement"/>
+			</generalizations>
+		</interface>
+		<interface name="Node">
+			<generalizations>
+				<generalization type="ScenePart"/>
+			</generalizations>
+			<annotations>
+				<form-definition>
+					<form>
+						<field
+							attribute="name"
+							fullQualifiedName="tl.threed.demo:Node#name"
+							type="tl.core:String"
+						/>
+						<field
+							attribute="tx"
+							fullQualifiedName="tl.threed.demo:Node#tx"
+							type="tl.core:String"
+						/>
+						<field
+							attribute="jtFile"
+							fullQualifiedName="tl.threed.demo:Node#jtFile"
+							type="tl.core:String"
+						/>
+						<group initiallyOpened="false">
+							<field
+								attribute="immutable"
+								fullQualifiedName="tl.threed.demo:Node#immutable"
+								type="tl.core:Boolean"
+							/>
+							<field
+								attribute="layer"
+								fullQualifiedName="tl.threed.demo:Node#layer"
+								type="tl.core:Boolean"
+							/>
+							<field
+								attribute="tile"
+								fullQualifiedName="tl.threed.demo:Node#tile"
+								type="tl.core:Boolean"
+							/>
+							<label key="dynamic.a6dee065-c3b0-403f-ba34-6eb4a933ff1b">
+								<de>Flags</de>
+							</label>
+						</group>
+						<other-attributes/>
+					</form>
+				</form-definition>
+			</annotations>
+			<attributes>
+				<property name="name"
+					type="tl.core:String"
+				/>
+				<property name="jtFile"
+					type="tl.core:String"
+				>
+					<annotations>
+						<storage-algorithm>
+							<query expr="node -> $node.get(`tl.threed.demo:Node#asset`).get(`tl.threed.demo:Asset3D#jtFile`)"/>
+						</storage-algorithm>
+					</annotations>
+				</property>
+				<property name="tx"
+					type="tl.core:String"
+				/>
+				<property name="immutable"
+					type="tl.core:Boolean"
+				/>
+				<property name="tile"
+					type="tl.core:Boolean"
+				/>
+				<property name="layer"
+					type="tl.core:Boolean"
+				/>
+				<reference name="asset"
+					kind="forwards"
+					navigate="true"
+					type="Asset3D"
+				/>
+			</attributes>
+		</interface>
+		<class name="Assembly">
+			<generalizations>
+				<generalization type="Node"/>
+				<generalization type="tl.element:StructuredElementContainer"/>
+			</generalizations>
+			<annotations>
+				<instance-presentation icon="css:fas fa-cubes"/>
+			</annotations>
+			<attributes>
+				<reference name="children"
+					override="true"
+					type="Node"
+				/>
+			</attributes>
+		</class>
+		<class name="Part">
+			<generalizations>
+				<generalization type="Node"/>
+			</generalizations>
+			<annotations>
+				<instance-presentation icon="css:fas fa-cube"/>
+			</annotations>
+		</class>
+		<class name="Text">
+			<generalizations>
+				<generalization type="Node"/>
+			</generalizations>
+			<annotations>
+				<instance-presentation icon="css:fas fa-font"/>
+			</annotations>
+			<attributes>
+				<property name="fontSize"
+					type="tl.core:Integer"
+				/>
+				<property name="color"
+					type="tl.util:Color"
+				/>
+				<property name="background"
+					type="tl.util:Color"
+				/>
+			</attributes>
+		</class>
+		<class name="Scene">
+			<generalizations>
+				<generalization type="ScenePart"/>
+			</generalizations>
+			<attributes>
+				<reference name="root"
+					composite="true"
+					kind="forwards"
+					mandatory="true"
+					navigate="true"
+					type="Node"
+				/>
+				<property name="name"
+					type="tl.core:String"
+				/>
+			</attributes>
+		</class>
+	</module>
+</model>

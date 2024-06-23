@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<config:template-call
+	xmlns:config="http://www.top-logic.com/ns/config/6.0"
+	final="true"
+	template="tl-3d-threejs/threejs.template.xml"
+>
+	<arguments
+		model="model(tl-3d-demo/three_js3D/sceneGrid.layout.xml#Grid)"
+		multiSelection="true"
+		selection="selection(tl-3d-demo/three_js3D/sceneGrid.layout.xml#Grid)"
+	>
+		<name key="dynamic.2affe21a-3127-4135-b45a-c6e45b0e3dbf">
+			<de>3D-Viewer</de>
+		</name>
+		<modelBuilder class="com.top_logic.threed.threejs.component.SceneBuilderByExpression">
+			<createScene><![CDATA[scene -> {
+    root = $scene.get(`tl.threed.demo:Scene#root`);
+
+    $root.traverse(
+        descend: node -> $node.get(`tl.threed.demo:Assembly#children`),
+        mapping: node -> switch {
+            $node.instanceOf(`tl.threed.demo:Part`) || $node.get(`tl.threed.demo:Node#asset`) != null: 
+                threejsGltf(
+                    tx:  $node.get(`tl.threed.demo:Node#tx`),
+                    userData: $node,
+                    url: $node.get(`tl.threed.demo:Part#asset`)
+                        .get(`tl.threed.demo:Asset3D#gltfUrl`));
+        },
+        compose: node -> parts -> assembly -> $node != null ? $node : threejsGroup(
+            tx:  $assembly.get(`tl.threed.demo:Node#tx`),
+            userData: $assembly,
+            components: $parts.filter(p -> $p != null))
+    )
+    
+}]]></createScene>
+		</modelBuilder>
+		<buttons>
+			<button id="ID_4893bf3f_116f_421c_b560_842f9b4b1073"
+				class="com.top_logic.layout.form.component.InvalidateCommand"
+			/>
+		</buttons>
+	</arguments>
+</config:template-call>

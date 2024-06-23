@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<config:template-call
+	xmlns:config="http://www.top-logic.com/ns/config/6.0"
+	final="true"
+	template="com.top_logic/selector.template.xml"
+>
+	<arguments>
+		<dialogs>
+			<layout-reference resource="tl-3d-demo/three_js3D/eigenschaften/dialog.layout.xml"/>
+		</dialogs>
+		<titleKey key="dynamic.0aaa02fc-a447-4938-9d3a-aa259da14443">
+			<de>Projekt</de>
+		</titleKey>
+		<optionBuilder class="com.top_logic.model.search.providers.ListModelByExpression"
+			elements="all(`tl.threed.demo:Scene`)"
+		/>
+	</arguments>
+</config:template-call>

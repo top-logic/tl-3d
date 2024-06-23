@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<config:template-call
+	xmlns:config="http://www.top-logic.com/ns/config/6.0"
+	final="true"
+	template="com.top_logic.element/form.template.xml"
+>
+	<arguments model="model(tl-3d-demo/scenes/eigenschaften/dialog.layout.xml#Dialog)">
+		<name key="dynamic.3d984f57-de8e-4060-8a83-7d63d3ecce93">
+			<de>Eigenschaften</de>
+		</name>
+	</arguments>
+</config:template-call>

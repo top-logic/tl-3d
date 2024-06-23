@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<config:template-call
+	xmlns:config="http://www.top-logic.com/ns/config/6.0"
+	final="true"
+	template="com.top_logic/tab.template.xml"
+>
+	<arguments
+		helpID="ID_98fe7ec4_6700_4f74_9185_95c358b7a4f4"
+		tabIcon="css:fas fa-images"
+	>
+		<tabLabel key="dynamic.929ca0e7-64dc-4ffa-8c9d-8b6a82b8c71b">
+			<de>Scenes</de>
+		</tabLabel>
+		<components>
+			<layout-reference resource="tl-3d-demo/scenes/innerLayout.layout.xml"/>
+		</components>
+	</arguments>
+</config:template-call>
