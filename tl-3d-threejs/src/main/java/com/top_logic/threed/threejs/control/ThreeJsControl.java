@@ -11,8 +11,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import javax.servlet.http.HttpServletResponse;
-
 import com.top_logic.base.services.simpleajax.JSFunctionCall;
 import com.top_logic.basic.util.ResKey;
 import com.top_logic.basic.xml.TagWriter;
@@ -37,6 +35,7 @@ import de.haumacher.msgbuf.json.JsonWriter;
 import de.haumacher.msgbuf.observer.Listener;
 import de.haumacher.msgbuf.observer.Observable;
 import de.haumacher.msgbuf.server.io.WriterAdapter;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * {@link Control} displaying a 3D scene using <code>three.js</code>.

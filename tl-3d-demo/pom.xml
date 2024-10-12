@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>com.top-logic</groupId>
 		<artifactId>tl-parent-app</artifactId>
-		<version>7.9.0-SNAPSHOT</version>	
+		<version>7.10.0-SNAPSHOT</version>	
 	</parent>
 	
 	<artifactId>tl-3d-demo</artifactId>
@@ -40,13 +40,6 @@
 	</properties>
 
 	<dependencies>
-		<!-- Using TopLogic Professional Edition. -->
-		<dependency>
-		    <groupId>com.top-logic</groupId>
-		    <artifactId>tl-license-professional</artifactId>
-		    <version>7.8.0-SNAPSHOT</version>
-		</dependency>
-
 		<dependency>
 			<groupId>com.top-logic</groupId>
 			<artifactId>tl-3d-threejs</artifactId>
@@ -56,7 +49,7 @@
 		<!-- TopLogic -->
 		<dependency>
 			<groupId>com.top-logic</groupId>
-			<artifactId>tl-themes-dezent</artifactId>
+			<artifactId>tl-themes-core</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>com.top-logic</groupId>

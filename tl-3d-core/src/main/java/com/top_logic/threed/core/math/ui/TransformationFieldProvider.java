@@ -32,7 +32,7 @@ public class TransformationFieldProvider extends AbstractFieldProvider {
 	}
 
 	@Override
-	public FormMember getFormField(EditContext editContext, String fieldName) {
+	protected FormMember createFormField(EditContext editContext, String fieldName) {
 		ComplexField result = FormFactory.newComplexField(fieldName, TransformationFormat.INSTANCE);
 		result.setControlProvider(DefaultFormFieldControlProvider.INSTANCE);
 		return result;
