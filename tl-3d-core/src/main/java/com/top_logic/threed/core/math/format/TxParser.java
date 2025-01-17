@@ -74,6 +74,10 @@ public class TxParser {
 					expect(')'); ws();
 					break;
 				}
+				default: {
+					throw new IllegalArgumentException(
+						"Unexpected token at position " + _offset + " while parsing transformation: " + _str);
+				}
 			}
 		}
 		
