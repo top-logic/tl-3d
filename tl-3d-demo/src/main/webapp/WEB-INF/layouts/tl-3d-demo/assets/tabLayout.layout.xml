@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<config:template-call
+	xmlns:config="http://www.top-logic.com/ns/config/6.0"
+	template="com.top_logic/tab.template.xml"
+>
+	<arguments
+		helpID="ID_6f768162_db49_425e_bdb5_8a9a566a5d61"
+		tabIcon="css:fa-solid fa-cube"
+	>
+		<tabLabel key="dynamic.b12d5ae8-0b12-44a1-aa34-fb1b7e6ff7d0">
+			<de>Assets</de>
+		</tabLabel>
+		<components>
+			<layout-reference resource="tl-3d-demo/assets/innerLayout.layout.xml"/>
+		</components>
+	</arguments>
+</config:template-call>
