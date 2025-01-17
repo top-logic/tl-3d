@@ -2,7 +2,6 @@
 
 <config:template-call
 	xmlns:config="http://www.top-logic.com/ns/config/6.0"
-	final="true"
 	template="com.top_logic.element/treegrid.template.xml"
 >
 	<arguments
@@ -15,7 +14,7 @@
 		</name>
 		<modelBuilder class="com.top_logic.model.search.providers.TreeModelByExpression"
 			children="node->$node.get(`tl.element:StructuredElementContainer#children`)"
-			nodePredicate="node->$node.instanceOf(`tl.threed.demo:Assembly`)"
+			nodePredicate="node->$node.instanceOf(`tl.threed.demo:Node`)"
 			parents="node->$node.referers(`tl.element:StructuredElementContainer#children`)"
 			rootNode="model -> $model.get(`tl.threed.demo:Scene#root`)"
 		/>
