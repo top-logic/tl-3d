@@ -24,6 +24,7 @@ import com.top_logic.layout.DisplayContext;
 import com.top_logic.layout.channel.ComponentChannel;
 import com.top_logic.layout.channel.ComponentChannel.ChannelListener;
 import com.top_logic.layout.component.Selectable;
+import com.top_logic.layout.component.SelectableWithSelectionModel;
 import com.top_logic.layout.component.model.SelectionListener;
 import com.top_logic.layout.structure.ContentLayoutControlProvider;
 import com.top_logic.layout.structure.LayoutControlProvider;
@@ -31,7 +32,6 @@ import com.top_logic.layout.table.component.BuilderComponent;
 import com.top_logic.mig.html.DefaultMultiSelectionModel;
 import com.top_logic.mig.html.DefaultSingleSelectionModel;
 import com.top_logic.mig.html.SelectionModel;
-import com.top_logic.mig.html.SelectionModelOwner;
 import com.top_logic.mig.html.layout.LayoutComponent;
 import com.top_logic.threed.threejs.control.ThreeJsControl;
 import com.top_logic.threed.threejs.scene.GroupNode;
@@ -43,7 +43,7 @@ import com.top_logic.threed.threejs.scene.SceneNode;
  * 3D-Viewer using the <code>Three.js</code> library.
  */
 public class ThreeJsComponent extends BuilderComponent
-		implements SelectionModelOwner, Selectable, ChannelListener, SelectionListener,
+		implements ChannelListener, SelectionListener, SelectableWithSelectionModel,
 		SceneNode.Visitor<Void, Map<Object, SceneNode>, RuntimeException> {
 
 	/**

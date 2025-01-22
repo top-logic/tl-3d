@@ -215,6 +215,7 @@ class ThreeJsControl {
 				for (const gltf of gltfs) {
 					assets[n++].gltf = gltf;
 				}
+				this.scene.rotation.x = -Math.PI/2;
 
 				this.sceneGraph.build(this.scene);
 				this.render();
