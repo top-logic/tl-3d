@@ -85,7 +85,7 @@ public class ThreeJsComponent extends BuilderComponent
 		@Override
 		protected HTMLFragment createView(LayoutComponent component) {
 			ThreeJsComponent viewer = (ThreeJsComponent) component;
-			return new ThreeJsControl(viewer.getScene(), viewer.getSelectionModel());
+			return viewer.getThreeJSControl();
 		}
 
 	}
@@ -99,6 +99,8 @@ public class ThreeJsComponent extends BuilderComponent
 	private boolean _sceneValid;
 
 	private boolean _multiSelect;
+
+	private ThreeJsControl _control;
 
 	/**
 	 * Creates a {@link ThreeJsComponent}.
@@ -117,11 +119,26 @@ public class ThreeJsComponent extends BuilderComponent
 		return _selectionModel;
 	}
 
+	/**
+	 * Shows the current selection in the viewport.
+	 */
+	public void zoomToSelection() {
+		getThreeJSControl().zoomToSelection();
+	}
+
 	@Override
 	protected void afterModelSet(Object oldModel, Object newModel) {
 		super.afterModelSet(oldModel, newModel);
 
 		_sceneValid = false;
+	}
+
+	ThreeJsControl getThreeJSControl() {
+		if (_control == null) {
+			_control = new ThreeJsControl(getScene(), getSelectionModel());
+		}
+
+		return _control;
 	}
 
 	@Override

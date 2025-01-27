@@ -19,7 +19,7 @@ import com.top_logic.layout.Control;
 import com.top_logic.layout.DisplayContext;
 import com.top_logic.layout.URLParser;
 import com.top_logic.layout.UpdateQueue;
-import com.top_logic.layout.basic.AbstractControlBase;
+import com.top_logic.layout.basic.AbstractControl;
 import com.top_logic.layout.basic.ControlCommand;
 import com.top_logic.layout.component.model.SelectionListener;
 import com.top_logic.mig.html.HTMLUtil;
@@ -40,7 +40,7 @@ import jakarta.servlet.http.HttpServletResponse;
 /**
  * {@link Control} displaying a 3D scene using <code>three.js</code>.
  */
-public class ThreeJsControl extends AbstractControlBase implements ContentHandler, Listener, SelectionListener {
+public class ThreeJsControl extends AbstractControl implements ContentHandler, Listener, SelectionListener {
 
 	private static final Map<String, ControlCommand> COMMANDS = createCommandMap(UpdateSelection.INSTANCE);
 
@@ -78,6 +78,13 @@ public class ThreeJsControl extends AbstractControlBase implements ContentHandle
 		return true;
 	}
 
+	/**
+	 * Sends the command to the client to zoom to the current selection.
+	 */
+	public void zoomToSelection() {
+		addUpdate(new JSFunctionCall(getID(), "window.services.threejs", "zoomToSelection"));
+	}
+
 	@Override
 	protected void internalAttach() {
 		super.internalAttach();
@@ -105,11 +112,13 @@ public class ThreeJsControl extends AbstractControlBase implements ContentHandle
 
 	@Override
 	protected boolean hasUpdates() {
-		return _selectionUpdate != null;
+		return super.hasUpdates() || _selectionUpdate != null;
 	}
 
 	@Override
 	protected void internalRevalidate(DisplayContext context, UpdateQueue actions) {
+		super.internalRevalidate(context, actions);
+
 		if (_selectionUpdate != null) {
 			actions.add(new JSFunctionCall(getID(), "window.services.threejs", "selectionChanged",
 				_selectionUpdate.toString()));

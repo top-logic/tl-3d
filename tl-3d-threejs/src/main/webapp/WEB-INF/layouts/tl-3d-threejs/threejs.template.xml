@@ -66,6 +66,17 @@
 	>
 		<buttons>
 			${buttons}
+			
+			<button id="zoomToSelection" class="com.top_logic.threed.threejs.component.ZoomToSelectionCommand"
+				group="System"
+				image="css:bi bi-zoom-in"
+			>
+				<resourceKey key="dynamic.b69eea1e-eddd-4bc5-889a-db7f4b4317ef">
+					<de>Zur Selektion fliegen</de>
+					<en>Fly to selection</en>
+				</resourceKey>
+			</button>
+			
 			<include name="templates/editComponentCommands.xml"/>
 		</buttons>
 	</component>

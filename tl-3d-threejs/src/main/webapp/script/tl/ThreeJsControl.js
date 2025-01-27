@@ -32,6 +32,14 @@ window.services.threejs = {
 		if (control != null) {
 			control.selectionChanged(changes);
 		}
+	},
+	
+	
+	zoomToSelection: function(container) {
+		const control = ThreeJsControl.control(container);
+		if (control != null) {
+			control.zoomToSelection();
+		}
 	}
 }
 
@@ -121,6 +129,10 @@ class ThreeJsControl {
 		
 		this.loadScene();		
 		this.render();
+	}
+	
+	zoomToSelection() {
+		alert("Zooming to selection.");
 	}
 	
 	/** Applies the changes to the current selection as received from the server. */
