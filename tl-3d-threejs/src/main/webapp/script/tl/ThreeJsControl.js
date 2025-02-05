@@ -12,12 +12,15 @@ import {
   WebGLRenderer,
   AxesHelper,
   Raycaster,
+  Box3,
   Vector3,
-  Vector2
+  Vector2,
+  BoxGeometry
 } from 'three';
 
 import { OrbitControls } from 'OrbitControls';
 import { GLTFLoader } from 'GLTFLoader';
+import { gsap } from 'gsap';
 
 // For sever communication written in legacy JS.
 window.services.threejs = {
@@ -25,16 +28,16 @@ window.services.threejs = {
 		const control = new ThreeJsControl(controlId, contextPath, dataUrl);
 		control.attach();
 	},
-	
-	
+
+
 	selectionChanged: function(container, changes) {
 		const control = ThreeJsControl.control(container);
 		if (control != null) {
 			control.selectionChanged(changes);
 		}
 	},
-	
-	
+
+
 	zoomToSelection: function(container) {
 		const control = ThreeJsControl.control(container);
 		if (control != null) {
@@ -44,289 +47,468 @@ window.services.threejs = {
 }
 
 class ThreeJsControl {
+  constructor(controlId, contextPath, dataUrl) {
+    this.isZoomedIn = false;
+    this.lastSelectedObject = null;
 
-	constructor(controlId, contextPath, dataUrl) {
-		this.controlId = controlId;
-		this.contextPath = contextPath;
-		this.dataUrl = dataUrl;
+    this.controlId = controlId;
+    this.contextPath = contextPath;
+    this.dataUrl = dataUrl;
 
-		this.scope = new Scope();
-		
-		// Filled in loadScene().
-		this.sceneGraph = null;
-		this.selection = [];
-		
-		const container = this.container;
+    this.scope = new Scope();
 
-		this.scene = new Scene();
-		this.scene.background = new Color('skyblue');
-		
-		const fov = 35; // AKA Field of View
-		const aspect = container.clientWidth / container.clientHeight;
-		const near = 10; // the near clipping plane
-		const far = 100000; // the far clipping plane
-		
-		this.camera = new PerspectiveCamera(fov, aspect, near, far);
-		this.camera.position.set(0, 10000, 5000);
-		
-		const light1 = new DirectionalLight('white', 8);
-		light1.position.set(0, 5500, 5500);
-		this.scene.add(light1);
-		
-		// soft white light
-		const light2 = new AmbientLight( 0x404040 );
-		this.scene.add( light2 );		
-		
-		const axesHelper = new AxesHelper(500);
-		this.scene.add(axesHelper);		
-		
-		this.renderer = new WebGLRenderer();
-		this.renderer.setSize(container.clientWidth, container.clientHeight);
-		this.renderer.setPixelRatio(window.devicePixelRatio);
-		
-		LayoutFunctions.addCustomRenderingFunction(container.parentNode, () => {
-			this.renderer.setSize(container.clientWidth, container.clientHeight);
-			this.render();
-		});
-		
-		const canvas = this.renderer.domElement;
-		container.append(canvas);
-		
-		this.controls = new OrbitControls(this.camera, canvas);
-		this.controls.enableZoom = false;
-		this.controls.screenSpacePanning = false;
-		this.controls.addEventListener("change", () => this.render());
-		
-		canvas.addEventListener('wheel', (event) => this.onMouseWheel(event), { passive: false });
-		
-		var clickStart = null;
+    // Filled in loadScene().
+    this.sceneGraph = null;
+    this.selection = [];
 
-		canvas.addEventListener('click', (event) => {
-			if (Date.now() - clickStart > 500) {
-				// Not a click.
-				return;
-			}
+    const container = this.container;
 
-			const raycaster = new Raycaster();
-			const pointer = new Vector2();
+    this.scene = new Scene();
+    this.scene.background = new Color("skyblue");
 
-			const clickPos = BAL.relativeMouseCoordinates(event, canvas);
-			
-			// Calculate pointer position in normalized device coordinates (-1 to +1) for both directions.
-			pointer.x = ( clickPos.x / canvas.clientWidth ) * 2 - 1;
-			pointer.y = - ( clickPos.y / canvas.clientHeight ) * 2 + 1;
-			
-			raycaster.setFromCamera(pointer, this.camera);
-			const intersects = raycaster.intersectObjects(this.scene.children, true);
-			
-			this.updateSelection(intersects, event.ctrlKey);
-			this.render();
-		});
+    const fov = 35; // AKA Field of View
+    const aspect = container.clientWidth / container.clientHeight;
+    const near = 10; // the near clipping plane
+    const far = 100000; // the far clipping plane
 
-		canvas.addEventListener('mousedown', (event) => {
-			clickStart = Date.now();
-		});
-		
-		this.loadScene();		
-		this.render();
-	}
-	
-	zoomToSelection() {
-		alert("Zooming to selection.");
-	}
-	
-	/** Applies the changes to the current selection as received from the server. */
-	selectionChanged(changes) {
-		const cmd = JSON.parse(changes);
-		for (const change of cmd.changed) {
-			const sharedNode = this.scope.getNode(change.key);
-			if (sharedNode == null) {
-				continue;
-			}
-			
-			switch (change.value) {
-				case "ADD":
-					this.setSelected(sharedNode, true);
-					break;
-				case "REMOVE": 
-					this.setSelected(sharedNode, false);
-					break;
-			}
+    this.camera = new PerspectiveCamera(fov, aspect, near, far);
+	this.camera.position.set(0, 8000, 8000);
+	this.camera.lookAt(new Vector3());
+    
+    const light1 = new DirectionalLight("white", 8);
+    light1.position.set(0, -100, 3000);
+    this.scene.add(light1);
+
+    // soft white light
+    const light2 = new AmbientLight(0x404040);
+    this.scene.add(light2);
+
+    const axesHelper = new AxesHelper(1500);
+    this.scene.add(axesHelper);
+
+    this.renderer = new WebGLRenderer();
+    this.renderer.setSize(container.clientWidth, container.clientHeight);
+    this.renderer.setPixelRatio(window.devicePixelRatio);
+
+    LayoutFunctions.addCustomRenderingFunction(container.parentNode, () => {
+      this.renderer.setSize(container.clientWidth, container.clientHeight);
+      this.render();
+    });
+
+    const canvas = this.renderer.domElement;
+	canvas.style.maxWidth = "100%";
+	canvas.style.maxHeight = "100%";
+    container.append(canvas);
+
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+	this.controls.reset();
+	this.controls.enableDamping = true;
+    this.controls.enableZoom = false;
+    this.controls.screenSpacePanning = false;
+    this.controls.addEventListener("change", () => this.render());
+
+	// Wir brauchen das nicht. OrbitControls macht es für uns.
+    // canvas.addEventListener("wheel", (event) => this.onMouseWheel(event), {
+    //   passive: false,
+    // });
+
+    var clickStart = null;
+
+    canvas.addEventListener("click", (event) => {
+      if (Date.now() - clickStart > 500) {
+        // Not a click.
+        return;
+      }
+
+      const raycaster = new Raycaster();
+      const pointer = new Vector2();
+
+      const clickPos = BAL.relativeMouseCoordinates(event, canvas);
+
+      // Calculate pointer position in normalized device coordinates (-1 to +1) for both directions.
+      pointer.x = (clickPos.x / canvas.clientWidth) * 2 - 1;
+      pointer.y = -(clickPos.y / canvas.clientHeight) * 2 + 1;
+
+      raycaster.setFromCamera(pointer, this.camera);
+      const intersects = raycaster.intersectObjects(this.scene.children, true);
+
+      this.updateSelection(intersects, event.ctrlKey);
+      this.render();
+    });
+
+    canvas.addEventListener("dblclick", (event) => {
+		const raycaster = new Raycaster();
+		const pointer = new Vector2();
+
+		const clickPos = BAL.relativeMouseCoordinates(event, canvas);
+
+		// Calculate pointer position in normalized device coordinates (-1 to +1) for both directions.
+		pointer.x = (clickPos.x / canvas.clientWidth) * 2 - 1;
+		pointer.y = -(clickPos.y / canvas.clientHeight) * 2 + 1;
+
+		raycaster.setFromCamera(pointer, this.camera);
+		const intersects = raycaster.intersectObjects(this.scene.children, true);
+		const selectedObject = intersects[0] && this.getParentNode(intersects[0].object);
+
+		if (selectedObject) {
+			this.onDblClick(selectedObject);
 		}
-		
-		this.render();
-	}
-	
-	/** Changes the selected state of the given shared node to the given value. */
-	setSelected(sharedNode, value) {
-		const index = this.selection.indexOf(sharedNode);
-		if (index >= 0) {
-			// Currently selected.
-			if (value) {
-				// Do not select again.
-				return;
-			}
-			this.setColor(sharedNode.node, 0xffffff);
-			this.selection.splice(index, 1);
-		} else {
-			// Currently not selected.
-			if (!value) {
-				// Cannot remove from selection.
-				return;
-			}
-			this.setColor(sharedNode.node, 0xff0000);
-			this.selection.push(sharedNode);
-		}
-	}
-	
-	setColor(node, color) {
-		if (node.material) {
-			node.material.color.set(color);
-		} else {
-			for (const child of node.children) {
-				this.setColor(child, color);
-			}
-		}	
-	}
-	
-	get container() {
-		return document.getElementById(this.controlId);
-	}
-	
-	static control(container) {
-		return container.tlControl;
-	}
-	
-	attach() {
-		this.container.tlControl = this;
-	}
-	
-	async loadScene() {
-		const gltfLoader = new GLTFLoader();
-		const loadUrl = (url) => new Promise((resolve, reject) => {
-			try {
-				gltfLoader.load(url, resolve, null, reject);
-			} catch (err) {
-				const msg = "Failed to load '" + url + "': " + err;
-				console.log(msg);
-				reject(msg);
-			}
-		});
+	});
 
-		const dataResponse = await fetch(this.dataUrl);
-		const dataJson = await dataResponse.json();
-		
-		this.sceneGraph = this.scope.loadJson(dataJson);
-		
-		const assets = this.scope.assets;
-		const urls = assets.flatMap((asset) => this.contextPath + asset.url);
-		
-		Promise.all(urls.flatMap(loadUrl)).then(
-			(gltfs) => {
-				var n = 0;
-				for (const gltf of gltfs) {
-					assets[n++].gltf = gltf;
-				}
-				this.scene.rotation.x = -Math.PI/2;
+    canvas.addEventListener("mousedown", (event) => {
+      clickStart = Date.now();
+    });
 
-				this.sceneGraph.build(this.scene);
+    this.loadScene();
+	this.render();
+
+	// for debug purposes
+	// const geometry = new BoxGeometry( 1000, 1000, 1000 );
+	// const material = new MeshBasicMaterial( {color: 0x00ff00} );
+	// const cube = new Mesh( geometry, material );
+	// cube.position.set(-3000, 2500, 0);
+	// this.scene.add( cube );
+
+	// this.renderAlways();
+    
+  }
+
+//   onDblClick(selectedObject) {
+// 	const zoomDuration = 1.5;
+// 	const targetPositionZ = 8000;
+
+// 	const boundingBox = new Box3().setFromObject(selectedObject);
+// 	const center = new Vector3();
+// 	boundingBox.getCenter(center);
+
+// 	const size = new Vector3();
+// 	boundingBox.getSize(size);
+// 	this.controls.saveState();
+
+// 	gsap.to(this.controls.target, {
+//       x: center.x,
+//       y: center.y,
+//       z: center.z,
+//       duration: zoomDuration,
+//       ease: "power3.inOut",
+//       onUpdate: () => { 
+// 		this.controls.update();
+// 		// this.controls.saveState();
+// 		this.render();
+// 	  },
+//       onComplete: () => {
+// 		// this.controls.saveState();
+// 		gsap.to(this.camera.position, {
+// 			x: center.x,
+// 			y: center.y,
+// 			z: targetPositionZ,
+// 			duration: zoomDuration,
+// 			ease: "power3.inOut",
+// 			onUpdate: () => { 
+// 				this.controls.update();
+// 			//   this.controls.saveState();
+// 			this.render();
+// 			},
+// 			onComplete: () => {
+// 				this.controls.update();
+// 			//   this.controls.saveState();
+// 			this.render();
+// 			},
+// 		  });
+// 	  },
+//     }); 
+// 	this.render();
+//   }
+
+  zoomToSelection() {
+	const zoomDuration = 1.5;
+	const targetPositionZ = 8000;
+
+    if (!this.isZoomedIn) {
+      const selectedObject = this.getParentNode(this.selection[0]?.node);
+      if (!selectedObject) return;
+
+      const boundingBox = new Box3().setFromObject(selectedObject);
+      const center = new Vector3();
+      boundingBox.getCenter(center);
+
+	  const size = new Vector3();
+      boundingBox.getSize(size);
+
+      const distance = this.camera.position.distanceTo(center);
+	  console.log('distance', distance);
+
+      const offset = new Vector3(0, 0, 0);
+      const targetPosition = center.clone().add(offset);
+	  console.log('targetPosition', targetPosition);
+	  this.controls.saveState();
+
+	  gsap.to(this.controls.target, {
+		x: center.x,
+		y: center.y,
+		z: center.z,
+		duration: zoomDuration,
+		ease: "power3.inOut",
+		onUpdate: () => { 
+			this.controls.update();
+			// this.controls.saveState();
+			this.render();
+		},
+		onComplete: () => {
+		  // this.controls.saveState();
+		  gsap.to(this.camera.position, {
+			  x: center.x,
+			  y: center.y,
+			  z: targetPositionZ,
+			  duration: zoomDuration,
+			  ease: "power3.inOut",
+			  onUpdate: () => { 
+				this.controls.update();
+			    // this.controls.saveState();
 				this.render();
-			}
-		);
-	}
+			  },
+			  onComplete: () => {
+				this.isZoomedIn = true;
+				this.lastSelectedObject = selectedObject;
+				this.controls.update();
+			    // this.controls.saveState();
+				this.render();
+			  },
+			});
+		},
+	  }); 
+	} else {
+		this.resetScene();
 
-	onMouseWheel(event) {
-		event.preventDefault();
-		
-		const target = this.controls.target;
-		const position = this.camera.position;
-		
-		const offset = new Vector3();
-		offset.copy(position);
-		offset.sub(target);
-		
-		const factor = event.deltaY < 0 ? 0.888888889 : 1.125;
-		offset.multiplyScalar(factor);
-		offset.add(target);
-		
-		this.camera.position.copy(offset);
-		this.render();
+	  }
+	  this.render();
 	}
+    debugger;
+  resetScene() {
+	console.log("Reset scene");
+    gsap.to(this.camera.position, {
+      x: 0,
+      y: 0,
+      z: 5000,
+      duration: zoomDuration,
+      ease: "power3.inOut",
+      onComplete: () => {
+        this.isZoomedIn = false;
+        this.lastSelectedObject = null;
+      },
+    });
 
-	/** Updates the selection from a click on the canvas. */
-	updateSelection(intersects, toggleMode) {
-		const changes = {};
-	
-		if (!toggleMode) {
-			for (const sharedNode of this.selection) {
-				changes[sharedNode.id] = "REMOVE";
-			}
-			this.clearSelection();
-		}
+  }
 
-		for ( let i = 0; i < intersects.length; i ++ ) {
-			const clicked = intersects[i].object;
-			
-			var candidate = clicked;
-			while (candidate != null) {
-				const sharedNode = candidate.userData;
-				if (sharedNode instanceof SharedObject) {
-					const value = toggleMode ? !this.selection.includes(sharedNode) : true;
-					this.setSelected(sharedNode, value);
-					
-					changes[sharedNode.id] = value ? "ADD" : "REMOVE";
-					
-					this.sendCommand("updateSelection", {"changes": changes});
-					return;
-				}
-				
-				candidate = candidate.parent;
-			}
-		}
-		
-		if (Object.keys(changes).length > 0) {
-			this.sendCommand("updateSelection", {"changes": changes});
-		}
-	}
+  getParentNode(node) {
+    while (node.parent && node.parent.type !== "Scene") {
+      node = node.parent;
+    }
 
-	clearSelection() {
-		for (const sharedNode of this.selection) {
-			this.setColor(sharedNode.node, 0xffffff);
-		}
-		
-		this.selection.length = 0;
-	}
-	
-	
-	render() {
-		requestAnimationFrame(() => this.renderer.render(this.scene, this.camera));
-	}
-	
-	
-	sendCommand(command, args) {
-		const message = {
-			controlCommand : command,
-			controlID : this.controlId
-		};
-		
-		for (const key in args) {
-			message[key] = args[key];
-		}
-		
-		services.ajax.execute("dispatchControlCommand", message);
-	}
-	
+    return node;
+  }
+
+  /** Applies the changes to the current selection as received from the server. */
+  selectionChanged(changes) {
+    const cmd = JSON.parse(changes);
+    for (const change of cmd.changed) {
+      const sharedNode = this.scope.getNode(change.key);
+      if (sharedNode == null) {
+        continue;
+      }
+
+      switch (change.value) {
+        case "ADD":
+          this.setSelected(sharedNode, true);
+          break;
+        case "REMOVE":
+          this.setSelected(sharedNode, false);
+          break;
+      }
+    }
+
+    this.render();
+  }
+
+  /** Changes the selected state of the given shared node to the given value. */
+  setSelected(sharedNode, value) {
+    const index = this.selection.indexOf(sharedNode);
+    if (index >= 0) {
+      // Currently selected.
+      if (value) {
+        // Do not select again.
+        return;
+      }
+      this.setColor(sharedNode.node, 0xffffff);
+      this.selection.splice(index, 1);
+    } else {
+      // Currently not selected.
+      if (!value) {
+        // Cannot remove from selection.
+        return;
+      }
+      this.setColor(sharedNode.node, 0xff0000);
+      this.selection.push(sharedNode);
+    }
+  }
+
+  setColor(node, color) {
+    if (node.material) {
+      node.material.color.set(color);
+    } else {
+      for (const child of node.children) {
+        this.setColor(child, color);
+      }
+    }
+  }
+
+  get container() {
+    return document.getElementById(this.controlId);
+  }
+
+  static control(container) {
+    return container.tlControl;
+  }
+
+  attach() {
+    this.container.tlControl = this;
+  }
+
+  async loadScene() {
+    const gltfLoader = new GLTFLoader();
+    const loadUrl = (url) =>
+      new Promise((resolve, reject) => {
+        try {
+          gltfLoader.load(url, resolve, null, reject);
+        } catch (err) {
+          const msg = "Failed to load '" + url + "': " + err;
+          console.log(msg);
+          reject(msg);
+        }
+      });
+
+    const dataResponse = await fetch(this.dataUrl);
+    const dataJson = await dataResponse.json();
+
+    this.sceneGraph = this.scope.loadJson(dataJson);
+
+    const assets = this.scope.assets;
+    const urls = assets.flatMap((asset) => this.contextPath + asset.url);
+
+    Promise.all(urls.flatMap(loadUrl)).then((gltfs) => {
+      var n = 0;
+      for (const gltf of gltfs) {
+        assets[n++].gltf = gltf;
+      }
+      this.scene.rotation.x = -Math.PI / 2;
+
+      this.sceneGraph.build(this.scene);
+
+      this.render();
+    });
+  }
+
+  onMouseWheel(event) {
+    event.preventDefault();
+
+    const target = this.controls.target;
+    const position = this.camera.position;
+
+    const offset = new Vector3();
+    offset.copy(position);
+    offset.sub(target);
+
+    const factor = event.deltaY < 0 ? 0.888888889 : 1.125;
+    offset.multiplyScalar(factor);
+    offset.add(target);
+
+    this.camera.position.copy(offset);
+    this.render();
+  }
+
+  /** Updates the selection from a click on the canvas. */
+  updateSelection(intersects, toggleMode) {
+    const changes = {};
+
+    if (!toggleMode) {
+      for (const sharedNode of this.selection) {
+        changes[sharedNode.id] = "REMOVE";
+      }
+      this.clearSelection();
+    }
+
+    for (let i = 0; i < intersects.length; i++) {
+      const clicked = intersects[i].object;
+
+      var candidate = clicked;
+      while (candidate != null) {
+        const sharedNode = candidate.userData;
+        if (sharedNode instanceof SharedObject) {
+          const value = toggleMode
+            ? !this.selection.includes(sharedNode)
+            : true;
+          this.setSelected(sharedNode, value);
+
+          changes[sharedNode.id] = value ? "ADD" : "REMOVE";
+
+          this.sendCommand("updateSelection", { changes: changes });
+          return;
+        }
+
+        candidate = candidate.parent;
+      }
+    }
+
+    if (Object.keys(changes).length > 0) {
+      this.sendCommand("updateSelection", { changes: changes });
+    }
+  }
+
+  clearSelection() {
+    for (const sharedNode of this.selection) {
+      this.setColor(sharedNode.node, 0xffffff);
+    }
+
+    this.selection.length = 0;
+  }
+
+  render() {
+    requestAnimationFrame(() => this.renderer.render(this.scene, this.camera));
+  }
+
+  // for debug purposes
+//   renderAlways() {
+// 	const callback = () => {
+// 		this.controls.update();
+// 		this.renderer.render(this.scene, this.camera);
+// 		requestAnimationFrame(callback);
+// 	};
+// 	callback();
+//   }
+
+  sendCommand(command, args) {
+    const message = {
+      controlCommand: command,
+      controlID: this.controlId,
+    };
+
+    for (const key in args) {
+      message[key] = args[key];
+    }
+
+    services.ajax.execute("dispatchControlCommand", message);
+  }
 }
 
 class Scope {
 	constructor() {
 		this.objects = [];
 	}
-	
+
 	get assets() {
 		return this.objects.filter((obj) => obj instanceof GltfAsset);
 	}
-	
+
 	getNode(id) {
 		return this.objects[id];
 	}
@@ -334,7 +516,7 @@ class Scope {
 	loadAll(json) {
 		return json.flatMap((value) => this.loadJson(value));
 	}
-	
+
 	loadJson(json) {
 		if (json == null) {
 			return null;
@@ -370,7 +552,7 @@ class SceneGraph extends SharedObject {
 	constructor(id) {
 		super(id);
 	}
-	
+
 	build(scene) {
 		this.root.build(scene);
 	}
@@ -422,7 +604,7 @@ function toMatrix(tx) {
 			tx[4],  tx[5],  tx[6],  tx[7],
 			tx[8],  tx[9],  tx[10], tx[11],
 			tx[12], tx[13], tx[14], tx[15]);
-	default: 
+	default:
 		throw new Error("Invalid transform array: " + tx);
 	}
 }
@@ -447,12 +629,12 @@ class GroupNode extends SharedObject {
 	constructor(id) {
 		super(id);
 	}
-	
+
 	build(scene) {
 		var group = transform(scene, this.transform);
 		this.contents.forEach((c) => c.build(group));
 	}
-	
+
 	loadJson(scope, json) {
 		this.transform = json.transform;
 		this.contents = scope.loadAll(json.contents);
@@ -463,17 +645,17 @@ class PartNode extends SharedObject {
 	constructor(id) {
 		super(id);
 	}
-	
+
 	build(scene) {
 		const node = this.asset.build(scene);
 		var group = transform(scene, this.transform);
 		group.add(node);
-		
+
 		// Link to scene node.
 		node.userData = this;
 		this.node = node;
 	}
-	
+
 	loadJson(scope, json) {
 		this.transform = json.transform;
 		this.asset = scope.loadJson(json.asset);
@@ -488,7 +670,7 @@ class GltfAsset extends SharedObject {
 	build(scene) {
 		return this.gltf.scene.clone();
 	}
-	
+
 	loadJson(scope, json) {
 		this.url = json.url;
 	}
