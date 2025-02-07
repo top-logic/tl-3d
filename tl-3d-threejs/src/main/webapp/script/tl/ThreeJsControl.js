@@ -43,6 +43,13 @@ window.services.threejs = {
 		if (control != null) {
 			control.zoomToSelection();
 		}
+	},
+
+	zoomOutFromSelection: function(container) {
+		const control = ThreeJsControl.control(container);
+		if (control != null) {
+			control.zoomOutFromSelection();
+		}
 	}
 }
 
@@ -297,7 +304,6 @@ class ThreeJsControl {
         this.lastSelectedObject = null;
       },
     });
-
   }
 
   getParentNode(node) {

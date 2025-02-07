@@ -76,6 +76,14 @@
 					<en>Fly to selection</en>
 				</resourceKey>
 			</button>
+			<button id="zoomOutFromSelection" class="com.top_logic.threed.threejs.component.ZoomOutFromSelectionCommand"
+				group="System"
+				image="css:bi bi-zoom-out">
+				<resourceKey key="dynamic.329fc91e-90e5-4f67-869b-ad52c2216dae">
+					<de>Vom Selektion weg fliegen</de>
+					<en>Zoom out from selection</en>
+				</resourceKey>
+			</button>
 			
 			<include name="templates/editComponentCommands.xml"/>
 		</buttons>

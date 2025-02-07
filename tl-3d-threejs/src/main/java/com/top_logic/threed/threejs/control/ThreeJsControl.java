@@ -85,6 +85,10 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler, L
 		addUpdate(new JSFunctionCall(getID(), "window.services.threejs", "zoomToSelection"));
 	}
 
+	public void zoomOutFromSelection() {
+    	addUpdate(new JSFunctionCall(getID(), "window.services.threejs", "zoomOutFromSelection"));
+	}
+
 	@Override
 	protected void internalAttach() {
 		super.internalAttach();

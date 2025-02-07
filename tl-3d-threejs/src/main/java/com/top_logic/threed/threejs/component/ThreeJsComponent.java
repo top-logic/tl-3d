@@ -126,6 +126,10 @@ public class ThreeJsComponent extends BuilderComponent
 		getThreeJSControl().zoomToSelection();
 	}
 
+	public void zoomOutFromSelection() {
+    	getThreeJSControl().zoomOutFromSelection();
+	}
+
 	@Override
 	protected void afterModelSet(Object oldModel, Object newModel) {
 		super.afterModelSet(oldModel, newModel);
