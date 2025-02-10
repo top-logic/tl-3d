@@ -29,14 +29,12 @@ window.services.threejs = {
 		control.attach();
 	},
 
-
 	selectionChanged: function(container, changes) {
 		const control = ThreeJsControl.control(container);
 		if (control != null) {
 			control.selectionChanged(changes);
 		}
 	},
-
 
 	zoomToSelection: function(container) {
 		const control = ThreeJsControl.control(container);
@@ -55,7 +53,6 @@ window.services.threejs = {
 
 class ThreeJsControl {
   constructor(controlId, contextPath, dataUrl) {
-    this.isZoomedIn = false;
     this.lastSelectedObject = null;
 
     this.controlId = controlId;
@@ -231,8 +228,7 @@ class ThreeJsControl {
 	const zoomDuration = 1.5;
 	const targetPositionZ = 8000;
 
-    if (!this.isZoomedIn) {
-      const selectedObject = this.getParentNode(this.selection[0]?.node);
+		const selectedObject = this.getParentNode(this.selection[0]?.node);
       if (!selectedObject) return;
 
       const boundingBox = new Box3().setFromObject(selectedObject);
@@ -248,8 +244,18 @@ class ThreeJsControl {
       const offset = new Vector3(0, 0, 0);
       const targetPosition = center.clone().add(offset);
 	  console.log('targetPosition', targetPosition);
-	  this.controls.saveState();
+	  
+	  const controlsObjectPositionMatches = this.controls.object.position.x === targetPosition.x && 
+	  this.controls.object.position.y === targetPosition.y && 
+	  this.controls.object.position.z === targetPositionZ;
+	  
+	  const controlsTargetMatches = this.controls.target.x === center.x && 
+	  this.controls.target.y === center.y && 
+	  this.controls.target.z === center.z;
 
+	 if(!controlsObjectPositionMatches && !controlsTargetMatches){
+		
+	//  this.controls.saveState();
 	  gsap.to(this.controls.target, {
 		x: center.x,
 		y: center.y,
@@ -258,12 +264,10 @@ class ThreeJsControl {
 		ease: "power3.inOut",
 		onUpdate: () => { 
 			this.controls.update();
-			// this.controls.saveState();
 			this.render();
 		},
 		onComplete: () => {
-		  // this.controls.saveState();
-		  gsap.to(this.camera.position, {
+		  gsap.to(this.controls.object.position, {
 			  x: center.x,
 			  y: center.y,
 			  z: targetPositionZ,
@@ -271,46 +275,40 @@ class ThreeJsControl {
 			  ease: "power3.inOut",
 			  onUpdate: () => { 
 				this.controls.update();
-			    // this.controls.saveState();
 				this.render();
 			  },
 			  onComplete: () => {
-				this.isZoomedIn = true;
 				this.lastSelectedObject = selectedObject;
 				this.controls.update();
-			    // this.controls.saveState();
 				this.render();
 			  },
 			});
 		},
 	  }); 
-	} else {
-		this.resetScene();
-
-	  }
+	}
 	  this.render();
 	}
-    debugger;
-  resetScene() {
+
+	zoomOutFromSelection() {
+	// debugger;
+
 	console.log("Reset scene");
-    gsap.to(this.camera.position, {
+    gsap.to(this.controls.object.position, {
       x: 0,
       y: 0,
       z: 5000,
       duration: zoomDuration,
       ease: "power3.inOut",
       onComplete: () => {
-        this.isZoomedIn = false;
         this.lastSelectedObject = null;
       },
     });
-  }
+	}
 
   getParentNode(node) {
     while (node.parent && node.parent.type !== "Scene") {
       node = node.parent;
     }
-
     return node;
   }
 
@@ -332,7 +330,6 @@ class ThreeJsControl {
           break;
       }
     }
-
     this.render();
   }
 
@@ -367,6 +364,51 @@ class ThreeJsControl {
       }
     }
   }
+
+    /** Updates the selection from a click on the canvas. */
+	updateSelection(intersects, toggleMode) {
+		const changes = {};
+	
+		if (!toggleMode) {
+		  for (const sharedNode of this.selection) {
+			changes[sharedNode.id] = "REMOVE";
+		  }
+		  this.clearSelection();
+		}
+	
+		for (let i = 0; i < intersects.length; i++) {
+		  const clicked = intersects[i].object;
+	
+		  var candidate = clicked;
+		  while (candidate != null) {
+			const sharedNode = candidate.userData;
+			if (sharedNode instanceof SharedObject) {
+			  const value = toggleMode
+				? !this.selection.includes(sharedNode)
+				: true;
+			  this.setSelected(sharedNode, value);
+	
+			  changes[sharedNode.id] = value ? "ADD" : "REMOVE";
+	
+			  this.sendCommand("updateSelection", { changes: changes });
+			  return;
+			}
+	
+			candidate = candidate.parent;
+		  }
+		}
+	
+		if (Object.keys(changes).length > 0) {
+		  this.sendCommand("updateSelection", { changes: changes });
+		}
+	  }
+	
+	  clearSelection() {
+		for (const sharedNode of this.selection) {
+		  this.setColor(sharedNode.node, 0xffffff);
+		}
+		this.selection.length = 0;
+	  }
 
   get container() {
     return document.getElementById(this.controlId);
@@ -430,52 +472,6 @@ class ThreeJsControl {
 
     this.camera.position.copy(offset);
     this.render();
-  }
-
-  /** Updates the selection from a click on the canvas. */
-  updateSelection(intersects, toggleMode) {
-    const changes = {};
-
-    if (!toggleMode) {
-      for (const sharedNode of this.selection) {
-        changes[sharedNode.id] = "REMOVE";
-      }
-      this.clearSelection();
-    }
-
-    for (let i = 0; i < intersects.length; i++) {
-      const clicked = intersects[i].object;
-
-      var candidate = clicked;
-      while (candidate != null) {
-        const sharedNode = candidate.userData;
-        if (sharedNode instanceof SharedObject) {
-          const value = toggleMode
-            ? !this.selection.includes(sharedNode)
-            : true;
-          this.setSelected(sharedNode, value);
-
-          changes[sharedNode.id] = value ? "ADD" : "REMOVE";
-
-          this.sendCommand("updateSelection", { changes: changes });
-          return;
-        }
-
-        candidate = candidate.parent;
-      }
-    }
-
-    if (Object.keys(changes).length > 0) {
-      this.sendCommand("updateSelection", { changes: changes });
-    }
-  }
-
-  clearSelection() {
-    for (const sharedNode of this.selection) {
-      this.setColor(sharedNode.node, 0xffffff);
-    }
-
-    this.selection.length = 0;
   }
 
   render() {
