@@ -76,9 +76,9 @@ class ThreeJsControl {
     const far = 100000; // the far clipping plane
 
     this.camera = new PerspectiveCamera(fov, aspect, near, far);
-	this.camera.position.set(0, 8000, 8000);
-	this.camera.lookAt(new Vector3());
-    
+    this.camera.position.set(0, 8000, 8000);
+    this.camera.lookAt(new Vector3());
+
     const light1 = new DirectionalLight("white", 8);
     light1.position.set(0, -100, 3000);
     this.scene.add(light1);
@@ -100,18 +100,18 @@ class ThreeJsControl {
     });
 
     const canvas = this.renderer.domElement;
-	canvas.style.maxWidth = "100%";
-	canvas.style.maxHeight = "100%";
+    canvas.style.maxWidth = "100%";
+    canvas.style.maxHeight = "100%";
     container.append(canvas);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-	this.controls.reset();
-	this.controls.enableDamping = true;
+    this.controls.reset();
+    this.controls.enableDamping = true;
     this.controls.enableZoom = false;
     this.controls.screenSpacePanning = false;
     this.controls.addEventListener("change", () => this.render());
 
-	// Wir brauchen das nicht. OrbitControls macht es für uns.
+    // Wir brauchen das nicht. OrbitControls macht es für uns.
     // canvas.addEventListener("wheel", (event) => this.onMouseWheel(event), {
     //   passive: false,
     // });
@@ -140,170 +140,227 @@ class ThreeJsControl {
       this.render();
     });
 
-    canvas.addEventListener("dblclick", (event) => {
-		const raycaster = new Raycaster();
-		const pointer = new Vector2();
+    // canvas.addEventListener("dblclick", (event) => {
+    //   const raycaster = new Raycaster();
+    //   const pointer = new Vector2();
 
-		const clickPos = BAL.relativeMouseCoordinates(event, canvas);
+    //   const clickPos = BAL.relativeMouseCoordinates(event, canvas);
 
-		// Calculate pointer position in normalized device coordinates (-1 to +1) for both directions.
-		pointer.x = (clickPos.x / canvas.clientWidth) * 2 - 1;
-		pointer.y = -(clickPos.y / canvas.clientHeight) * 2 + 1;
+    //   // Calculate pointer position in normalized device coordinates (-1 to +1) for both directions.
+    //   pointer.x = (clickPos.x / canvas.clientWidth) * 2 - 1;
+    //   pointer.y = -(clickPos.y / canvas.clientHeight) * 2 + 1;
 
-		raycaster.setFromCamera(pointer, this.camera);
-		const intersects = raycaster.intersectObjects(this.scene.children, true);
-		const selectedObject = intersects[0] && this.getParentNode(intersects[0].object);
+    //   raycaster.setFromCamera(pointer, this.camera);
+    //   const intersects = raycaster.intersectObjects(this.scene.children, true);
+    //   const selectedObject =
+    //     intersects[0] && this.getParentNode(intersects[0].object);
 
-		if (selectedObject) {
-			this.onDblClick(selectedObject);
-		}
-	});
+    //   if (selectedObject) {
+    //     this.onDblClick(selectedObject);
+    //   }
+    // });
 
     canvas.addEventListener("mousedown", (event) => {
       clickStart = Date.now();
     });
 
     this.loadScene();
-	this.render();
+    this.render();
 
-	// for debug purposes
-	// const geometry = new BoxGeometry( 1000, 1000, 1000 );
-	// const material = new MeshBasicMaterial( {color: 0x00ff00} );
-	// const cube = new Mesh( geometry, material );
-	// cube.position.set(-3000, 2500, 0);
-	// this.scene.add( cube );
+    // for debug purposes
+    // const geometry = new BoxGeometry( 1000, 1000, 1000 );
+    // const material = new MeshBasicMaterial( {color: 0x00ff00} );
+    // const cube = new Mesh( geometry, material );
+    // cube.position.set(-3000, 2500, 0);
+    // this.scene.add( cube );
 
-	// this.renderAlways();
-    
+    // this.renderAlways();
   }
 
-//   onDblClick(selectedObject) {
-// 	const zoomDuration = 1.5;
-// 	const targetPositionZ = 8000;
+  //   onDblClick(selectedObject) {
+  // 	const zoomDuration = 1.5;
+  // 	const targetPositionZ = 8000;
 
-// 	const boundingBox = new Box3().setFromObject(selectedObject);
-// 	const center = new Vector3();
-// 	boundingBox.getCenter(center);
+  // 	const boundingBox = new Box3().setFromObject(selectedObject);
+  // 	const center = new Vector3();
+  // 	boundingBox.getCenter(center);
 
-// 	const size = new Vector3();
-// 	boundingBox.getSize(size);
-// 	this.controls.saveState();
+  // 	const size = new Vector3();
+  // 	boundingBox.getSize(size);
+  // 	this.controls.saveState();
 
-// 	gsap.to(this.controls.target, {
-//       x: center.x,
-//       y: center.y,
-//       z: center.z,
-//       duration: zoomDuration,
-//       ease: "power3.inOut",
-//       onUpdate: () => { 
-// 		this.controls.update();
-// 		// this.controls.saveState();
-// 		this.render();
-// 	  },
-//       onComplete: () => {
-// 		// this.controls.saveState();
-// 		gsap.to(this.camera.position, {
-// 			x: center.x,
-// 			y: center.y,
-// 			z: targetPositionZ,
-// 			duration: zoomDuration,
-// 			ease: "power3.inOut",
-// 			onUpdate: () => { 
-// 				this.controls.update();
-// 			//   this.controls.saveState();
-// 			this.render();
-// 			},
-// 			onComplete: () => {
-// 				this.controls.update();
-// 			//   this.controls.saveState();
-// 			this.render();
-// 			},
-// 		  });
-// 	  },
-//     }); 
-// 	this.render();
-//   }
+  // 	gsap.to(this.controls.target, {
+  //       x: center.x,
+  //       y: center.y,
+  //       z: center.z,
+  //       duration: zoomDuration,
+  //       ease: "power3.inOut",
+  //       onUpdate: () => {
+  // 		this.controls.update();
+  // 		// this.controls.saveState();
+  // 		this.render();
+  // 	  },
+  //       onComplete: () => {
+  // 		// this.controls.saveState();
+  // 		gsap.to(this.camera.position, {
+  // 			x: center.x,
+  // 			y: center.y,
+  // 			z: targetPositionZ,
+  // 			duration: zoomDuration,
+  // 			ease: "power3.inOut",
+  // 			onUpdate: () => {
+  // 				this.controls.update();
+  // 			//   this.controls.saveState();
+  // 			this.render();
+  // 			},
+  // 			onComplete: () => {
+  // 				this.controls.update();
+  // 			//   this.controls.saveState();
+  // 			this.render();
+  // 			},
+  // 		  });
+  // 	  },
+  //     });
+  // 	this.render();
+  //   }
 
   zoomToSelection() {
+    const zoomDuration = 1.5;
+    const selectedObject = this.getParentNode(this.selection[0]?.node);
+    if (!selectedObject) return;
+
+    const boundingBox = new Box3().setFromObject(selectedObject);
+    const center = new Vector3();
+    boundingBox.getCenter(center);
+
+    const size = new Vector3();
+    boundingBox.getSize(size);
+    const objectWidth = size.x;
+    const objectHeight = size.y;
+    const objectDepth = size.z;
+
+    const objectPosition = selectedObject.getWorldPosition(new Vector3());
+    const objectPositionZ = objectPosition.z;
+
+    const canvasWidth = this.renderer.domElement.clientWidth * 10;
+    const canvasHeight = this.renderer.domElement.clientHeight * 10;
+
+    const fov = this.camera.fov * (Math.PI / 180);
+
+    let targetDistance;
+
+    // if (objectWidth > objectHeight) {
+    //   targetDistance =
+    //     canvasWidth / (2 * Math.tan((this.camera.fov * Math.PI) / 180));
+    // } else {
+    //   targetDistance =
+    //     canvasHeight / (2 * Math.tan((this.camera.fov * Math.PI) / 180));
+    // }
+
+    if (objectWidth > objectHeight) {
+        targetDistance = (objectWidth / 2) / Math.tan(fov / 2);
+    } else {
+        targetDistance = (objectHeight / 2) / Math.tan(fov / 2);
+    }
+
+    // const MAX_DISTANCE = 5000;
+    // if (targetDistance > MAX_DISTANCE) {
+    //     targetDistance = MAX_DISTANCE;
+    // }
+
+    const distanceToObject = objectPositionZ;
+    const targetPositionZ = targetDistance + distanceToObject;
+
+    console.log("canvasWidth:", canvasWidth);
+    console.log("canvasHeight:", canvasHeight);
+    console.log("Object width:", objectWidth);
+    console.log("Object height:", objectHeight);
+    console.log("Object depth:", objectDepth);
+    console.log("Distance to object:", distanceToObject);
+    console.log("Target position Z:", targetPositionZ);
+
+    const offset = new Vector3(0, 0, 0);
+    const targetPosition = center.clone().add(offset);
+
+    const controlsObjectPositionMatches =
+      this.controls.object.position.x === targetPosition.x &&
+      this.controls.object.position.y === targetPosition.y &&
+      this.controls.object.position.z === targetPositionZ;
+
+    const controlsTargetMatches =
+      this.controls.target.x === center.x &&
+      this.controls.target.y === center.y &&
+      this.controls.target.z === center.z;
+
+    if (!controlsObjectPositionMatches && !controlsTargetMatches) {
+      gsap.to(this.controls.target, {
+        x: center.x,
+        y: center.y,
+        z: center.z,
+        duration: zoomDuration,
+        ease: "power3.inOut",
+        onUpdate: () => {
+          this.controls.update();
+          this.render();
+        },
+        onComplete: () => {
+		gsap.to(this.controls.object.position, {
+            x: center.x,
+            y: center.y,
+            z: targetPositionZ,
+            duration: zoomDuration,
+            ease: "power3.inOut",
+            onUpdate: () => {
+              this.controls.update();
+              this.render();
+            },
+            onComplete: () => {
+              this.lastSelectedObject = selectedObject;
+              this.controls.update();
+              this.render();
+            },
+          });
+        },
+      });
+    }
+    this.render();
+  }
+
+  zoomOutFromSelection() {
 	const zoomDuration = 1.5;
-	const targetPositionZ = 8000;
-
-		const selectedObject = this.getParentNode(this.selection[0]?.node);
-      if (!selectedObject) return;
-
-      const boundingBox = new Box3().setFromObject(selectedObject);
-      const center = new Vector3();
-      boundingBox.getCenter(center);
-
-	  const size = new Vector3();
-      boundingBox.getSize(size);
-
-      const distance = this.camera.position.distanceTo(center);
-	  console.log('distance', distance);
-
-      const offset = new Vector3(0, 0, 0);
-      const targetPosition = center.clone().add(offset);
-	  console.log('targetPosition', targetPosition);
-	  
-	  const controlsObjectPositionMatches = this.controls.object.position.x === targetPosition.x && 
-	  this.controls.object.position.y === targetPosition.y && 
-	  this.controls.object.position.z === targetPositionZ;
-	  
-	  const controlsTargetMatches = this.controls.target.x === center.x && 
-	  this.controls.target.y === center.y && 
-	  this.controls.target.z === center.z;
-
-	 if(!controlsObjectPositionMatches && !controlsTargetMatches){
-		
-	//  this.controls.saveState();
-	  gsap.to(this.controls.target, {
-		x: center.x,
-		y: center.y,
-		z: center.z,
-		duration: zoomDuration,
-		ease: "power3.inOut",
-		onUpdate: () => { 
-			this.controls.update();
-			this.render();
-		},
-		onComplete: () => {
-		  gsap.to(this.controls.object.position, {
-			  x: center.x,
-			  y: center.y,
-			  z: targetPositionZ,
-			  duration: zoomDuration,
-			  ease: "power3.inOut",
-			  onUpdate: () => { 
-				this.controls.update();
-				this.render();
-			  },
-			  onComplete: () => {
-				this.lastSelectedObject = selectedObject;
-				this.controls.update();
-				this.render();
-			  },
-			});
-		},
-	  }); 
-	}
-	  this.render();
-	}
-
-	zoomOutFromSelection() {
-	// debugger;
-
-	console.log("Reset scene");
-    gsap.to(this.controls.object.position, {
+    console.log("Reset scene");
+    this.controls.update();
+    this.render();
+    gsap.to(this.controls.target, {
       x: 0,
       y: 0,
-      z: 5000,
+      z: 0,
       duration: zoomDuration,
       ease: "power3.inOut",
+      onUpdate: () => {
+        this.controls.update();
+        this.render();
+      },
       onComplete: () => {
-        this.lastSelectedObject = null;
+        gsap.to(this.controls.object.position, {
+          x: 0,
+          y: 8000,
+          z: 8000,
+          duration: zoomDuration,
+          ease: "power3.inOut",
+          onUpdate: () => {
+            this.controls.update();
+            this.render();
+          },
+          onComplete: () => {
+            this.lastSelectedObject = null;
+            this.controls.update();
+            this.render();
+          },
+        });
       },
     });
-	}
+  }
 
   getParentNode(node) {
     while (node.parent && node.parent.type !== "Scene") {
@@ -365,50 +422,50 @@ class ThreeJsControl {
     }
   }
 
-    /** Updates the selection from a click on the canvas. */
-	updateSelection(intersects, toggleMode) {
-		const changes = {};
-	
-		if (!toggleMode) {
-		  for (const sharedNode of this.selection) {
-			changes[sharedNode.id] = "REMOVE";
-		  }
-		  this.clearSelection();
-		}
-	
-		for (let i = 0; i < intersects.length; i++) {
-		  const clicked = intersects[i].object;
-	
-		  var candidate = clicked;
-		  while (candidate != null) {
-			const sharedNode = candidate.userData;
-			if (sharedNode instanceof SharedObject) {
-			  const value = toggleMode
-				? !this.selection.includes(sharedNode)
-				: true;
-			  this.setSelected(sharedNode, value);
-	
-			  changes[sharedNode.id] = value ? "ADD" : "REMOVE";
-	
-			  this.sendCommand("updateSelection", { changes: changes });
-			  return;
-			}
-	
-			candidate = candidate.parent;
-		  }
-		}
-	
-		if (Object.keys(changes).length > 0) {
-		  this.sendCommand("updateSelection", { changes: changes });
-		}
-	  }
-	
-	  clearSelection() {
-		for (const sharedNode of this.selection) {
-		  this.setColor(sharedNode.node, 0xffffff);
-		}
-		this.selection.length = 0;
-	  }
+  /** Updates the selection from a click on the canvas. */
+  updateSelection(intersects, toggleMode) {
+    const changes = {};
+
+    if (!toggleMode) {
+      for (const sharedNode of this.selection) {
+        changes[sharedNode.id] = "REMOVE";
+      }
+      this.clearSelection();
+    }
+
+    for (let i = 0; i < intersects.length; i++) {
+      const clicked = intersects[i].object;
+
+      var candidate = clicked;
+      while (candidate != null) {
+        const sharedNode = candidate.userData;
+        if (sharedNode instanceof SharedObject) {
+          const value = toggleMode
+            ? !this.selection.includes(sharedNode)
+            : true;
+          this.setSelected(sharedNode, value);
+
+          changes[sharedNode.id] = value ? "ADD" : "REMOVE";
+
+          this.sendCommand("updateSelection", { changes: changes });
+          return;
+        }
+
+        candidate = candidate.parent;
+      }
+    }
+
+    if (Object.keys(changes).length > 0) {
+      this.sendCommand("updateSelection", { changes: changes });
+    }
+  }
+
+  clearSelection() {
+    for (const sharedNode of this.selection) {
+      this.setColor(sharedNode.node, 0xffffff);
+    }
+    this.selection.length = 0;
+  }
 
   get container() {
     return document.getElementById(this.controlId);
@@ -479,14 +536,14 @@ class ThreeJsControl {
   }
 
   // for debug purposes
-//   renderAlways() {
-// 	const callback = () => {
-// 		this.controls.update();
-// 		this.renderer.render(this.scene, this.camera);
-// 		requestAnimationFrame(callback);
-// 	};
-// 	callback();
-//   }
+  //   renderAlways() {
+  // 	const callback = () => {
+  // 		this.controls.update();
+  // 		this.renderer.render(this.scene, this.camera);
+  // 		requestAnimationFrame(callback);
+  // 	};
+  // 	callback();
+  //   }
 
   sendCommand(command, args) {
     const message = {
