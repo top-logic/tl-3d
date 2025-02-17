@@ -1,8 +1,5 @@
 import {
-  BoxBufferGeometry,
   Color,
-  Mesh,
-  MeshBasicMaterial,
   PerspectiveCamera,
   Matrix4,
   Group,
@@ -15,7 +12,8 @@ import {
   Box3,
   Vector3,
   Vector2,
-  BoxGeometry
+  BoxHelper,
+  Box3Helper,
 } from 'three';
 
 import { OrbitControls } from 'OrbitControls';
@@ -76,11 +74,11 @@ class ThreeJsControl {
     const far = 100000; // the far clipping plane
 
     this.camera = new PerspectiveCamera(fov, aspect, near, far);
-    this.camera.position.set(0, 8000, 8000);
+    this.camera.position.set(5000, 6000, 10000);
     this.camera.lookAt(new Vector3());
 
     const light1 = new DirectionalLight("white", 8);
-    light1.position.set(0, -100, 3000);
+    light1.position.set(0, -300, 3000);
     this.scene.add(light1);
 
     // soft white light
@@ -107,14 +105,14 @@ class ThreeJsControl {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.reset();
     this.controls.enableDamping = true;
+    this.controls.update();
     this.controls.enableZoom = false;
     this.controls.screenSpacePanning = false;
     this.controls.addEventListener("change", () => this.render());
 
-    // Wir brauchen das nicht. OrbitControls macht es für uns.
-    // canvas.addEventListener("wheel", (event) => this.onMouseWheel(event), {
-    //   passive: false,
-    // });
+    canvas.addEventListener("wheel", (event) => this.onMouseWheel(event), {
+      passive: false,
+    });
 
     var clickStart = null;
 
@@ -140,26 +138,6 @@ class ThreeJsControl {
       this.render();
     });
 
-    // canvas.addEventListener("dblclick", (event) => {
-    //   const raycaster = new Raycaster();
-    //   const pointer = new Vector2();
-
-    //   const clickPos = BAL.relativeMouseCoordinates(event, canvas);
-
-    //   // Calculate pointer position in normalized device coordinates (-1 to +1) for both directions.
-    //   pointer.x = (clickPos.x / canvas.clientWidth) * 2 - 1;
-    //   pointer.y = -(clickPos.y / canvas.clientHeight) * 2 + 1;
-
-    //   raycaster.setFromCamera(pointer, this.camera);
-    //   const intersects = raycaster.intersectObjects(this.scene.children, true);
-    //   const selectedObject =
-    //     intersects[0] && this.getParentNode(intersects[0].object);
-
-    //   if (selectedObject) {
-    //     this.onDblClick(selectedObject);
-    //   }
-    // });
-
     canvas.addEventListener("mousedown", (event) => {
       clickStart = Date.now();
     });
@@ -177,53 +155,6 @@ class ThreeJsControl {
     // this.renderAlways();
   }
 
-  //   onDblClick(selectedObject) {
-  // 	const zoomDuration = 1.5;
-  // 	const targetPositionZ = 8000;
-
-  // 	const boundingBox = new Box3().setFromObject(selectedObject);
-  // 	const center = new Vector3();
-  // 	boundingBox.getCenter(center);
-
-  // 	const size = new Vector3();
-  // 	boundingBox.getSize(size);
-  // 	this.controls.saveState();
-
-  // 	gsap.to(this.controls.target, {
-  //       x: center.x,
-  //       y: center.y,
-  //       z: center.z,
-  //       duration: zoomDuration,
-  //       ease: "power3.inOut",
-  //       onUpdate: () => {
-  // 		this.controls.update();
-  // 		// this.controls.saveState();
-  // 		this.render();
-  // 	  },
-  //       onComplete: () => {
-  // 		// this.controls.saveState();
-  // 		gsap.to(this.camera.position, {
-  // 			x: center.x,
-  // 			y: center.y,
-  // 			z: targetPositionZ,
-  // 			duration: zoomDuration,
-  // 			ease: "power3.inOut",
-  // 			onUpdate: () => {
-  // 				this.controls.update();
-  // 			//   this.controls.saveState();
-  // 			this.render();
-  // 			},
-  // 			onComplete: () => {
-  // 				this.controls.update();
-  // 			//   this.controls.saveState();
-  // 			this.render();
-  // 			},
-  // 		  });
-  // 	  },
-  //     });
-  // 	this.render();
-  //   }
-
   zoomToSelection() {
     const zoomDuration = 1.5;
     const selectedObject = this.getParentNode(this.selection[0]?.node);
@@ -235,50 +166,14 @@ class ThreeJsControl {
 
     const size = new Vector3();
     boundingBox.getSize(size);
-    const objectWidth = size.x;
-    const objectHeight = size.y;
-    const objectDepth = size.z;
 
     const objectPosition = selectedObject.getWorldPosition(new Vector3());
-    const objectPositionZ = objectPosition.z;
 
-    const canvasWidth = this.renderer.domElement.clientWidth * 10;
-    const canvasHeight = this.renderer.domElement.clientHeight * 10;
-
+    const maxSize = Math.max(size.x, size.y);
     const fov = this.camera.fov * (Math.PI / 180);
+    let targetDistance = (maxSize / 2) / Math.tan(fov / 2);
 
-    let targetDistance;
-
-    // if (objectWidth > objectHeight) {
-    //   targetDistance =
-    //     canvasWidth / (2 * Math.tan((this.camera.fov * Math.PI) / 180));
-    // } else {
-    //   targetDistance =
-    //     canvasHeight / (2 * Math.tan((this.camera.fov * Math.PI) / 180));
-    // }
-
-    if (objectWidth > objectHeight) {
-        targetDistance = (objectWidth / 2) / Math.tan(fov / 2);
-    } else {
-        targetDistance = (objectHeight / 2) / Math.tan(fov / 2);
-    }
-
-    // const MAX_DISTANCE = 5000;
-    // if (targetDistance > MAX_DISTANCE) {
-    //     targetDistance = MAX_DISTANCE;
-    // }
-
-    const distanceToObject = objectPositionZ;
-    const targetPositionZ = targetDistance + distanceToObject;
-
-    console.log("canvasWidth:", canvasWidth);
-    console.log("canvasHeight:", canvasHeight);
-    console.log("Object width:", objectWidth);
-    console.log("Object height:", objectHeight);
-    console.log("Object depth:", objectDepth);
-    console.log("Distance to object:", distanceToObject);
-    console.log("Target position Z:", targetPositionZ);
-
+    const targetPositionZ = targetDistance + objectPosition.z;
     const offset = new Vector3(0, 0, 0);
     const targetPosition = center.clone().add(offset);
 
@@ -303,23 +198,23 @@ class ThreeJsControl {
           this.controls.update();
           this.render();
         },
+      });
+
+      gsap.to(this.controls.object.position, {
+        x: center.x,
+        y: center.y + 2000,
+        z: targetPositionZ,
+        duration: zoomDuration,
+        ease: "power3.inOut",
+        onUpdate: () => {
+          this.controls.update();
+          this.render();
+        },
         onComplete: () => {
-		gsap.to(this.controls.object.position, {
-            x: center.x,
-            y: center.y,
-            z: targetPositionZ,
-            duration: zoomDuration,
-            ease: "power3.inOut",
-            onUpdate: () => {
-              this.controls.update();
-              this.render();
-            },
-            onComplete: () => {
-              this.lastSelectedObject = selectedObject;
-              this.controls.update();
-              this.render();
-            },
-          });
+          this.lastSelectedObject = selectedObject;
+          this.controls.enableDamping = true;
+          this.controls.update();
+          this.render();
         },
       });
     }
@@ -327,14 +222,50 @@ class ThreeJsControl {
   }
 
   zoomOutFromSelection() {
-	const zoomDuration = 1.5;
-    console.log("Reset scene");
-    this.controls.update();
-    this.render();
+    const zoomDuration = 1.5;
+    const boundingBox = new Box3();
+    this.scene.traverse((object) => {
+      if (object.type === 'Mesh') {
+        boundingBox.expandByObject(object);
+      }
+    });
+
+    // shows bounding box around all objects
+    // this.boundingBoxHelper = new Box3Helper(boundingBox, 0xffff00); 
+    // this.scene.add(this.boundingBoxHelper);
+
+    const center = new Vector3();
+    boundingBox.getCenter(center);
+
+    const size = new Vector3();
+    boundingBox.getSize(size);
+
+    const maxSize = Math.max(size.x, size.y, size.z);
+    const fov = this.camera.fov * (Math.PI / 180);
+    const distance = (maxSize / 2) / Math.tan(fov / 2);
+
+    const targetPosition = new Vector3(
+      center.x + 10000, // for looking a bit at the front side
+      center.y + 15000, // for looking a bit from the top
+      center.z + distance
+    );
+
     gsap.to(this.controls.target, {
-      x: 0,
-      y: 0,
-      z: 0,
+      x: center.x,
+      y: center.y,
+      z: center.z,
+      duration: zoomDuration,
+      ease: "power3.inOut",
+      onUpdate: () => {
+        this.controls.update();
+        this.render();
+      },
+    });
+
+    gsap.to(this.controls.object.position, {
+      x: targetPosition.x,
+      y: targetPosition.y,
+      z: targetPosition.z,
       duration: zoomDuration,
       ease: "power3.inOut",
       onUpdate: () => {
@@ -342,22 +273,9 @@ class ThreeJsControl {
         this.render();
       },
       onComplete: () => {
-        gsap.to(this.controls.object.position, {
-          x: 0,
-          y: 8000,
-          z: 8000,
-          duration: zoomDuration,
-          ease: "power3.inOut",
-          onUpdate: () => {
-            this.controls.update();
-            this.render();
-          },
-          onComplete: () => {
-            this.lastSelectedObject = null;
-            this.controls.update();
-            this.render();
-          },
-        });
+        this.lastSelectedObject = null;
+        this.controls.update();
+        this.render();
       },
     });
   }
@@ -446,6 +364,23 @@ class ThreeJsControl {
           this.setSelected(sharedNode, value);
 
           changes[sharedNode.id] = value ? "ADD" : "REMOVE";
+
+          // shows bounding box around the selected object
+          // if (this.lastSelectedObject) {
+          //   this.lastSelectedObject.remove(this.lastSelectedBoxHelper);
+          //   this.lastSelectedBoxHelper = null;
+          // }
+
+          // if (value) {
+          //   const boxHelper = new BoxHelper(candidate, 0xffff00);
+          //   this.scene.add(boxHelper);
+
+          //   this.lastSelectedObject = candidate;
+          //   this.lastSelectedBoxHelper = boxHelper;
+          // } else {
+          //   this.lastSelectedObject = null;
+          // }
+          // this.render();
 
           this.sendCommand("updateSelection", { changes: changes });
           return;
