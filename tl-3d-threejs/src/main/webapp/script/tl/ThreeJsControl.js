@@ -98,8 +98,6 @@ class ThreeJsControl {
     });
 
     const canvas = this.renderer.domElement;
-    canvas.style.maxWidth = "100%";
-    canvas.style.maxHeight = "100%";
     container.append(canvas);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -114,8 +112,17 @@ class ThreeJsControl {
       passive: false,
     });
 
-    var clickStart = null;
+    canvas.style.maxWidth = "100%";
+    canvas.style.maxHeight = "100%";
+    // update camera's aspect ratio when the size of the canvas changes
+    const resizeObserver = new ResizeObserver(() => {
+      this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
+      this.camera.updateProjectionMatrix();
+      this.render();
+    });
+    resizeObserver.observe(canvas);
 
+    var clickStart = null;
     canvas.addEventListener("click", (event) => {
       if (Date.now() - clickStart > 500) {
         // Not a click.
@@ -236,7 +243,6 @@ class ThreeJsControl {
 
     const center = new Vector3();
     boundingBox.getCenter(center);
-
     const size = new Vector3();
     boundingBox.getSize(size);
 
