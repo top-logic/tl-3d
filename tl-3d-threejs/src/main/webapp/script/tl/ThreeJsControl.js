@@ -20,6 +20,8 @@ import { OrbitControls } from 'OrbitControls';
 import { GLTFLoader } from 'GLTFLoader';
 import { gsap } from 'gsap';
 
+const SOFT_WHITE_LIGHT = 0x404040;
+
 // For sever communication written in legacy JS.
 window.services.threejs = {
 	init: async function(controlId, contextPath, dataUrl) {
@@ -44,7 +46,7 @@ window.services.threejs = {
 	zoomOutFromSelection: function(container) {
 		const control = ThreeJsControl.control(container);
 		if (control != null) {
-			control.zoomOutFromSelection();
+			control.zoomOut();
 		}
 	}
 }
@@ -81,8 +83,7 @@ class ThreeJsControl {
     light1.position.set(0, -300, 3000);
     this.scene.add(light1);
 
-    // soft white light
-    const light2 = new AmbientLight(0x404040);
+    const light2 = new AmbientLight(SOFT_WHITE_LIGHT);
     this.scene.add(light2);
 
     const axesHelper = new AxesHelper(1500);
@@ -116,7 +117,7 @@ class ThreeJsControl {
     canvas.style.maxHeight = "100%";
     // update camera's aspect ratio when the size of the canvas changes
     const resizeObserver = new ResizeObserver(() => {
-      this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
+      this.camera.aspect = canvas.clientWidth / canvas.clientHeight;
       this.camera.updateProjectionMatrix();
       this.render();
     });
@@ -131,7 +132,7 @@ class ThreeJsControl {
 
       const raycaster = new Raycaster();
       const pointer = new Vector2();
-
+      
       const clickPos = BAL.relativeMouseCoordinates(event, canvas);
 
       // Calculate pointer position in normalized device coordinates (-1 to +1) for both directions.
@@ -149,8 +150,9 @@ class ThreeJsControl {
       clickStart = Date.now();
     });
 
-    this.loadScene();
     this.render();
+
+    this.loadScene().then(() => setTimeout(() => this.zoomOut(), 100));
 
     // for debug purposes
     // const geometry = new BoxGeometry( 1000, 1000, 1000 );
@@ -228,7 +230,7 @@ class ThreeJsControl {
     this.render();
   }
 
-  zoomOutFromSelection() {
+  zoomOut() {
     const zoomDuration = 1.5;
     const boundingBox = new Box3();
     this.scene.traverse((object) => {
@@ -441,8 +443,9 @@ class ThreeJsControl {
     const assets = this.scope.assets;
     const urls = assets.flatMap((asset) => this.contextPath + asset.url);
 
-    Promise.all(urls.flatMap(loadUrl)).then((gltfs) => {
-      var n = 0;
+    const gltfs = await Promise.all(urls.flatMap(loadUrl));
+      // .then((gltfs) => {
+      let n = 0;
       for (const gltf of gltfs) {
         assets[n++].gltf = gltf;
       }
@@ -451,7 +454,6 @@ class ThreeJsControl {
       this.sceneGraph.build(this.scene);
 
       this.render();
-    });
   }
 
   onMouseWheel(event) {
