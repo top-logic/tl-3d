@@ -14,62 +14,45 @@ import {
   Vector2,
   BoxHelper,
   Box3Helper,
-} from 'three';
+} from "three";
 
-import { OrbitControls } from 'OrbitControls';
-import { GLTFLoader } from 'GLTFLoader';
-import { gsap } from 'gsap';
+import { OrbitControls } from "OrbitControls";
+import { GLTFLoader } from "GLTFLoader";
+import { gsap } from "gsap";
 
 const SOFT_WHITE_LIGHT = 0x404040;
-
-// For sever communication written in legacy JS.
-window.services.threejs = {
-	init: async function(controlId, contextPath, dataUrl) {
-		const control = new ThreeJsControl(controlId, contextPath, dataUrl);
-		control.attach();
-	},
-
-	selectionChanged: function(container, changes) {
-		const control = ThreeJsControl.control(container);
-		if (control != null) {
-			control.selectionChanged(changes);
-		}
-	},
-
-	zoomToSelection: function(container) {
-		const control = ThreeJsControl.control(container);
-		if (control != null) {
-			control.zoomToSelection();
-		}
-	},
-
-	zoomOutFromSelection: function(container) {
-		const control = ThreeJsControl.control(container);
-		if (control != null) {
-			control.zoomOut();
-		}
-	}
-}
 
 class ThreeJsControl {
   constructor(controlId, contextPath, dataUrl) {
     this.lastSelectedObject = null;
-
     this.controlId = controlId;
     this.contextPath = contextPath;
     this.dataUrl = dataUrl;
-
     this.scope = new Scope();
 
+    this.initializeScene();
+    this.initializeRenderer();
+    this.initializeControls();
+    this.render();
+    this.loadScene().then(() => setTimeout(() => this.zoomOut(), 100));
+    this.setupEventListeners();
+  }
+
+  initializeScene() {
     // Filled in loadScene().
     this.sceneGraph = null;
     this.selection = [];
 
-    const container = this.container;
-
     this.scene = new Scene();
     this.scene.background = new Color("skyblue");
 
+    this.createCamera();
+    this.addLights();
+    this.addHelpers();
+  }
+
+  createCamera() {
+    const container = this.container;
     const fov = 35; // AKA Field of View
     const aspect = container.clientWidth / container.clientHeight;
     const near = 10; // the near clipping plane
@@ -78,17 +61,24 @@ class ThreeJsControl {
     this.camera = new PerspectiveCamera(fov, aspect, near, far);
     this.camera.position.set(5000, 6000, 10000);
     this.camera.lookAt(new Vector3());
+  }
 
+  addLights() {
     const light1 = new DirectionalLight("white", 8);
     light1.position.set(0, -300, 3000);
     this.scene.add(light1);
 
     const light2 = new AmbientLight(SOFT_WHITE_LIGHT);
     this.scene.add(light2);
+  }
 
+  addHelpers() {
     const axesHelper = new AxesHelper(1500);
     this.scene.add(axesHelper);
+  }
 
+  initializeRenderer() {
+    const container = this.container;
     this.renderer = new WebGLRenderer();
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.setPixelRatio(window.devicePixelRatio);
@@ -98,9 +88,13 @@ class ThreeJsControl {
       this.render();
     });
 
-    const canvas = this.renderer.domElement;
-    container.append(canvas);
+    this.canvas = this.renderer.domElement;
+    this.canvas.style.maxWidth = "100%";
+    this.canvas.style.maxHeight = "100%";
+    container.append(this.canvas);
+  }
 
+  initializeControls() {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.reset();
     this.controls.enableDamping = true;
@@ -108,60 +102,67 @@ class ThreeJsControl {
     this.controls.enableZoom = false;
     this.controls.screenSpacePanning = false;
     this.controls.addEventListener("change", () => this.render());
+  }
 
-    canvas.addEventListener("wheel", (event) => this.onMouseWheel(event), {
+  setupEventListeners() {
+    // update objects' size when the size of the canvas changes
+    const resizeObserver = this.createResizeObserver(this.canvas);
+    resizeObserver.observe(this.canvas);
+
+    this.canvas.addEventListener("mousedown", () => this.onMouseDown());
+    this.canvas.addEventListener("click", (event) => this.onClick(event));
+    this.canvas.addEventListener("wheel", (event) => this.onMouseWheel(event), {
       passive: false,
     });
+  }
 
-    canvas.style.maxWidth = "100%";
-    canvas.style.maxHeight = "100%";
-    // update camera's aspect ratio when the size of the canvas changes
-    const resizeObserver = new ResizeObserver(() => {
+  createResizeObserver(canvas) {
+    return new ResizeObserver(() => {
       this.camera.aspect = canvas.clientWidth / canvas.clientHeight;
       this.camera.updateProjectionMatrix();
       this.render();
     });
-    resizeObserver.observe(canvas);
+  }
 
-    var clickStart = null;
-    canvas.addEventListener("click", (event) => {
-      if (Date.now() - clickStart > 500) {
-        // Not a click.
-        return;
-      }
+  onMouseDown() {
+    this.clickStart = Date.now();
+  }
 
-      const raycaster = new Raycaster();
-      const pointer = new Vector2();
-      
-      const clickPos = BAL.relativeMouseCoordinates(event, canvas);
+  onClick(event) {
+    if (Date.now() - this.clickStart > 500) {
+      return; // Not a click.
+    }
 
-      // Calculate pointer position in normalized device coordinates (-1 to +1) for both directions.
-      pointer.x = (clickPos.x / canvas.clientWidth) * 2 - 1;
-      pointer.y = -(clickPos.y / canvas.clientHeight) * 2 + 1;
+    const raycaster = new Raycaster();
+    const pointer = new Vector2();
 
-      raycaster.setFromCamera(pointer, this.camera);
-      const intersects = raycaster.intersectObjects(this.scene.children, true);
+    const clickPos = BAL.relativeMouseCoordinates(event, this.canvas);
+    pointer.x = (clickPos.x / this.canvas.clientWidth) * 2 - 1;
+    pointer.y = -(clickPos.y / this.canvas.clientHeight) * 2 + 1;
 
-      this.updateSelection(intersects, event.ctrlKey);
-      this.render();
-    });
+    raycaster.setFromCamera(pointer, this.camera);
+    const intersects = raycaster.intersectObjects(this.scene.children, true);
 
-    canvas.addEventListener("mousedown", (event) => {
-      clickStart = Date.now();
-    });
-
+    this.updateSelection(intersects, event.ctrlKey);
     this.render();
+  }
 
-    this.loadScene().then(() => setTimeout(() => this.zoomOut(), 100));
+  onMouseWheel(event) {
+    event.preventDefault();
 
-    // for debug purposes
-    // const geometry = new BoxGeometry( 1000, 1000, 1000 );
-    // const material = new MeshBasicMaterial( {color: 0x00ff00} );
-    // const cube = new Mesh( geometry, material );
-    // cube.position.set(-3000, 2500, 0);
-    // this.scene.add( cube );
+    const target = this.controls.target;
+    const position = this.camera.position;
 
-    // this.renderAlways();
+    const offset = new Vector3();
+    offset.copy(position);
+    offset.sub(target);
+
+    const factor = event.deltaY < 0 ? 0.888888889 : 1.125;
+    offset.multiplyScalar(factor);
+    offset.add(target);
+
+    this.camera.position.copy(offset);
+    this.render();
   }
 
   zoomToSelection() {
@@ -234,13 +235,13 @@ class ThreeJsControl {
     const zoomDuration = 1.5;
     const boundingBox = new Box3();
     this.scene.traverse((object) => {
-      if (object.type === 'Mesh') {
+      if (object.type === "Mesh") {
         boundingBox.expandByObject(object);
       }
     });
 
     // shows bounding box around all objects
-    // this.boundingBoxHelper = new Box3Helper(boundingBox, 0xffff00); 
+    // this.boundingBoxHelper = new Box3Helper(boundingBox, 0xffff00);
     // this.scene.add(this.boundingBoxHelper);
 
     const center = new Vector3();
@@ -444,49 +445,17 @@ class ThreeJsControl {
     const urls = assets.flatMap((asset) => this.contextPath + asset.url);
 
     const gltfs = await Promise.all(urls.flatMap(loadUrl));
-      // .then((gltfs) => {
-      let n = 0;
-      for (const gltf of gltfs) {
-        assets[n++].gltf = gltf;
-      }
-      this.scene.rotation.x = -Math.PI / 2;
+    // .then((gltfs) => {
+    let n = 0;
+    for (const gltf of gltfs) {
+      assets[n++].gltf = gltf;
+    }
+    this.scene.rotation.x = -Math.PI / 2;
 
-      this.sceneGraph.build(this.scene);
+    this.sceneGraph.build(this.scene);
 
-      this.render();
-  }
-
-  onMouseWheel(event) {
-    event.preventDefault();
-
-    const target = this.controls.target;
-    const position = this.camera.position;
-
-    const offset = new Vector3();
-    offset.copy(position);
-    offset.sub(target);
-
-    const factor = event.deltaY < 0 ? 0.888888889 : 1.125;
-    offset.multiplyScalar(factor);
-    offset.add(target);
-
-    this.camera.position.copy(offset);
     this.render();
   }
-
-  render() {
-    requestAnimationFrame(() => this.renderer.render(this.scene, this.camera));
-  }
-
-  // for debug purposes
-  //   renderAlways() {
-  // 	const callback = () => {
-  // 		this.controls.update();
-  // 		this.renderer.render(this.scene, this.camera);
-  // 		requestAnimationFrame(callback);
-  // 	};
-  // 	callback();
-  //   }
 
   sendCommand(command, args) {
     const message = {
@@ -500,68 +469,16 @@ class ThreeJsControl {
 
     services.ajax.execute("dispatchControlCommand", message);
   }
-}
 
-class Scope {
-	constructor() {
-		this.objects = [];
-	}
-
-	get assets() {
-		return this.objects.filter((obj) => obj instanceof GltfAsset);
-	}
-
-	getNode(id) {
-		return this.objects[id];
-	}
-
-	loadAll(json) {
-		return json.flatMap((value) => this.loadJson(value));
-	}
-
-	loadJson(json) {
-		if (json == null) {
-			return null;
-		}
-		if (json instanceof Array) {
-			const id = json[1];
-			var obj;
-			switch (json[0]) {
-				case 'SceneGraph': obj = new SceneGraph(id); break;
-				case 'GroupNode': obj = new GroupNode(id); break;
-				case 'PartNode': obj = new PartNode(id); break;
-				case 'GltfAsset': obj = new GltfAsset(id); break;
-			}
-			this.objects[id] = obj;
-			obj.loadJson(this, json[2]);
-			return obj;
-		} else if (typeof json === "number") {
-			// Is a reference.
-			return this.objects[json];
-		} else {
-			throw new Error("Invalid graph specifier: " + json);
-		}
-	}
+  render() {
+    requestAnimationFrame(() => this.renderer.render(this.scene, this.camera));
+  }
 }
 
 class SharedObject {
-	constructor(id) {
-		this.id = id;
-	}
-}
-
-class SceneGraph extends SharedObject {
-	constructor(id) {
-		super(id);
-	}
-
-	build(scene) {
-		this.root.build(scene);
-	}
-
-	loadJson(scope, json) {
-		this.root = scope.loadJson(json.root);
-	}
+  constructor(id) {
+    this.id = id;
+  }
 }
 
 function matrix(
@@ -570,111 +487,195 @@ function matrix(
 	i, j, k, l,
 	m, n, o, p
 ) {
-	const result = new Matrix4();
+  const result = new Matrix4();
 	result.set(
 		a, b, c, d,
 		e, f, g, h,
 		i, j, k, l,
 		m, n, o, p
 	);
-	return result;
+  return result;
 }
 
 function toMatrix(tx) {
-	switch (tx.length) {
-	case 3:
+  switch (tx.length) {
+    case 3:
 		return matrix(
 			1, 0, 0, tx[0],
 			0, 1, 0, tx[1],
 			0, 0, 1, tx[2],
 			0, 0, 0, 1);
-	case 9:
-		return matrix(
+    case 9:
+      return matrix(
 			tx[0], tx[1], tx[2], 0,
 			tx[3], tx[4], tx[5], 0,
 			tx[6], tx[7], tx[8], 0,
 			0,     0,     0,     1);
-	case 12:
-		return matrix(
+    case 12:
+      return matrix(
 			tx[0], tx[1], tx[2], tx[9],
 			tx[3], tx[4], tx[5], tx[10],
 			tx[6], tx[7], tx[8], tx[11],
 			0,     0,     0,     1);
-	case 16:
-		return matrix(
+    case 16:
+      return matrix(
 			tx[0],  tx[1],  tx[2],  tx[3],
 			tx[4],  tx[5],  tx[6],  tx[7],
 			tx[8],  tx[9],  tx[10], tx[11],
 			tx[12], tx[13], tx[14], tx[15]);
-	default:
-		throw new Error("Invalid transform array: " + tx);
-	}
+    default:
+      throw new Error("Invalid transform array: " + tx);
+  }
 }
 
 function transform(scene, tx) {
-	if (tx != null && tx.length > 0) {
-		const group = new Group();
-		scene.add(group);
+  if (tx != null && tx.length > 0) {
+    const group = new Group();
+    scene.add(group);
 
-		if (tx.length == 3) {
-			group.position.set(tx[0], tx[1], tx[2]);
-		} else {
-			group.applyMatrix4(toMatrix(tx));
-		}
-		return group;
-	} else {
-		return scene;
-	}
+    if (tx.length == 3) {
+      group.position.set(tx[0], tx[1], tx[2]);
+    } else {
+      group.applyMatrix4(toMatrix(tx));
+    }
+    return group;
+  } else {
+    return scene;
+  }
+}
+
+class Scope {
+  constructor() {
+    this.objects = [];
+  }
+
+  get assets() {
+    return this.objects.filter((obj) => obj instanceof GltfAsset);
+  }
+
+  getNode(id) {
+    return this.objects[id];
+  }
+
+  loadAll(json) {
+    return json.flatMap((value) => this.loadJson(value));
+  }
+
+  loadJson(json) {
+    if (json == null) {
+      return null;
+    }
+    if (json instanceof Array) {
+      const id = json[1];
+      var obj;
+      switch (json[0]) {
+				case 'SceneGraph': obj = new SceneGraph(id); break;
+				case 'GroupNode': obj = new GroupNode(id); break;
+				case 'PartNode': obj = new PartNode(id); break;
+				case 'GltfAsset': obj = new GltfAsset(id); break;
+      }
+      this.objects[id] = obj;
+      obj.loadJson(this, json[2]);
+      return obj;
+    } else if (typeof json === "number") {
+      // Is a reference.
+      return this.objects[json];
+    } else {
+      throw new Error("Invalid graph specifier: " + json);
+    }
+  }
+}
+
+class SceneGraph extends SharedObject {
+  constructor(id) {
+    super(id);
+  }
+
+  build(scene) {
+    this.root.build(scene);
+  }
+
+  loadJson(scope, json) {
+    this.root = scope.loadJson(json.root);
+  }
 }
 
 class GroupNode extends SharedObject {
-	constructor(id) {
-		super(id);
-	}
+  constructor(id) {
+    super(id);
+  }
 
-	build(scene) {
-		var group = transform(scene, this.transform);
-		this.contents.forEach((c) => c.build(group));
-	}
+  build(scene) {
+    var group = transform(scene, this.transform);
+    this.contents.forEach((c) => c.build(group));
+  }
 
-	loadJson(scope, json) {
-		this.transform = json.transform;
-		this.contents = scope.loadAll(json.contents);
-	}
+  loadJson(scope, json) {
+    this.transform = json.transform;
+    this.contents = scope.loadAll(json.contents);
+  }
 }
 
 class PartNode extends SharedObject {
-	constructor(id) {
-		super(id);
-	}
+  constructor(id) {
+    super(id);
+  }
 
-	build(scene) {
-		const node = this.asset.build(scene);
-		var group = transform(scene, this.transform);
-		group.add(node);
+  build(scene) {
+    const node = this.asset.build(scene);
+    var group = transform(scene, this.transform);
+    group.add(node);
 
-		// Link to scene node.
-		node.userData = this;
-		this.node = node;
-	}
+    // Link to scene node.
+    node.userData = this;
+    this.node = node;
+  }
 
-	loadJson(scope, json) {
-		this.transform = json.transform;
-		this.asset = scope.loadJson(json.asset);
-	}
+  loadJson(scope, json) {
+    this.transform = json.transform;
+    this.asset = scope.loadJson(json.asset);
+  }
 }
 
 class GltfAsset extends SharedObject {
-	constructor(id) {
-		super(id);
-	}
+  constructor(id) {
+    super(id);
+  }
 
-	build(scene) {
-		return this.gltf.scene.clone();
-	}
+  build(scene) {
+    return this.gltf.scene.clone();
+  }
 
-	loadJson(scope, json) {
-		this.url = json.url;
-	}
+  loadJson(scope, json) {
+    this.url = json.url;
+  }
 }
 
+// For sever communication written in legacy JS.
+window.services.threejs = {
+  init: async function (controlId, contextPath, dataUrl) {
+    const control = new ThreeJsControl(controlId, contextPath, dataUrl);
+    control.attach();
+  },
+
+  selectionChanged: function (container, changes) {
+    const control = ThreeJsControl.control(container);
+    if (control != null) {
+      control.selectionChanged(changes);
+    }
+  },
+
+  zoomToSelection: function (container) {
+    const control = ThreeJsControl.control(container);
+    if (control != null) {
+      control.zoomToSelection();
+    }
+  },
+
+  zoomOutFromSelection: function (container) {
+    const control = ThreeJsControl.control(container);
+    if (control != null) {
+      control.zoomOut();
+    }
+  },
+};
