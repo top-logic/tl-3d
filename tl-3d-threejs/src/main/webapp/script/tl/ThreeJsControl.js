@@ -14,6 +14,10 @@ import {
   Vector2,
   BoxHelper,
   Box3Helper,
+  BoxGeometry,
+  BoxBufferGeometry,
+  Mesh,
+  MeshBasicMaterial,
 } from "three";
 
 import { OrbitControls } from "OrbitControls";
@@ -30,15 +34,17 @@ class ThreeJsControl {
     this.dataUrl = dataUrl;
     this.scope = new Scope();
 
-    this.initializeScene();
-    this.initializeRenderer();
-    this.initializeControls();
+    this.initScene();
+    this.initAxesCubeScene();
+    this.initRenderer();
+    this.initAxesCubeRenderer();
+    this.initControls();
     this.render();
     this.loadScene().then(() => setTimeout(() => this.zoomOut(), 100));
     this.setupEventListeners();
   }
 
-  initializeScene() {
+  initScene() {
     // Filled in loadScene().
     this.sceneGraph = null;
     this.selection = [];
@@ -48,8 +54,34 @@ class ThreeJsControl {
 
     this.createCamera();
     this.addLights();
-    this.addHelpers();
+    this.addHelpers(this.scene);
   }
+
+  initAxesCubeScene() {
+    this.axesScene = new Scene();
+    this.axesScene.background = new Color( 0xBCD48F );
+
+    this.axesCamera = new PerspectiveCamera(75, 1, 1, 100);
+    this.axesCamera.position.set(0, 0, 50);
+    this.axesCamera.lookAt(0, 0, 0);
+
+    const directionalLight = new DirectionalLight( 0xffffff, 5 );
+    directionalLight.position.set(0, 0, 10);
+    this.axesScene.add( directionalLight );
+
+    const light = new AmbientLight(0xffffff, 0.5);
+    this.axesScene.add(light);
+    this.addHelpers(this.axesScene);
+
+    const cubeSize = 30;
+    const cubeGeometry = new BoxGeometry(cubeSize, cubeSize, cubeSize);
+    const cubeMaterial = new MeshBasicMaterial({ color: 0xff0000 });
+    this.axesCube = new Mesh(cubeGeometry, cubeMaterial);
+    this.axesCube.position.set(0, 0, 0);
+    this.axesScene.add(this.axesCube);
+    this.axesScene.rotation.x = -Math.PI / 2;
+    this.render();
+}
 
   createCamera() {
     const container = this.container;
@@ -72,29 +104,40 @@ class ThreeJsControl {
     this.scene.add(light2);
   }
 
-  addHelpers() {
-    const axesHelper = new AxesHelper(1500);
-    this.scene.add(axesHelper);
+  addHelpers(scene) {
+    const axesHelper = new AxesHelper(1000);
+    scene.add(axesHelper);
   }
 
-  initializeRenderer() {
+  initRenderer() {
     const container = this.container;
     this.renderer = new WebGLRenderer();
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.setPixelRatio(window.devicePixelRatio);
-
+    this.canvas = this.renderer.domElement;
+    this.canvas.style.maxWidth = "100%";
+    this.canvas.style.maxHeight = "100%";
+    container.append(this.canvas);
     LayoutFunctions.addCustomRenderingFunction(container.parentNode, () => {
       this.renderer.setSize(container.clientWidth, container.clientHeight);
       this.render();
     });
 
-    this.canvas = this.renderer.domElement;
-    this.canvas.style.maxWidth = "100%";
-    this.canvas.style.maxHeight = "100%";
-    container.append(this.canvas);
+  }
+  initAxesCubeRenderer() {
+    const container = this.container;
+  this.axesRenderer = new WebGLRenderer();
+  this.axesRenderer.setSize(100, 100);
+  this.axesRenderer.setPixelRatio(window.devicePixelRatio);
+  this.canvas2 = this.axesRenderer.domElement;
+  this.canvas2.style.maxWidth = "100px";
+  this.canvas2.style.maxHeight = "100px";
+  this.canvas2.style.position = 'absolute';
+  this.canvas2.style.top = '0';
+  container.append(this.canvas2);
   }
 
-  initializeControls() {
+  initControls() {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.reset();
     this.controls.enableDamping = true;
@@ -111,7 +154,7 @@ class ThreeJsControl {
 
     this.canvas.addEventListener("mousedown", () => this.onMouseDown());
     this.canvas.addEventListener("click", (event) => this.onClick(event));
-    this.canvas.addEventListener("wheel", (event) => this.onMouseWheel(event), {
+    this.container.addEventListener("wheel", (event) => this.onMouseWheel(event), {
       passive: false,
     });
   }
@@ -162,6 +205,15 @@ class ThreeJsControl {
     offset.add(target);
 
     this.camera.position.copy(offset);
+    
+    // second canvas 
+    // const position2 = this.axesCamera.position;
+    // const offset2 = new Vector3();
+    // offset2.copy(position2);
+    // const factor2 = event.deltaY < 0 ? 0.888888889 : 1.125;
+    // offset2.multiplyScalar(factor2);
+    // this.axesCamera.position.copy(offset2);
+    
     this.render();
   }
 
@@ -471,7 +523,12 @@ class ThreeJsControl {
   }
 
   render() {
-    requestAnimationFrame(() => this.renderer.render(this.scene, this.camera));
+    // requestAnimationFrame(() => this.renderer.render(this.scene, this.camera));
+    requestAnimationFrame(() => {
+      const { renderer, axesRenderer, scene, camera, axesScene, axesCamera } = this;
+      renderer.render(scene, camera);
+      axesRenderer.render(axesScene, axesCamera);
+    });
   }
 }
 
