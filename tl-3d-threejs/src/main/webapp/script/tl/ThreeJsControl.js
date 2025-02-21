@@ -25,6 +25,9 @@ import { GLTFLoader } from "GLTFLoader";
 import { gsap } from "gsap";
 
 const SOFT_WHITE_LIGHT = 0x404040;
+const YELLOW = 0xffff00;
+const NEAR = 10; // the near clipping plane
+const FAR = 100000; // the far clipping plane
 
 class ThreeJsControl {
   constructor(controlId, contextPath, dataUrl) {
@@ -39,6 +42,7 @@ class ThreeJsControl {
     this.initRenderer();
     this.initAxesCubeRenderer();
     this.initControls();
+    this.initAxesCubeControls();
     this.render();
     this.loadScene().then(() => setTimeout(() => this.zoomOut(), 100));
     this.setupEventListeners();
@@ -54,59 +58,29 @@ class ThreeJsControl {
 
     this.createCamera();
     this.addLights();
-    this.addHelpers(this.scene);
+    this.addAxesHelper(this.scene);
   }
 
   initAxesCubeScene() {
     this.axesScene = new Scene();
-    this.axesScene.background = new Color( 0xBCD48F );
+    this.axesScene.background = null;
 
-    this.axesCamera = new PerspectiveCamera(75, 1, 1, 100);
-    this.axesCamera.position.set(0, 0, 50);
+    const fov = 75; 
+    const aspect = 1;
+
+    this.axesCamera = new PerspectiveCamera(fov, aspect, NEAR, FAR);
+    this.axesCamera.position.set(0, 0, 10000);
     this.axesCamera.lookAt(0, 0, 0);
+    this.addAxesHelper(this.axesScene);
 
-    const directionalLight = new DirectionalLight( 0xffffff, 5 );
-    directionalLight.position.set(0, 0, 10);
-    this.axesScene.add( directionalLight );
-
-    const light = new AmbientLight(0xffffff, 0.5);
-    this.axesScene.add(light);
-    this.addHelpers(this.axesScene);
-
-    const cubeSize = 30;
+    const cubeSize = 15000;
     const cubeGeometry = new BoxGeometry(cubeSize, cubeSize, cubeSize);
-    const cubeMaterial = new MeshBasicMaterial({ color: 0xff0000 });
+    const cubeMaterial = new MeshBasicMaterial({ color: 0xff0000, wireframe: true });
     this.axesCube = new Mesh(cubeGeometry, cubeMaterial);
     this.axesCube.position.set(0, 0, 0);
     this.axesScene.add(this.axesCube);
     this.axesScene.rotation.x = -Math.PI / 2;
     this.render();
-}
-
-  createCamera() {
-    const container = this.container;
-    const fov = 35; // AKA Field of View
-    const aspect = container.clientWidth / container.clientHeight;
-    const near = 10; // the near clipping plane
-    const far = 100000; // the far clipping plane
-
-    this.camera = new PerspectiveCamera(fov, aspect, near, far);
-    this.camera.position.set(5000, 6000, 10000);
-    this.camera.lookAt(new Vector3());
-  }
-
-  addLights() {
-    const light1 = new DirectionalLight("white", 8);
-    light1.position.set(0, -300, 3000);
-    this.scene.add(light1);
-
-    const light2 = new AmbientLight(SOFT_WHITE_LIGHT);
-    this.scene.add(light2);
-  }
-
-  addHelpers(scene) {
-    const axesHelper = new AxesHelper(1000);
-    scene.add(axesHelper);
   }
 
   initRenderer() {
@@ -122,16 +96,14 @@ class ThreeJsControl {
       this.renderer.setSize(container.clientWidth, container.clientHeight);
       this.render();
     });
-
   }
+
   initAxesCubeRenderer() {
-    const container = this.container;
-  this.axesRenderer = new WebGLRenderer();
+  const container = this.container;
+  this.axesRenderer = new WebGLRenderer({ alpha: true });
   this.axesRenderer.setSize(100, 100);
   this.axesRenderer.setPixelRatio(window.devicePixelRatio);
   this.canvas2 = this.axesRenderer.domElement;
-  this.canvas2.style.maxWidth = "100px";
-  this.canvas2.style.maxHeight = "100px";
   this.canvas2.style.position = 'absolute';
   this.canvas2.style.top = '0';
   container.append(this.canvas2);
@@ -140,11 +112,75 @@ class ThreeJsControl {
   initControls() {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.reset();
-    this.controls.enableDamping = true;
-    this.controls.update();
     this.controls.enableZoom = false;
     this.controls.screenSpacePanning = false;
-    this.controls.addEventListener("change", () => this.render());
+
+    this.controls.addEventListener("change", () => {
+      // if (this.zoomEnabled) {
+        this.axesCamera.quaternion.copy(this.camera.quaternion);
+        this.axesControls.object.position.copy(this.controls.object.position);
+        this.render();
+      // }
+    });
+  }
+
+  initAxesCubeControls() {
+    this.axesControls = new OrbitControls(this.axesCamera, this.canvas2);
+    this.axesControls.enableZoom = false;
+    this.axesControls.enablePan = false;
+    this.zoomEnabled = false;
+    this.axesControls.target.set(0, 0, 0);
+
+    this.axesControls.addEventListener("change", () => {
+        this.camera.quaternion.copy(this.axesCamera.quaternion);
+        this.controls.object.position.copy(this.axesControls.object.position);
+        this.render();
+    });
+  }
+
+  createCamera() {
+    const container = this.container;
+    const fov = 35; // AKA Field of View
+    const aspect = container.clientWidth / container.clientHeight;
+
+    this.camera = new PerspectiveCamera(fov, aspect, NEAR, FAR);
+    this.camera.position.set(5000, 6000, 10000);
+    this.camera.lookAt(new Vector3());
+  }
+
+  addLights() {
+    const light1 = new DirectionalLight("white", 8);
+    light1.position.set(0, -300, 3000);
+    this.scene.add(light1);
+
+    const light2 = new AmbientLight( SOFT_WHITE_LIGHT );
+    this.scene.add(light2);
+  }
+
+  addAxesHelper(scene) {
+    const axesHelper = new AxesHelper(1000);
+    scene.add(axesHelper);
+  }
+
+  addBoxHelpers() {
+    // show bounding box around the selected object
+    if (this.lastSelectedObject) {
+      this.lastSelectedObject.remove(this.lastSelectedBoxHelper);
+      this.lastSelectedBoxHelper = null;
+    }
+    if (this.value) {
+      const boxHelper = new BoxHelper(this.candidate, YELLOW);
+      this.scene.add(boxHelper);
+      this.lastSelectedObject = this.candidate;
+      this.lastSelectedBoxHelper = boxHelper;
+    } else {
+      this.lastSelectedObject = null;
+    }
+
+    // show bounding box around all objects
+    this.boundingBoxHelper = new Box3Helper(this.boundingBox, YELLOW);
+    this.scene.add(this.boundingBoxHelper);
+    this.render();
   }
 
   setupEventListeners() {
@@ -205,15 +241,15 @@ class ThreeJsControl {
     offset.add(target);
 
     this.camera.position.copy(offset);
-    
-    // second canvas 
+
+    // second canvas
     // const position2 = this.axesCamera.position;
     // const offset2 = new Vector3();
     // offset2.copy(position2);
     // const factor2 = event.deltaY < 0 ? 0.888888889 : 1.125;
     // offset2.multiplyScalar(factor2);
     // this.axesCamera.position.copy(offset2);
-    
+
     this.render();
   }
 
@@ -285,36 +321,37 @@ class ThreeJsControl {
 
   zoomOut() {
     const zoomDuration = 1.5;
-    const boundingBox = new Box3();
+    this.boundingBox = new Box3();
     this.scene.traverse((object) => {
       if (object.type === "Mesh") {
-        boundingBox.expandByObject(object);
+        this.boundingBox.expandByObject(object);
       }
     });
 
-    // shows bounding box around all objects
-    // this.boundingBoxHelper = new Box3Helper(boundingBox, 0xffff00);
-    // this.scene.add(this.boundingBoxHelper);
+    // this.addBoxHelpers();
 
-    const center = new Vector3();
-    boundingBox.getCenter(center);
+    this.center = new Vector3();
+    this.boundingBox.getCenter(this.center);
     const size = new Vector3();
-    boundingBox.getSize(size);
+    this.boundingBox.getSize(size);
 
     const maxSize = Math.max(size.x, size.y, size.z);
     const fov = this.camera.fov * (Math.PI / 180);
     const distance = (maxSize / 2) / Math.tan(fov / 2);
 
     const targetPosition = new Vector3(
-      center.x + 10000, // for looking a bit at the front side
-      center.y + 15000, // for looking a bit from the top
-      center.z + distance
+      this.center.x + 10000, // for looking a bit at the front side
+      this.center.y + 15000, // for looking a bit from the top
+      this.center.z + distance
     );
 
     gsap.to(this.controls.target, {
-      x: center.x,
-      y: center.y,
-      z: center.z,
+      x: 0,
+      y: 0,
+      z: 0,
+      // x: this.center.x,
+      // y: this.center.y,
+      // z: this.center.z,
       duration: zoomDuration,
       ease: "power3.inOut",
       onUpdate: () => {
@@ -415,39 +452,26 @@ class ThreeJsControl {
     for (let i = 0; i < intersects.length; i++) {
       const clicked = intersects[i].object;
 
-      var candidate = clicked;
-      while (candidate != null) {
-        const sharedNode = candidate.userData;
+      this.candidate = clicked;
+      while (this.candidate != null) {
+        const sharedNode = this.candidate.userData;
         if (sharedNode instanceof SharedObject) {
-          const value = toggleMode
+          this.value = toggleMode
             ? !this.selection.includes(sharedNode)
             : true;
-          this.setSelected(sharedNode, value);
+          this.setSelected(sharedNode, this.value);
 
-          changes[sharedNode.id] = value ? "ADD" : "REMOVE";
+          changes[sharedNode.id] = this.value ? "ADD" : "REMOVE";
 
-          // shows bounding box around the selected object
-          // if (this.lastSelectedObject) {
-          //   this.lastSelectedObject.remove(this.lastSelectedBoxHelper);
-          //   this.lastSelectedBoxHelper = null;
-          // }
+          // this.addBoxHelpers();
 
-          // if (value) {
-          //   const boxHelper = new BoxHelper(candidate, 0xffff00);
-          //   this.scene.add(boxHelper);
-
-          //   this.lastSelectedObject = candidate;
-          //   this.lastSelectedBoxHelper = boxHelper;
-          // } else {
-          //   this.lastSelectedObject = null;
-          // }
-          // this.render();
+          this.render();
 
           this.sendCommand("updateSelection", { changes: changes });
           return;
         }
 
-        candidate = candidate.parent;
+        this.candidate = this.candidate.parent;
       }
     }
 
