@@ -26,8 +26,6 @@ import { gsap } from "gsap";
 
 const SOFT_WHITE_LIGHT = 0x404040;
 const YELLOW = 0xffff00;
-const NEAR = 10; // the near clipping plane
-const FAR = 100000; // the far clipping plane
 
 class ThreeJsControl {
   constructor(controlId, contextPath, dataUrl) {
@@ -65,15 +63,18 @@ class ThreeJsControl {
     this.axesScene = new Scene();
     this.axesScene.background = null;
 
-    const fov = 75; 
+    const fov = 75;
     const aspect = 1;
+    const near = 1; 
+    const far = 20;
 
-    this.axesCamera = new PerspectiveCamera(fov, aspect, NEAR, FAR);
-    this.axesCamera.position.set(0, 0, 10000);
-    this.axesCamera.lookAt(0, 0, 0);
+    this.axesCamera = new PerspectiveCamera(fov, aspect, near, far);
+    this.axesCamera.position.set(0, 0, 10);
+    this.axesTarget = new Vector3(0, 0, 0);
+    this.axesCamera.lookAt(this.axesTarget);
     this.addAxesHelper(this.axesScene);
 
-    const cubeSize = 15000;
+    const cubeSize = 6;
     const cubeGeometry = new BoxGeometry(cubeSize, cubeSize, cubeSize);
     const cubeMaterial = new MeshBasicMaterial({ color: 0xff0000, wireframe: true });
     this.axesCube = new Mesh(cubeGeometry, cubeMaterial);
@@ -107,20 +108,21 @@ class ThreeJsControl {
   this.canvas2.style.position = 'absolute';
   this.canvas2.style.top = '0';
   container.append(this.canvas2);
-  }
-
+  }  
+  
   initControls() {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.reset();
-    this.controls.enableZoom = false;
-    this.controls.screenSpacePanning = false;
+    this.controls.enableZoom = true;
+    this.controls.screenSpacePanning = true;
 
     this.controls.addEventListener("change", () => {
-      // if (this.zoomEnabled) {
-        this.axesCamera.quaternion.copy(this.camera.quaternion);
-        this.axesControls.object.position.copy(this.controls.object.position);
-        this.render();
-      // }
+      this.axesCamera.quaternion.copy(this.camera.quaternion);
+      this.axesCamera.position.copy(
+        calculateAxesCameraPosition(this.camera.position, this.controls.target)
+      );
+      this.render();
+      console.log(this.camera.position);
     });
   }
 
@@ -128,13 +130,14 @@ class ThreeJsControl {
     this.axesControls = new OrbitControls(this.axesCamera, this.canvas2);
     this.axesControls.enableZoom = false;
     this.axesControls.enablePan = false;
-    this.zoomEnabled = false;
     this.axesControls.target.set(0, 0, 0);
 
     this.axesControls.addEventListener("change", () => {
-        this.camera.quaternion.copy(this.axesCamera.quaternion);
-        this.controls.object.position.copy(this.axesControls.object.position);
-        this.render();
+      this.camera.quaternion.copy(this.axesCamera.quaternion);
+      this.camera.position.copy(
+        calculateMainCameraPosition(this.axesCamera.position, this.camera.position, this.controls.target)
+      );
+      this.render();
     });
   }
 
@@ -142,8 +145,10 @@ class ThreeJsControl {
     const container = this.container;
     const fov = 35; // AKA Field of View
     const aspect = container.clientWidth / container.clientHeight;
+    const near = 10; // the near clipping plane
+    const far = 100000; // the far clipping plane
 
-    this.camera = new PerspectiveCamera(fov, aspect, NEAR, FAR);
+    this.camera = new PerspectiveCamera(fov, aspect, near, far);
     this.camera.position.set(5000, 6000, 10000);
     this.camera.lookAt(new Vector3());
   }
@@ -273,11 +278,11 @@ class ThreeJsControl {
 
     const targetPositionZ = targetDistance + objectPosition.z;
     const offset = new Vector3(0, 0, 0);
-    const targetPosition = center.clone().add(offset);
+    const targetZoomInPosition = center.clone().add(offset);
 
     const controlsObjectPositionMatches =
-      this.controls.object.position.x === targetPosition.x &&
-      this.controls.object.position.y === targetPosition.y &&
+      this.controls.object.position.x === targetZoomInPosition.x &&
+      this.controls.object.position.y === targetZoomInPosition.y &&
       this.controls.object.position.z === targetPositionZ;
 
     const controlsTargetMatches =
@@ -339,7 +344,7 @@ class ThreeJsControl {
     const fov = this.camera.fov * (Math.PI / 180);
     const distance = (maxSize / 2) / Math.tan(fov / 2);
 
-    const targetPosition = new Vector3(
+    const targetZoomOutPosition = new Vector3(
       this.center.x + 10000, // for looking a bit at the front side
       this.center.y + 15000, // for looking a bit from the top
       this.center.z + distance
@@ -361,9 +366,9 @@ class ThreeJsControl {
     });
 
     gsap.to(this.controls.object.position, {
-      x: targetPosition.x,
-      y: targetPosition.y,
-      z: targetPosition.z,
+      x: targetZoomOutPosition.x,
+      y: targetZoomOutPosition.y,
+      z: targetZoomOutPosition.z,
       duration: zoomDuration,
       ease: "power3.inOut",
       onUpdate: () => {
@@ -554,6 +559,20 @@ class ThreeJsControl {
       axesRenderer.render(axesScene, axesCamera);
     });
   }
+}
+
+function calculateAxesCameraPosition(cameraPosition, controlsTarget) {
+  const subAxesOffset = new Vector3().subVectors(cameraPosition, controlsTarget);
+  return subAxesOffset.normalize().multiplyScalar(10);
+}
+
+function calculateMainCameraPosition(axesCameraPosition, cameraPosition, controlsTarget) {
+  let subMainOffset = new Vector3(...axesCameraPosition.toArray());
+  const cameraOffset = new Vector3().subVectors(cameraPosition, controlsTarget);
+
+  subMainOffset.normalize().multiplyScalar(cameraOffset.length());
+  subMainOffset = new Vector3().addVectors(subMainOffset, controlsTarget);
+  return subMainOffset;
 }
 
 class SharedObject {
