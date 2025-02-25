@@ -15,17 +15,24 @@ import {
   BoxHelper,
   Box3Helper,
   BoxGeometry,
-  BoxBufferGeometry,
   Mesh,
-  MeshBasicMaterial,
+  MeshStandardMaterial,
+  EdgesGeometry,
+  LineBasicMaterial,
+  LineSegments,
+  CanvasTexture,
+  FrontSide
 } from "three";
 
 import { OrbitControls } from "OrbitControls";
 import { GLTFLoader } from "GLTFLoader";
 import { gsap } from "gsap";
 
-const SOFT_WHITE_LIGHT = 0x404040;
+const WHITE_LIGHT = "#ffffff";
+const LIGHT_GREY = "#cccccc";
+const DARK_GREY = "#333333";
 const YELLOW = 0xffff00;
+const CUBE_CAMERA_FAR = 10;
 
 class ThreeJsControl {
   constructor(controlId, contextPath, dataUrl) {
@@ -59,31 +66,6 @@ class ThreeJsControl {
     this.addAxesHelper(this.scene);
   }
 
-  initAxesCubeScene() {
-    this.axesScene = new Scene();
-    this.axesScene.background = null;
-
-    const fov = 75;
-    const aspect = 1;
-    const near = 1; 
-    const far = 20;
-
-    this.axesCamera = new PerspectiveCamera(fov, aspect, near, far);
-    this.axesCamera.position.set(0, 0, 10);
-    this.axesTarget = new Vector3(0, 0, 0);
-    this.axesCamera.lookAt(this.axesTarget);
-    this.addAxesHelper(this.axesScene);
-
-    const cubeSize = 6;
-    const cubeGeometry = new BoxGeometry(cubeSize, cubeSize, cubeSize);
-    const cubeMaterial = new MeshBasicMaterial({ color: 0xff0000, wireframe: true });
-    this.axesCube = new Mesh(cubeGeometry, cubeMaterial);
-    this.axesCube.position.set(0, 0, 0);
-    this.axesScene.add(this.axesCube);
-    this.axesScene.rotation.x = -Math.PI / 2;
-    this.render();
-  }
-
   initRenderer() {
     const container = this.container;
     this.renderer = new WebGLRenderer();
@@ -99,17 +81,6 @@ class ThreeJsControl {
     });
   }
 
-  initAxesCubeRenderer() {
-  const container = this.container;
-  this.axesRenderer = new WebGLRenderer({ alpha: true });
-  this.axesRenderer.setSize(100, 100);
-  this.axesRenderer.setPixelRatio(window.devicePixelRatio);
-  this.canvas2 = this.axesRenderer.domElement;
-  this.canvas2.style.position = 'absolute';
-  this.canvas2.style.top = '0';
-  container.append(this.canvas2);
-  }  
-  
   initControls() {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.reset();
@@ -117,25 +88,161 @@ class ThreeJsControl {
     this.controls.screenSpacePanning = true;
 
     this.controls.addEventListener("change", () => {
-      this.axesCamera.quaternion.copy(this.camera.quaternion);
-      this.axesCamera.position.copy(
-        calculateAxesCameraPosition(this.camera.position, this.controls.target)
+      this.cubeCamera.quaternion.copy(this.camera.quaternion);
+      this.cubeCamera.position.copy(
+        calculatecubeCameraPosition(this.camera.position, this.controls.target)
       );
       this.render();
-      console.log(this.camera.position);
     });
   }
 
-  initAxesCubeControls() {
-    this.axesControls = new OrbitControls(this.axesCamera, this.canvas2);
-    this.axesControls.enableZoom = false;
-    this.axesControls.enablePan = false;
-    this.axesControls.target.set(0, 0, 0);
+  initAxesCubeScene() {
+    this.cubeScene = new Scene();
+    this.cubeScene.background = null;
 
-    this.axesControls.addEventListener("change", () => {
-      this.camera.quaternion.copy(this.axesCamera.quaternion);
+    const fov = 75;
+    const aspect = 1;
+    const near = 1; 
+    const far = 20;
+
+    this.cubeCamera = new PerspectiveCamera(fov, aspect, near, far);
+    this.cubeCamera.position.set(0, 0, CUBE_CAMERA_FAR);
+    this.cubeTarget = new Vector3(0, 0, 0);
+    this.cubeCamera.lookAt(this.cubeTarget);
+    // this.addAxesHelper(this.cubeScene);
+    this.cubeScene.rotation.x = -Math.PI / 2;
+
+    this.cubeScene.add(new AmbientLight(WHITE_LIGHT, 0.7));
+    const light = new DirectionalLight(WHITE_LIGHT, 0.5);
+    light.position.set(3, 5, 8);
+    light.castShadow = true;
+    this.cubeScene.add(light);
+    const light2 = new DirectionalLight(WHITE_LIGHT, 0.5);
+    light2.position.set(-3, -5, 0);
+    light2.castShadow = true;
+    this.cubeScene.add(light2);
+
+    this.axesCube = this.createAxesCube();
+    this.cubeScene.add(this.axesCube);
+
+    this.render();
+  }
+
+  createAxesCube() {
+    const cubeSize = 6;
+    const cubeGeometry = new BoxGeometry(cubeSize, cubeSize, cubeSize);
+    const cubeMaterials = [
+      new MeshStandardMaterial({ map: this.createTextTexture("Right"), side: FrontSide }),
+      new MeshStandardMaterial({ map: this.createTextTexture("Left"), side: FrontSide }),    
+      new MeshStandardMaterial({ map: this.createTextTexture("Back"), side: FrontSide }),
+      new MeshStandardMaterial({ map: this.createTextTexture("Front"), side: FrontSide }),
+      new MeshStandardMaterial({ map: this.createTextTexture("Top"), side: FrontSide }), 
+      new MeshStandardMaterial({ map: this.createTextTexture("Bottom"), side: FrontSide }),    
+  ];
+
+    const cube = new Mesh(cubeGeometry, cubeMaterials);
+    cube.position.set(0, 0, 0);
+
+    const edgeGeometry = new EdgesGeometry(cubeGeometry);
+    const edgeMaterial = new LineBasicMaterial({ color: DARK_GREY });
+    const cubeEdges = new LineSegments(edgeGeometry, edgeMaterial);
+
+    const group = new Group();
+    group.add(cube);
+    group.add(cubeEdges);
+
+    this.originalMaterials = cubeMaterials.map(material => material.clone());
+
+    return group;
+  }
+
+  createTextTexture(text) {
+    const size = 256; 
+    const textCanvas = document.createElement("canvas");
+    textCanvas.width = size;
+    textCanvas.height = size;
+    const context = textCanvas.getContext("2d");
+
+    context.fillStyle = LIGHT_GREY; 
+    context.fillRect(0, 0, size, size);
+
+    context.fillStyle = DARK_GREY; 
+    context.font = "bold 70px Arial";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+
+    context.translate(size / 2, size / 2);
+
+    switch (text) {
+      case "Right": context.rotate(-Math.PI / 2);
+          break;
+      case "Left": context.rotate(Math.PI / 2);
+          break;
+      case "Back": context.rotate(Math.PI);
+          break;
+      case "Bottom": context.rotate(Math.PI);
+          break;
+  }
+    context.fillText(text, 0, 0);
+
+    return new CanvasTexture(textCanvas);
+  }
+
+  onCubeHover( event ) {
+    if (Date.now() - this.clickStart > 500) {
+      return;
+    }
+
+    const raycaster = new Raycaster();
+    const mouse = new Vector2();
+    const rect = this.cubeCanvas.getBoundingClientRect();
+    const hoverPos = {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top
+    };
+
+    mouse.x = (hoverPos.x / this.cubeCanvas.clientWidth) * 2 - 1;
+    mouse.y = -(hoverPos.y / this.cubeCanvas.clientHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, this.cubeCamera);
+
+    const intersects = raycaster.intersectObject(this.axesCube.children[0], true);
+    const materials = this.axesCube.children[0].material;
+    materials.forEach((material, index) => {
+      material.color.copy(this.originalMaterials[index].color);
+      material.map = this.originalMaterials[index].map;
+  });
+
+    if(Array.isArray(materials) && intersects.length > 0) {
+      const intersectedFace = intersects[0].face;
+      materials[intersectedFace.materialIndex].color.set("#66bbff");
+    } 
+    
+    this.render();
+  }
+
+  initAxesCubeRenderer() {
+    const container = this.container;
+    this.cubeRenderer = new WebGLRenderer({ alpha: true });
+    this.cubeRenderer.shadowMap.enabled = true;
+    this.cubeRenderer.setSize(100, 100);
+    this.cubeRenderer.setPixelRatio(window.devicePixelRatio);
+    this.cubeCanvas = this.cubeRenderer.domElement;
+    this.cubeCanvas.style.position = 'absolute';
+    this.cubeCanvas.style.top = '0';
+    container.append(this.cubeCanvas);
+    this.cubeCanvas.addEventListener('mousemove', (event) => this.onCubeHover(event), false);
+  }  
+  
+  initAxesCubeControls() {
+    this.cubeControls = new OrbitControls(this.cubeCamera, this.cubeCanvas);
+    this.cubeControls.enableZoom = false;
+    this.cubeControls.enablePan = false;
+    this.cubeControls.target.set(0, 0, 0);
+
+    this.cubeControls.addEventListener("change", () => {
+      this.camera.quaternion.copy(this.cubeCamera.quaternion);
       this.camera.position.copy(
-        calculateMainCameraPosition(this.axesCamera.position, this.camera.position, this.controls.target)
+        calculateMainCameraPosition(this.cubeCamera.position, this.camera.position, this.controls.target)
       );
       this.render();
     });
@@ -154,11 +261,12 @@ class ThreeJsControl {
   }
 
   addLights() {
-    const light1 = new DirectionalLight("white", 8);
-    light1.position.set(0, -300, 3000);
+    const light1 = new DirectionalLight(WHITE_LIGHT, 8);
+    light1.position.set(0, -400, 3000);
     this.scene.add(light1);
 
-    const light2 = new AmbientLight( SOFT_WHITE_LIGHT );
+    const light2 = new DirectionalLight(WHITE_LIGHT, 2);
+    light2.position.set(200, 400, -1000);
     this.scene.add(light2);
   }
 
@@ -248,12 +356,12 @@ class ThreeJsControl {
     this.camera.position.copy(offset);
 
     // second canvas
-    // const position2 = this.axesCamera.position;
+    // const position2 = this.cubeCamera.position;
     // const offset2 = new Vector3();
     // offset2.copy(position2);
     // const factor2 = event.deltaY < 0 ? 0.888888889 : 1.125;
     // offset2.multiplyScalar(factor2);
-    // this.axesCamera.position.copy(offset2);
+    // this.cubeCamera.position.copy(offset2);
 
     this.render();
   }
@@ -345,18 +453,16 @@ class ThreeJsControl {
     const distance = (maxSize / 2) / Math.tan(fov / 2);
 
     const targetZoomOutPosition = new Vector3(
-      this.center.x + 10000, // for looking a bit at the front side
+      this.center.x + 12000, // for looking a bit at the right side
       this.center.y + 15000, // for looking a bit from the top
       this.center.z + distance
     );
 
     gsap.to(this.controls.target, {
-      x: 0,
-      y: 0,
-      z: 0,
-      // x: this.center.x,
-      // y: this.center.y,
-      // z: this.center.z,
+      // x: 0, y: 0, z: 0,
+      x: this.center.x,
+      y: this.center.y,
+      z: this.center.z,
       duration: zoomDuration,
       ease: "power3.inOut",
       onUpdate: () => {
@@ -554,20 +660,20 @@ class ThreeJsControl {
   render() {
     // requestAnimationFrame(() => this.renderer.render(this.scene, this.camera));
     requestAnimationFrame(() => {
-      const { renderer, axesRenderer, scene, camera, axesScene, axesCamera } = this;
+      const { renderer, cubeRenderer, scene, camera, cubeScene, cubeCamera } = this;
       renderer.render(scene, camera);
-      axesRenderer.render(axesScene, axesCamera);
+      cubeRenderer.render(cubeScene, cubeCamera);
     });
   }
 }
 
-function calculateAxesCameraPosition(cameraPosition, controlsTarget) {
+function calculatecubeCameraPosition(cameraPosition, controlsTarget) {
   const subAxesOffset = new Vector3().subVectors(cameraPosition, controlsTarget);
-  return subAxesOffset.normalize().multiplyScalar(10);
+  return subAxesOffset.normalize().multiplyScalar(CUBE_CAMERA_FAR);
 }
 
-function calculateMainCameraPosition(axesCameraPosition, cameraPosition, controlsTarget) {
-  let subMainOffset = new Vector3(...axesCameraPosition.toArray());
+function calculateMainCameraPosition(cubeCameraPosition, cameraPosition, controlsTarget) {
+  let subMainOffset = new Vector3(...cubeCameraPosition.toArray());
   const cameraOffset = new Vector3().subVectors(cameraPosition, controlsTarget);
 
   subMainOffset.normalize().multiplyScalar(cameraOffset.length());
