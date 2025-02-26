@@ -50,7 +50,6 @@ class ThreeJsControl {
     this.initAxesCubeControls();
     this.render();
     this.loadScene().then(() => setTimeout(() => this.zoomOut(), 100));
-    this.setupEventListeners();
   }
 
   initScene() {
@@ -75,6 +74,14 @@ class ThreeJsControl {
     this.canvas.style.maxWidth = "100%";
     this.canvas.style.maxHeight = "100%";
     container.append(this.canvas);
+    // update objects' size when the size of the canvas changes
+    const resizeObserver = this.createResizeObserver(this.canvas);
+    resizeObserver.observe(this.canvas);
+    this.canvas.addEventListener("mousedown", () => this.onMouseDown());
+    this.canvas.addEventListener("click", (event) => this.onClick(event));
+    this.container.addEventListener("wheel", (event) => this.onMouseWheel(event), {
+      passive: false,
+    });
     LayoutFunctions.addCustomRenderingFunction(container.parentNode, () => {
       this.renderer.setSize(container.clientWidth, container.clientHeight);
       this.render();
@@ -109,7 +116,6 @@ class ThreeJsControl {
     this.cubeCamera.position.set(0, 0, CUBE_CAMERA_FAR);
     this.cubeTarget = new Vector3(0, 0, 0);
     this.cubeCamera.lookAt(this.cubeTarget);
-    // this.addAxesHelper(this.cubeScene);
     this.cubeScene.rotation.x = -Math.PI / 2;
 
     this.cubeScene.add(new AmbientLight(WHITE_LIGHT, 0.7));
@@ -188,38 +194,6 @@ class ThreeJsControl {
     return new CanvasTexture(textCanvas);
   }
 
-  onCubeHover( event ) {
-    if (Date.now() - this.clickStart > 500) {
-      return;
-    }
-
-    const raycaster = new Raycaster();
-    const mouse = new Vector2();
-    const rect = this.cubeCanvas.getBoundingClientRect();
-    const hoverPos = {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top
-    };
-
-    mouse.x = (hoverPos.x / this.cubeCanvas.clientWidth) * 2 - 1;
-    mouse.y = -(hoverPos.y / this.cubeCanvas.clientHeight) * 2 + 1;
-    raycaster.setFromCamera(mouse, this.cubeCamera);
-
-    const intersects = raycaster.intersectObject(this.axesCube.children[0], true);
-    const materials = this.axesCube.children[0].material;
-    materials.forEach((material, index) => {
-      material.color.copy(this.originalMaterials[index].color);
-      material.map = this.originalMaterials[index].map;
-  });
-
-    if(Array.isArray(materials) && intersects.length > 0) {
-      const intersectedFace = intersects[0].face;
-      materials[intersectedFace.materialIndex].color.set("#66bbff");
-    } 
-    
-    this.render();
-  }
-
   initAxesCubeRenderer() {
     const container = this.container;
     this.cubeRenderer = new WebGLRenderer({ alpha: true });
@@ -231,6 +205,8 @@ class ThreeJsControl {
     this.cubeCanvas.style.top = '0';
     container.append(this.cubeCanvas);
     this.cubeCanvas.addEventListener('mousemove', (event) => this.onCubeHover(event), false);
+    this.cubeCanvas.addEventListener("mousedown", () => this.onMouseDown());
+    this.cubeCanvas.addEventListener("click", (event) => this.onCubeClick(event), false);
   }  
   
   initAxesCubeControls() {
@@ -246,6 +222,50 @@ class ThreeJsControl {
       );
       this.render();
     });
+  }
+
+  onCubeClick( event ) {
+    if (Date.now() - this.clickStart > 500) {
+      return; // Not a click
+    }
+    const raycaster = getRaycaster(event, this.cubeCamera, this.cubeCanvas);
+    const intersects = raycaster.intersectObjects(this.cubeScene.children, true);
+    const intersectedFace = intersects.find(i => !!i.face)?.face;
+
+    if (!intersectedFace) return;
+
+    const faceIndex = intersectedFace.materialIndex; 
+
+    const facePositions = {
+        0: { x: 10, y: 0, z: 0 },  // Right
+        1: { x: -10, y: 0, z: 0 }, // Left
+        2: { x: 0, y: 0, z: -10 }, // Back
+        3: { x: 0, y: 0, z: 10 },  // Front
+        4: { x: 0, y: 10, z: 0 },  // Top
+        5: { x: 0, y: -10, z: 0 }  // Bottom
+    };
+
+    const newPos = facePositions[faceIndex];
+
+    gsap.to(this.cubeCamera.position, {
+        x: newPos.x,
+        y: newPos.y,
+        z: newPos.z,
+        duration: 1.5,
+        ease: "power2.out",
+        onUpdate: () => {
+          this.cubeControls.update();
+          this.render();
+            // this.cubeControls.dispatchEvent( { type: 'change' } );
+          console.log(this.cubeCamera.position);
+        },
+        onComplete: () => {
+          console.log('eferferf', this.cubeCamera.position);
+          this.render();
+        }
+    });
+
+    console.log("clicked", intersects);
   }
 
   createCamera() {
@@ -296,18 +316,6 @@ class ThreeJsControl {
     this.render();
   }
 
-  setupEventListeners() {
-    // update objects' size when the size of the canvas changes
-    const resizeObserver = this.createResizeObserver(this.canvas);
-    resizeObserver.observe(this.canvas);
-
-    this.canvas.addEventListener("mousedown", () => this.onMouseDown());
-    this.canvas.addEventListener("click", (event) => this.onClick(event));
-    this.container.addEventListener("wheel", (event) => this.onMouseWheel(event), {
-      passive: false,
-    });
-  }
-
   createResizeObserver(canvas) {
     return new ResizeObserver(() => {
       this.camera.aspect = canvas.clientWidth / canvas.clientHeight;
@@ -324,15 +332,7 @@ class ThreeJsControl {
     if (Date.now() - this.clickStart > 500) {
       return; // Not a click.
     }
-
-    const raycaster = new Raycaster();
-    const pointer = new Vector2();
-
-    const clickPos = BAL.relativeMouseCoordinates(event, this.canvas);
-    pointer.x = (clickPos.x / this.canvas.clientWidth) * 2 - 1;
-    pointer.y = -(clickPos.y / this.canvas.clientHeight) * 2 + 1;
-
-    raycaster.setFromCamera(pointer, this.camera);
+    const raycaster = getRaycaster(event, this.camera, this.canvas);
     const intersects = raycaster.intersectObjects(this.scene.children, true);
 
     this.updateSelection(intersects, event.ctrlKey);
@@ -363,6 +363,24 @@ class ThreeJsControl {
     // offset2.multiplyScalar(factor2);
     // this.cubeCamera.position.copy(offset2);
 
+    this.render();
+  }
+
+  onCubeHover( event ) {
+    const raycaster = getRaycaster(event, this.cubeCamera, this.cubeCanvas);
+    const intersects = raycaster.intersectObject(this.axesCube.children[0], true);
+
+    const materials = this.axesCube.children[0].material;
+    materials.forEach((material, index) => {
+        material.color.copy(this.originalMaterials[index].color);
+        material.map = this.originalMaterials[index].map;
+    });
+
+    if(intersects.length > 0) {
+      const intersectedFace = intersects[0].face;
+      materials[intersectedFace.materialIndex].color.set("#66bbff");
+    } 
+    
     this.render();
   }
 
@@ -665,6 +683,23 @@ class ThreeJsControl {
       cubeRenderer.render(cubeScene, cubeCamera);
     });
   }
+}
+
+function getRaycaster(event, camera, canvas) {
+  const raycaster = new Raycaster();
+  const mouse = new Vector2();
+
+  const rect = canvas.getBoundingClientRect();
+  const mousePos = {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top
+  };
+  mouse.x = (mousePos.x / canvas.clientWidth) * 2 - 1;
+  mouse.y = -(mousePos.y / canvas.clientHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+
+  return raycaster;
 }
 
 function calculatecubeCameraPosition(cameraPosition, controlsTarget) {
