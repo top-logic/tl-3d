@@ -33,6 +33,7 @@ const LIGHT_GREY = "#cccccc";
 const DARK_GREY = "#333333";
 const YELLOW = 0xffff00;
 const CUBE_CAMERA_FAR = 10;
+const CAMERA_MOVE_DURATION = 1.5;
 
 class ThreeJsControl {
   constructor(controlId, contextPath, dataUrl) {
@@ -94,12 +95,20 @@ class ThreeJsControl {
     this.controls.enableZoom = true;
     this.controls.screenSpacePanning = true;
 
+    this.controlsIsUpdating = false;
+
     this.controls.addEventListener("change", () => {
-      this.cubeCamera.quaternion.copy(this.camera.quaternion);
-      this.cubeCamera.position.copy(
-        calculatecubeCameraPosition(this.camera.position, this.controls.target)
-      );
-      this.render();
+      if (!this.cubeControlsIsUpdating) {
+        this.controlsIsUpdating = true;
+        this.cubeCamera.quaternion.copy(this.camera.quaternion);
+        this.cubeCamera.position.copy(
+          calculatecubeCameraPosition(this.camera.position, this.controls.target)
+        );
+        this.cubeControls.update();
+        this.controlsIsUpdating = false;
+
+        this.render();
+      }
     });
   }
 
@@ -215,12 +224,20 @@ class ThreeJsControl {
     this.cubeControls.enablePan = false;
     this.cubeControls.target.set(0, 0, 0);
 
+    this.cubeControlsIsUpdating = false;
+
     this.cubeControls.addEventListener("change", () => {
-      this.camera.quaternion.copy(this.cubeCamera.quaternion);
-      this.camera.position.copy(
-        calculateMainCameraPosition(this.cubeCamera.position, this.camera.position, this.controls.target)
-      );
-      this.render();
+      if (!this.controlsIsUpdating) {
+        this.cubeControlsIsUpdating = true;
+        this.camera.quaternion.copy(this.cubeCamera.quaternion);
+        this.camera.position.copy(
+          calculateMainCameraPosition(this.cubeCamera.position, this.camera.position, this.controls.target)
+        );
+        this.controls.update();
+        this.cubeControlsIsUpdating = false;
+
+        this.render();
+      }
     });
   }
 
@@ -237,35 +254,30 @@ class ThreeJsControl {
     const faceIndex = intersectedFace.materialIndex; 
 
     const facePositions = {
-        0: { x: 10, y: 0, z: 0 },  // Right
-        1: { x: -10, y: 0, z: 0 }, // Left
-        2: { x: 0, y: 0, z: -10 }, // Back
-        3: { x: 0, y: 0, z: 10 },  // Front
-        4: { x: 0, y: 10, z: 0 },  // Top
-        5: { x: 0, y: -10, z: 0 }  // Bottom
+      0: { x: 10, y: 0, z: 0 },  // Right
+      1: { x: -10, y: 0, z: 0 }, // Left
+      2: { x: 0, y: 0, z: -10 }, // Back
+      3: { x: 0, y: 0, z: 10 },  // Front
+      4: { x: 0, y: 10, z: 1 },  // Top
+      5: { x: 0, y: -10, z: 1 }  // Bottom
     };
 
     const newPos = facePositions[faceIndex];
 
-    gsap.to(this.cubeCamera.position, {
+    gsap.to(this.cubeControls.object.position, {
         x: newPos.x,
         y: newPos.y,
         z: newPos.z,
-        duration: 1.5,
+        duration: CAMERA_MOVE_DURATION,
         ease: "power2.out",
         onUpdate: () => {
-          this.cubeControls.update();
-          this.render();
-            // this.cubeControls.dispatchEvent( { type: 'change' } );
-          console.log(this.cubeCamera.position);
+            this.cubeControls.update();
+            this.render();
         },
         onComplete: () => {
-          console.log('eferferf', this.cubeCamera.position);
-          this.render();
+            this.render();
         }
     });
-
-    console.log("clicked", intersects);
   }
 
   createCamera() {
@@ -385,7 +397,6 @@ class ThreeJsControl {
   }
 
   zoomToSelection() {
-    const zoomDuration = 1.5;
     const selectedObject = this.getParentNode(this.selection[0]?.node);
     if (!selectedObject) return;
 
@@ -417,23 +428,12 @@ class ThreeJsControl {
       this.controls.target.z === center.z;
 
     if (!controlsObjectPositionMatches && !controlsTargetMatches) {
-      gsap.to(this.controls.target, {
-        x: center.x,
-        y: center.y,
-        z: center.z,
-        duration: zoomDuration,
-        ease: "power3.inOut",
-        onUpdate: () => {
-          this.controls.update();
-          this.render();
-        },
-      });
 
       gsap.to(this.controls.object.position, {
         x: center.x,
         y: center.y + 2000,
         z: targetPositionZ,
-        duration: zoomDuration,
+        duration: CAMERA_MOVE_DURATION,
         ease: "power3.inOut",
         onUpdate: () => {
           this.controls.update();
@@ -446,12 +446,23 @@ class ThreeJsControl {
           this.render();
         },
       });
+
+      gsap.to(this.controls.target, {
+        x: center.x,
+        y: center.y,
+        z: center.z,
+        duration: CAMERA_MOVE_DURATION,
+        ease: "power3.inOut",
+        onUpdate: () => {
+          this.controls.update();
+          this.render();
+        },
+      });
     }
     this.render();
   }
 
   zoomOut() {
-    const zoomDuration = 1.5;
     this.boundingBox = new Box3();
     this.scene.traverse((object) => {
       if (object.type === "Mesh") {
@@ -476,12 +487,11 @@ class ThreeJsControl {
       this.center.z + distance
     );
 
-    gsap.to(this.controls.target, {
-      // x: 0, y: 0, z: 0,
-      x: this.center.x,
-      y: this.center.y,
-      z: this.center.z,
-      duration: zoomDuration,
+    gsap.to(this.controls.object.position, {
+      x: targetZoomOutPosition.x,
+      y: targetZoomOutPosition.y,
+      z: targetZoomOutPosition.z,
+      duration: CAMERA_MOVE_DURATION,
       ease: "power3.inOut",
       onUpdate: () => {
         this.controls.update();
@@ -489,11 +499,12 @@ class ThreeJsControl {
       },
     });
 
-    gsap.to(this.controls.object.position, {
-      x: targetZoomOutPosition.x,
-      y: targetZoomOutPosition.y,
-      z: targetZoomOutPosition.z,
-      duration: zoomDuration,
+    gsap.to(this.controls.target, {
+      x: 0, y: 0, z: 0,
+      // x: this.center.x,
+      // y: this.center.y,
+      // z: this.center.z,
+      duration: CAMERA_MOVE_DURATION,
       ease: "power3.inOut",
       onUpdate: () => {
         this.controls.update();
