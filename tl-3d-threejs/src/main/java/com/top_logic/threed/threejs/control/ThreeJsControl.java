@@ -153,7 +153,7 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler, L
 			getFrameScope().getURL(context, this).appendParameter("t", Long.toString(System.nanoTime())).getURL();
 
 		HTMLUtil.beginScriptAfterRendering(out);
-		out.append("window.services.threejs.init('" + getID() + "', '" + context.getContextPath() + "', '" + dataUrl + "')");
+		out.append("window.services.threejs.init('" + getID() + "', '" + context.getContextPath() + "', '" + dataUrl + "', " + _isWorkplaneVisible + ")");
 		HTMLUtil.endScriptAfterRendering(out);
 
 		out.endTag(DIV);

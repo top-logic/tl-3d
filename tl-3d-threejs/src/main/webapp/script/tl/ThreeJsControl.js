@@ -37,13 +37,12 @@ const CUBE_CAMERA_FAR = 10;
 const CAMERA_MOVE_DURATION = 1.5;
 
 class ThreeJsControl {
-  constructor(controlId, contextPath, dataUrl) {
+  constructor(controlId, contextPath, dataUrl, isWorkplaneVisible) {
     this.lastSelectedObject = null;
     this.controlId = controlId;
     this.contextPath = contextPath;
     this.dataUrl = dataUrl;
     this.scope = new Scope();
-    // this.isWorkplaneVisible = false;
 
     this.initScene();
     this.initAxesCubeScene();
@@ -54,6 +53,7 @@ class ThreeJsControl {
     this.render();
     this.loadScene().then(() => setTimeout(() => {
       this.createBoundingBox();
+      this.toggleWorkplane(isWorkplaneVisible);
       this.zoomOut();
     }, 100));
   }
@@ -291,10 +291,6 @@ class ThreeJsControl {
 
     this.isWorkplaneVisible = visible;
     this.render();
-  }
-
-  getIsWorkplaneVisible() {
-    return this.isWorkplaneVisible;
   }
 
   addAxesHelper(scene) {
@@ -939,8 +935,8 @@ class GltfAsset extends SharedObject {
 
 // For sever communication written in legacy JS.
 window.services.threejs = {
-  init: async function (controlId, contextPath, dataUrl) {
-    const control = new ThreeJsControl(controlId, contextPath, dataUrl);
+  init: async function (controlId, contextPath, dataUrl, isWorkplaneVisible) {
+    const control = new ThreeJsControl(controlId, contextPath, dataUrl, isWorkplaneVisible);
     control.attach();
   },
 
