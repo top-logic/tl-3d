@@ -7,13 +7,14 @@ import {
   DirectionalLight,
   AmbientLight,
   WebGLRenderer,
-  AxesHelper,
   Raycaster,
   Box3,
   Vector3,
   Vector2,
+  AxesHelper,
   BoxHelper,
   Box3Helper,
+  GridHelper,
   BoxGeometry,
   Mesh,
   MeshStandardMaterial,
@@ -42,6 +43,7 @@ class ThreeJsControl {
     this.contextPath = contextPath;
     this.dataUrl = dataUrl;
     this.scope = new Scope();
+    // this.isWorkplaneVisible = false;
 
     this.initScene();
     this.initAxesCubeScene();
@@ -50,7 +52,10 @@ class ThreeJsControl {
     this.initControls();
     this.initAxesCubeControls();
     this.render();
-    this.loadScene().then(() => setTimeout(() => this.zoomOut(), 100));
+    this.loadScene().then(() => setTimeout(() => {
+      this.createBoundingBox();
+      this.zoomOut();
+    }, 100));
   }
 
   initScene() {
@@ -118,7 +123,7 @@ class ThreeJsControl {
 
     const fov = 75;
     const aspect = 1;
-    const near = 1; 
+    const near = 1;
     const far = 20;
 
     this.cubeCamera = new PerspectiveCamera(fov, aspect, near, far);
@@ -153,7 +158,7 @@ class ThreeJsControl {
       new MeshStandardMaterial({ map: this.createTextTexture("Front"), side: FrontSide }),
       new MeshStandardMaterial({ map: this.createTextTexture("Top"), side: FrontSide }), 
       new MeshStandardMaterial({ map: this.createTextTexture("Bottom"), side: FrontSide }),    
-  ];
+    ];
 
     const cube = new Mesh(cubeGeometry, cubeMaterials);
     cube.position.set(0, 0, 0);
@@ -166,22 +171,22 @@ class ThreeJsControl {
     group.add(cube);
     group.add(cubeEdges);
 
-    this.originalMaterials = cubeMaterials.map(material => material.clone());
+    this.originalMaterials = cubeMaterials.map((material) => material.clone());
 
     return group;
   }
 
   createTextTexture(text) {
-    const size = 256; 
+    const size = 256;
     const textCanvas = document.createElement("canvas");
     textCanvas.width = size;
     textCanvas.height = size;
     const context = textCanvas.getContext("2d");
 
-    context.fillStyle = LIGHT_GREY; 
+    context.fillStyle = LIGHT_GREY;
     context.fillRect(0, 0, size, size);
 
-    context.fillStyle = DARK_GREY; 
+    context.fillStyle = DARK_GREY;
     context.font = "bold 70px Arial";
     context.textAlign = "center";
     context.textBaseline = "middle";
@@ -190,14 +195,14 @@ class ThreeJsControl {
 
     switch (text) {
       case "Right": context.rotate(-Math.PI / 2);
-          break;
+        break;
       case "Left": context.rotate(Math.PI / 2);
-          break;
+        break;
       case "Back": context.rotate(Math.PI);
-          break;
+        break;
       case "Bottom": context.rotate(Math.PI);
-          break;
-  }
+        break;
+    }
     context.fillText(text, 0, 0);
 
     return new CanvasTexture(textCanvas);
@@ -210,14 +215,14 @@ class ThreeJsControl {
     this.cubeRenderer.setSize(100, 100);
     this.cubeRenderer.setPixelRatio(window.devicePixelRatio);
     this.cubeCanvas = this.cubeRenderer.domElement;
-    this.cubeCanvas.style.position = 'absolute';
-    this.cubeCanvas.style.top = '0';
+    this.cubeCanvas.style.position = "absolute";
+    this.cubeCanvas.style.top = "0";
     container.append(this.cubeCanvas);
-    this.cubeCanvas.addEventListener('mousemove', (event) => this.onCubeHover(event), false);
+    this.cubeCanvas.addEventListener("mousemove", (event) => this.onCubeHover(event), false);
     this.cubeCanvas.addEventListener("mousedown", () => this.onMouseDown());
     this.cubeCanvas.addEventListener("click", (event) => this.onCubeClick(event), false);
-  }  
-  
+  }
+
   initAxesCubeControls() {
     this.cubeControls = new OrbitControls(this.cubeCamera, this.cubeCanvas);
     this.cubeControls.enableZoom = false;
@@ -241,45 +246,6 @@ class ThreeJsControl {
     });
   }
 
-  onCubeClick( event ) {
-    if (Date.now() - this.clickStart > 500) {
-      return; // Not a click
-    }
-    const raycaster = getRaycaster(event, this.cubeCamera, this.cubeCanvas);
-    const intersects = raycaster.intersectObjects(this.cubeScene.children, true);
-    const intersectedFace = intersects.find(i => !!i.face)?.face;
-
-    if (!intersectedFace) return;
-
-    const faceIndex = intersectedFace.materialIndex; 
-
-    const facePositions = {
-      0: { x: 10, y: 0, z: 0 },  // Right
-      1: { x: -10, y: 0, z: 0 }, // Left
-      2: { x: 0, y: 0, z: -10 }, // Back
-      3: { x: 0, y: 0, z: 10 },  // Front
-      4: { x: 0, y: 10, z: 1 },  // Top
-      5: { x: 0, y: -10, z: 1 }  // Bottom
-    };
-
-    const newPos = facePositions[faceIndex];
-
-    gsap.to(this.cubeControls.object.position, {
-        x: newPos.x,
-        y: newPos.y,
-        z: newPos.z,
-        duration: CAMERA_MOVE_DURATION,
-        ease: "power2.out",
-        onUpdate: () => {
-            this.cubeControls.update();
-            this.render();
-        },
-        onComplete: () => {
-            this.render();
-        }
-    });
-  }
-
   createCamera() {
     const container = this.container;
     const fov = 35; // AKA Field of View
@@ -300,6 +266,35 @@ class ThreeJsControl {
     const light2 = new DirectionalLight(WHITE_LIGHT, 2);
     light2.position.set(200, 400, -1000);
     this.scene.add(light2);
+  }
+
+  toggleWorkplane(visible) {
+    if (!this.boundingBox) {
+      return;
+    }
+
+    if (!this.workplane) {
+      const divisions = 50;
+      const boxSize = new Vector3();
+      this.boundingBox.getSize(boxSize);
+      const gridSize = Math.max(boxSize.x, boxSize.y, boxSize.z) * 1.5;
+
+      this.workplane = new GridHelper(gridSize, divisions, new Color(0xdd0000), new Color(DARK_GREY));
+      this.workplane.rotation.x = Math.PI / 2;
+    }
+
+    if (visible) {
+      this.scene.add(this.workplane);
+    } else {
+      this.scene.remove(this.workplane);
+    }
+
+    this.isWorkplaneVisible = visible;
+    this.render();
+  }
+
+  getIsWorkplaneVisible() {
+    return this.isWorkplaneVisible;
   }
 
   addAxesHelper(scene) {
@@ -326,6 +321,15 @@ class ThreeJsControl {
     this.boundingBoxHelper = new Box3Helper(this.boundingBox, YELLOW);
     this.scene.add(this.boundingBoxHelper);
     this.render();
+  }
+
+  createBoundingBox() {
+    this.boundingBox = new Box3();
+    this.scene.traverse((object) => {
+      if (object.type === "Mesh") {
+        this.boundingBox.expandByObject(object);
+      }
+    });
   }
 
   createResizeObserver(canvas) {
@@ -367,33 +371,67 @@ class ThreeJsControl {
 
     this.camera.position.copy(offset);
 
-    // second canvas
-    // const position2 = this.cubeCamera.position;
-    // const offset2 = new Vector3();
-    // offset2.copy(position2);
-    // const factor2 = event.deltaY < 0 ? 0.888888889 : 1.125;
-    // offset2.multiplyScalar(factor2);
-    // this.cubeCamera.position.copy(offset2);
-
     this.render();
   }
 
-  onCubeHover( event ) {
+  onCubeHover(event) {
     const raycaster = getRaycaster(event, this.cubeCamera, this.cubeCanvas);
     const intersects = raycaster.intersectObject(this.axesCube.children[0], true);
 
     const materials = this.axesCube.children[0].material;
     materials.forEach((material, index) => {
-        material.color.copy(this.originalMaterials[index].color);
-        material.map = this.originalMaterials[index].map;
+      material.color.copy(this.originalMaterials[index].color);
+      material.map = this.originalMaterials[index].map;
     });
 
-    if(intersects.length > 0) {
+    if (intersects.length > 0) {
       const intersectedFace = intersects[0].face;
       materials[intersectedFace.materialIndex].color.set("#66bbff");
-    } 
-    
+    }
+
     this.render();
+  }
+
+  onCubeClick(event) {
+    if (Date.now() - this.clickStart > 500) {
+      return; // Not a click
+    }
+    const raycaster = getRaycaster(event, this.cubeCamera, this.cubeCanvas);
+    const intersects = raycaster.intersectObjects(
+      this.cubeScene.children,
+      true
+    );
+    const intersectedFace = intersects.find((i) => !!i.face)?.face;
+
+    if (!intersectedFace) return;
+
+    const faceIndex = intersectedFace.materialIndex;
+
+    const facePositions = {
+      0: { x: 10, y: 0, z: 0 }, // Right
+      1: { x: -10, y: 0, z: 0 }, // Left
+      2: { x: 0, y: 0, z: -10 }, // Back
+      3: { x: 0, y: 0, z: 10 }, // Front
+      4: { x: 0, y: 10, z: 1 }, // Top
+      5: { x: 0, y: -10, z: 1 }, // Bottom
+    };
+
+    const newPos = facePositions[faceIndex];
+
+    gsap.to(this.cubeControls.object.position, {
+      x: newPos.x,
+      y: newPos.y,
+      z: newPos.z,
+      duration: CAMERA_MOVE_DURATION,
+      ease: "power2.out",
+      onUpdate: () => {
+        this.cubeControls.update();
+        this.render();
+      },
+      onComplete: () => {
+        this.render();
+      },
+    });
   }
 
   zoomToSelection() {
@@ -428,7 +466,6 @@ class ThreeJsControl {
       this.controls.target.z === center.z;
 
     if (!controlsObjectPositionMatches && !controlsTargetMatches) {
-
       gsap.to(this.controls.object.position, {
         x: center.x,
         y: center.y + 2000,
@@ -463,17 +500,14 @@ class ThreeJsControl {
   }
 
   zoomOut() {
-    this.boundingBox = new Box3();
-    this.scene.traverse((object) => {
-      if (object.type === "Mesh") {
-        this.boundingBox.expandByObject(object);
-      }
-    });
+    if (!this.boundingBox) {
+      return;
+    }
 
     // this.addBoxHelpers();
+    const center = new Vector3();
+    this.boundingBox.getCenter(center);
 
-    this.center = new Vector3();
-    this.boundingBox.getCenter(this.center);
     const size = new Vector3();
     this.boundingBox.getSize(size);
 
@@ -482,9 +516,9 @@ class ThreeJsControl {
     const distance = (maxSize / 2) / Math.tan(fov / 2);
 
     const targetZoomOutPosition = new Vector3(
-      this.center.x + 12000, // for looking a bit at the right side
-      this.center.y + 15000, // for looking a bit from the top
-      this.center.z + distance
+      center.x + 12000, // for looking a bit at the right side
+      center.y + 15000, // for looking a bit from the top
+      center.z + distance
     );
 
     gsap.to(this.controls.object.position, {
@@ -501,9 +535,9 @@ class ThreeJsControl {
 
     gsap.to(this.controls.target, {
       x: 0, y: 0, z: 0,
-      // x: this.center.x,
-      // y: this.center.y,
-      // z: this.center.z,
+      // x: center.x,
+      // y: center.y,
+      // z: center.z,
       duration: CAMERA_MOVE_DURATION,
       ease: "power3.inOut",
       onUpdate: () => {
@@ -928,6 +962,13 @@ window.services.threejs = {
     const control = ThreeJsControl.control(container);
     if (control != null) {
       control.zoomOut();
+    }
+  },
+
+  toggleWorkplane: function (container, visible) {
+    const control = ThreeJsControl.control(container);
+    if (control != null) {
+      control.toggleWorkplane(visible);
     }
   },
 };

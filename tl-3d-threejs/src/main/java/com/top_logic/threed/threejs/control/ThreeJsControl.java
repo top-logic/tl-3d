@@ -50,6 +50,8 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler, L
 
 	private final SelectionModel _selection;
 
+	private boolean _isWorkplaneVisible;
+
 	/**
 	 * Whether {@link #_selection} is currently updated with new values from the UI. During that
 	 * period, events from the {@link #_selection} are ignored.
@@ -87,6 +89,16 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler, L
 
 	public void zoomOutFromSelection() {
     	addUpdate(new JSFunctionCall(getID(), "window.services.threejs", "zoomOutFromSelection"));
+	}
+
+	public boolean getIsWorkplaneVisible() {
+		return _isWorkplaneVisible;
+	}
+
+	public void setIsWorkplaneVisible(boolean visible) {
+		_isWorkplaneVisible = visible;
+		
+		addUpdate(new JSFunctionCall(getID(), "window.services.threejs", "toggleWorkplane", visible));
 	}
 
 	@Override

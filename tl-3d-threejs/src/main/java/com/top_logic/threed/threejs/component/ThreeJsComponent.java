@@ -39,6 +39,7 @@ import com.top_logic.threed.threejs.scene.PartNode;
 import com.top_logic.threed.threejs.scene.SceneGraph;
 import com.top_logic.threed.threejs.scene.SceneNode;
 
+
 /**
  * 3D-Viewer using the <code>Three.js</code> library.
  */
@@ -128,6 +129,14 @@ public class ThreeJsComponent extends BuilderComponent
 
 	public void zoomOutFromSelection() {
     	getThreeJSControl().zoomOutFromSelection();
+	}
+
+	public boolean getIsWorkplaneVisible() {
+		return getThreeJSControl().getIsWorkplaneVisible();
+	}
+
+	public void setIsWorkplaneVisible(boolean visible) {
+		getThreeJSControl().setIsWorkplaneVisible(visible);
 	}
 
 	@Override

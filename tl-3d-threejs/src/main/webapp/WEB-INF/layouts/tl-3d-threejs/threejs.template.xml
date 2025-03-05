@@ -66,7 +66,16 @@
 	>
 		<buttons>
 			${buttons}
-			
+			<button id="addWorkplane" class="com.top_logic.threed.threejs.component.ToggleWorkplaneCommand"
+				group="System"
+				image="css:bi bi-grid-3x3"
+				activeImage="css:bi bi-grid-3x3 tl-danger"
+			>
+				<resourceKey key="dynamic.4f78bb6c-0176-41e6-ba2a-6426d5b04562">
+					<de>Arbeitsebene</de>
+					<en>Workplane</en>
+				</resourceKey>
+			</button>
 			<button id="zoomToSelection" class="com.top_logic.threed.threejs.component.ZoomToSelectionCommand"
 				group="System"
 				image="css:bi bi-zoom-in"
