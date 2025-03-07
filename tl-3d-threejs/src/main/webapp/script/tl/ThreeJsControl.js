@@ -14,8 +14,9 @@ import {
   AxesHelper,
   BoxHelper,
   Box3Helper,
-  GridHelper,
   BoxGeometry,
+  BufferGeometry,
+  Line,
   Mesh,
   MeshStandardMaterial,
   EdgesGeometry,
@@ -33,6 +34,9 @@ const WHITE_LIGHT = "#ffffff";
 const LIGHT_GREY = "#cccccc";
 const DARK_GREY = "#333333";
 const YELLOW = 0xffff00;
+const LIGHT_BLUE = 0x77aacc;
+const MIDDLE_BLUE = 0x447799;
+const DARK_BLUE = 0x001122;
 const CUBE_CAMERA_FAR = 10;
 const CAMERA_MOVE_DURATION = 1.5;
 
@@ -274,12 +278,11 @@ class ThreeJsControl {
     }
 
     if (!this.workplane) {
-      const divisions = 50;
       const boxSize = new Vector3();
       this.boundingBox.getSize(boxSize);
       const gridSize = Math.max(boxSize.x, boxSize.y, boxSize.z) * 1.5;
 
-      this.workplane = new GridHelper(gridSize, divisions, new Color(0xdd0000), new Color(DARK_GREY));
+      this.workplane = this.createDetailedGrid(gridSize);
       this.workplane.rotation.x = Math.PI / 2;
     }
 
@@ -292,6 +295,69 @@ class ThreeJsControl {
     this.isWorkplaneVisible = visible;
     this.render();
   }
+
+  createDetailedGrid(size) {
+    const z = 0;
+    const edge = size / 2;
+    const gridGroup = new Group();
+
+    const smallCell = 200;
+    const bigCell = smallCell * 10;
+
+    function createLine(start, end, color, linewidth) {
+        const geometry = new BufferGeometry().setFromPoints([start, end]);
+        const material = new LineBasicMaterial({ color, linewidth });
+        return new Line(geometry, material);
+    }
+
+    const gridSmall = new Group();
+    // vertical lines
+    for (let i = 0; i <= edge; i += smallCell) {
+      gridSmall.add(createLine(new Vector3(-i, -edge, z), new Vector3(-i, edge, z), LIGHT_BLUE, 1));
+      gridSmall.add(createLine(new Vector3(i, -edge, z), new Vector3(i, edge, z), LIGHT_BLUE, 1));
+    }
+    // horizontal lines
+    for (let i = z; i <= edge; i += smallCell) {
+      gridSmall.add(createLine(new Vector3(-edge, -i, z), new Vector3(edge, -i, z), LIGHT_BLUE, 1));
+      gridSmall.add(createLine(new Vector3(-edge, i, z), new Vector3(edge, i, z), LIGHT_BLUE, 1));
+    }
+
+    const gridBig = new Group();
+    for (let i = bigCell; i <= edge; i += bigCell) {
+      // vertical lines
+      gridBig.add(createLine(new Vector3(-i, -edge, z), new Vector3(-i, edge, z), MIDDLE_BLUE, 2));
+      gridBig.add(createLine(new Vector3(i, -edge, z), new Vector3(i, edge, z), MIDDLE_BLUE, 2));
+      // horizontal lines
+      gridBig.add(createLine(new Vector3(-edge, -i, z), new Vector3(edge, -i, z), MIDDLE_BLUE, 2));
+      gridBig.add(createLine(new Vector3(-edge, i, z), new Vector3(edge, i, z), MIDDLE_BLUE, 2));
+  }
+
+    const gridEdgeCenter = new Group();
+    const thickestLines = [
+      // vertical outer lines
+      [new Vector3(-edge, -edge, z), new Vector3(-edge, edge, z)],
+      [new Vector3(edge, -edge, z), new Vector3(edge, edge, z)],
+      // horizontal outer lines
+      [new Vector3(-edge, -edge, z), new Vector3(edge, -edge, z)],
+      [new Vector3(-edge, edge, z), new Vector3(edge, edge, z)],
+      // central lines
+      [new Vector3(0, -edge, z), new Vector3(0, edge, z)],
+      [new Vector3(-edge, 0, z), new Vector3(edge, 0, z)]
+    ];
+    thickestLines.forEach(([start, end]) => {
+        gridEdgeCenter.add(createLine(start, end, DARK_BLUE, 3));
+    });
+
+    gridSmall.rotation.x = Math.PI / 2;
+    gridBig.rotation.x = Math.PI / 2;
+    gridEdgeCenter.rotation.x = Math.PI / 2;
+
+    gridGroup.add(gridSmall);
+    gridGroup.add(gridBig);
+    gridGroup.add(gridEdgeCenter);
+
+    return gridGroup;
+}
 
   addAxesHelper(scene) {
     const axesHelper = new AxesHelper(1000);
