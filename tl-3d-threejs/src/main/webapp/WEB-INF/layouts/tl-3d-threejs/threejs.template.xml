@@ -66,6 +66,36 @@
 	>
 		<buttons>
 			${buttons}
+			<button id="rotate" class="com.top_logic.threed.threejs.component.ToggleRotateAxes"
+				group="System"
+				image="css:fa-solid fa-arrow-rotate-right"
+				activeImage="css:fa-solid fa-arrow-rotate-right tl-danger"
+			>
+				<resourceKey key="dynamic.f9609aaa-19cd-42ec-85d1-20c4bf774e6e">
+					<de>Drehen</de>
+					<en>Rotate</en>
+				</resourceKey>
+			</button>
+			<button id="translate" class="com.top_logic.threed.threejs.component.ToggleTranslateAxes"
+				group="System"
+				image="css:fa-solid fa-arrow-right-arrow-left"
+				activeImage="css:fa-solid fa-arrow-right-arrow-left tl-danger"
+			>
+				<resourceKey key="dynamic.67bd3d24-fa90-40ee-a975-1f5c255a824e">
+					<de>Schieben</de>
+					<en>Move</en>
+				</resourceKey>
+			</button>
+			<button id="edit" class="com.top_logic.threed.threejs.component.ToggleEditModeCommand"
+				group="System"
+				image="css:fa-solid fa-pen"
+				activeImage="css:fa-solid fa-pen tl-danger"
+			>
+				<resourceKey key="dynamic.139be71c-2240-4880-b2bd-da05a09ed8a7">
+					<de>Bearbeiten</de>
+					<en>Edit</en>
+				</resourceKey>
+			</button>
 			<button id="addWorkplane" class="com.top_logic.threed.threejs.component.ToggleWorkplaneCommand"
 				group="System"
 				image="css:bi bi-grid-3x3"

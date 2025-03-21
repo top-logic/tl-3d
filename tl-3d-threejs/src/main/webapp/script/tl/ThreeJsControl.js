@@ -27,6 +27,7 @@ import {
 } from "three";
 
 import { OrbitControls } from "OrbitControls";
+import { TransformControls } from "TransformControls";
 import { GLTFLoader } from "GLTFLoader";
 import { gsap } from "gsap";
 
@@ -41,23 +42,26 @@ const CUBE_CAMERA_FAR = 10;
 const CAMERA_MOVE_DURATION = 1.5;
 
 class ThreeJsControl {
-  constructor(controlId, contextPath, dataUrl, isWorkplaneVisible) {
+  constructor(controlId, contextPath, dataUrl, isWorkplaneVisible, isInEditMode) {
     this.lastSelectedObject = null;
     this.controlId = controlId;
     this.contextPath = contextPath;
     this.dataUrl = dataUrl;
     this.scope = new Scope();
 
+    this.zUpRoot = new Group();
     this.initScene();
     this.initAxesCubeScene();
     this.initRenderer();
     this.initAxesCubeRenderer();
     this.initControls();
     this.initAxesCubeControls();
+    this.initTransformControls();
     this.render();
     this.loadScene().then(() => setTimeout(() => {
       this.createBoundingBox();
       this.toggleWorkplane(isWorkplaneVisible);
+      this.toggleEditMode(isInEditMode);
       this.zoomOut();
     }, 100));
   }
@@ -111,11 +115,10 @@ class ThreeJsControl {
         this.controlsIsUpdating = true;
         this.cubeCamera.quaternion.copy(this.camera.quaternion);
         this.cubeCamera.position.copy(
-          calculatecubeCameraPosition(this.camera.position, this.controls.target)
+          calculateCubeCameraPosition(this.camera.position, this.controls.target)
         );
         this.cubeControls.update();
         this.controlsIsUpdating = false;
-
         this.render();
       }
     });
@@ -264,11 +267,11 @@ class ThreeJsControl {
 
   addLights() {
     const light1 = new DirectionalLight(WHITE_LIGHT, 8);
-    light1.position.set(0, -400, 3000);
+    light1.position.set(0, 5000, 1000);
     this.scene.add(light1);
 
-    const light2 = new DirectionalLight(WHITE_LIGHT, 2);
-    light2.position.set(200, 400, -1000);
+    const light2 = new DirectionalLight(WHITE_LIGHT, 3);
+    light2.position.set(200, -3000, -3000);
     this.scene.add(light2);
   }
 
@@ -294,6 +297,98 @@ class ThreeJsControl {
 
     this.isWorkplaneVisible = visible;
     this.render();
+  }
+
+  initTransformControls() {
+    this.initTranslateControls();
+    this.initRotateControls();
+  }
+
+  initTranslateControls() {
+    this.translateControls = new TransformControls(this.camera, this.renderer.domElement);
+    this.translateControls.setMode("translate");
+    this.translateControls.setSpace("world");
+    this.scene.add(this.translateControls);
+    const updateRender = () => this.render();
+    this.translateControls.addEventListener('dragging-changed', updateRender);
+    this.translateControls.addEventListener('objectChange', updateRender);
+    this.translateControls.enabled = true;
+  }
+
+  initRotateControls() {
+    this.rotateControls = new TransformControls(this.camera, this.renderer.domElement);
+    // this.rotateControls.setMode("rotate");
+    this.scene.add(this.rotateControls);
+    const updateRender = () => this.render();
+    this.rotateControls.addEventListener('dragging-changed', updateRender);
+    this.rotateControls.addEventListener('objectChange', updateRender);
+    this.rotateControls.enabled = false;
+  }
+
+  toggleEditMode(editing) {
+    this.isEditMode = editing;
+    // turn on/off translateControls and rotateControls 
+    // this.translateControls.enabled = editing;
+    // this.rotateControls.enabled = editing;
+    // turn on/off orbitControls 
+    // this.controls.enabled = !editing;
+
+    if (editing) {
+        this.enableEditing();
+    } else {
+        this.disableEditing();
+    }
+
+    this.render();
+  }
+
+  enableEditing() {
+    if (this.isEditMode && this.selection.length > 0) {
+      const object = this.getParentNode(this.selection[0]?.node);
+      this.translateControls.enabled = true;
+      this.translateControls.attach(object);
+      this.rotateControls.attach(object);
+      this.controls.enabled = false;
+      this.updateTransformControls();
+      // const tx = this.selection[0].transform;
+      // if (tx) {
+      //   debugger;
+      //   this.translateControls.applyMatrix4(toMatrix(tx));
+      // }
+      // object.position.set(object.position.x, object.position.y, object.position.z);
+    }
+  }
+
+  disableEditing() {
+    if (this.translateControls) {
+      this.translateControls.detach();
+    }
+
+    if (this.rotateControls) {
+        this.rotateControls.detach();
+    }
+
+    this.translateControls.enabled = false;
+    this.rotateControls.enabled = false;
+    this.controls.enabled = true;
+  }
+
+  updateTransformControls() {
+    if (this.translateControls && this.translateControls.object) {
+      const objectPosition = new Vector3();
+      this.translateControls.object.getWorldPosition(objectPosition);
+  
+      this.translateControls.position.copy(objectPosition);
+      this.translateControls.updateMatrixWorld();
+    }
+  
+    if (this.rotateControls && this.rotateControls.object) {
+      const objectPosition = new Vector3();
+      this.rotateControls.object.getWorldPosition(objectPosition);
+  
+      this.rotateControls.position.copy(objectPosition);
+      this.rotateControls.updateMatrixWorld();
+    }
   }
 
   createDetailedGrid(size) {
@@ -348,16 +443,16 @@ class ThreeJsControl {
         gridEdgeCenter.add(createLine(start, end, DARK_BLUE, 3));
     });
 
-    gridSmall.rotation.x = Math.PI / 2;
-    gridBig.rotation.x = Math.PI / 2;
-    gridEdgeCenter.rotation.x = Math.PI / 2;
+    // gridSmall.rotation.x = Math.PI / 2;
+    // gridBig.rotation.x = Math.PI / 2;
+    // gridEdgeCenter.rotation.x = Math.PI / 2;
 
     gridGroup.add(gridSmall);
     gridGroup.add(gridBig);
     gridGroup.add(gridEdgeCenter);
 
     return gridGroup;
-}
+  }
 
   addAxesHelper(scene) {
     const axesHelper = new AxesHelper(1000);
@@ -615,7 +710,7 @@ class ThreeJsControl {
   }
 
   getParentNode(node) {
-    while (node.parent && node.parent.type !== "Scene") {
+    while (node.parent && node.parent.parent.type !== "Scene") {
       node = node.parent;
     }
     return node;
@@ -662,6 +757,8 @@ class ThreeJsControl {
       this.setColor(sharedNode.node, 0xff0000);
       this.selection.push(sharedNode);
     }
+
+    this.enableEditing();
   }
 
   setColor(node, color) {
@@ -721,6 +818,8 @@ class ThreeJsControl {
       this.setColor(sharedNode.node, 0xffffff);
     }
     this.selection.length = 0;
+
+    this.disableEditing();
   }
 
   get container() {
@@ -762,9 +861,15 @@ class ThreeJsControl {
     for (const gltf of gltfs) {
       assets[n++].gltf = gltf;
     }
-    this.scene.rotation.x = -Math.PI / 2;
 
-    this.sceneGraph.build(this.scene);
+    // this.scene.rotation.x = -Math.PI / 2;
+    this.zUpRoot.rotation.x = -Math.PI / 2;
+    this.scene.add(this.zUpRoot);
+    this.camera.position.applyMatrix4(this.scene.matrix);
+    this.camera.updateProjectionMatrix();
+    this.updateTransformControls();
+
+    this.sceneGraph.build(this.zUpRoot);
 
     this.render();
   }
@@ -809,7 +914,7 @@ function getRaycaster(event, camera, canvas) {
   return raycaster;
 }
 
-function calculatecubeCameraPosition(cameraPosition, controlsTarget) {
+function calculateCubeCameraPosition(cameraPosition, controlsTarget) {
   const subAxesOffset = new Vector3().subVectors(cameraPosition, controlsTarget);
   return subAxesOffset.normalize().multiplyScalar(CUBE_CAMERA_FAR);
 }
@@ -876,10 +981,10 @@ function toMatrix(tx) {
   }
 }
 
-function transform(scene, tx) {
+function transform(zUpRoot, tx) {
   if (tx != null && tx.length > 0) {
     const group = new Group();
-    scene.add(group);
+    zUpRoot.add(group);
 
     if (tx.length == 3) {
       group.position.set(tx[0], tx[1], tx[2]);
@@ -888,7 +993,7 @@ function transform(scene, tx) {
     }
     return group;
   } else {
-    return scene;
+    return zUpRoot;
   }
 }
 
@@ -939,8 +1044,8 @@ class SceneGraph extends SharedObject {
     super(id);
   }
 
-  build(scene) {
-    this.root.build(scene);
+  build(zUpRoot) {
+    this.root.build(zUpRoot);
   }
 
   loadJson(scope, json) {
@@ -953,8 +1058,8 @@ class GroupNode extends SharedObject {
     super(id);
   }
 
-  build(scene) {
-    var group = transform(scene, this.transform);
+  build(zUpRoot) {
+    var group = transform(zUpRoot, this.transform);
     this.contents.forEach((c) => c.build(group));
   }
 
@@ -969,9 +1074,9 @@ class PartNode extends SharedObject {
     super(id);
   }
 
-  build(scene) {
-    const node = this.asset.build(scene);
-    var group = transform(scene, this.transform);
+  build(zUpRoot) {
+    const node = this.asset.build(zUpRoot);
+    var group = transform(zUpRoot, this.transform);
     group.add(node);
 
     // Link to scene node.
@@ -990,7 +1095,7 @@ class GltfAsset extends SharedObject {
     super(id);
   }
 
-  build(scene) {
+  build(zUpRoot) {
     return this.gltf.scene.clone();
   }
 
@@ -1001,8 +1106,8 @@ class GltfAsset extends SharedObject {
 
 // For sever communication written in legacy JS.
 window.services.threejs = {
-  init: async function (controlId, contextPath, dataUrl, isWorkplaneVisible) {
-    const control = new ThreeJsControl(controlId, contextPath, dataUrl, isWorkplaneVisible);
+  init: async function (controlId, contextPath, dataUrl, isWorkplaneVisible, isInEditMode) {
+    const control = new ThreeJsControl(controlId, contextPath, dataUrl, isWorkplaneVisible, isInEditMode);
     control.attach();
   },
 
@@ -1031,6 +1136,13 @@ window.services.threejs = {
     const control = ThreeJsControl.control(container);
     if (control != null) {
       control.toggleWorkplane(visible);
+    }
+  },
+
+  toggleEditMode: function (container, editing) {
+    const control = ThreeJsControl.control(container);
+    if (control != null) {
+      control.toggleEditMode(editing);
     }
   },
 };

@@ -52,6 +52,8 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler, L
 
 	private boolean _isWorkplaneVisible;
 
+	private boolean _isInEditMode;
+
 	/**
 	 * Whether {@link #_selection} is currently updated with new values from the UI. During that
 	 * period, events from the {@link #_selection} are ignored.
@@ -99,6 +101,16 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler, L
 		_isWorkplaneVisible = visible;
 		
 		addUpdate(new JSFunctionCall(getID(), "window.services.threejs", "toggleWorkplane", visible));
+	}
+
+	public boolean getIsInEditMode() {
+		return _isInEditMode;
+	}
+
+	public void setIsInEditMode(boolean editing) {
+		_isInEditMode = editing;
+		
+		addUpdate(new JSFunctionCall(getID(), "window.services.threejs", "toggleEditMode", editing));
 	}
 
 	@Override
@@ -153,7 +165,7 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler, L
 			getFrameScope().getURL(context, this).appendParameter("t", Long.toString(System.nanoTime())).getURL();
 
 		HTMLUtil.beginScriptAfterRendering(out);
-		out.append("window.services.threejs.init('" + getID() + "', '" + context.getContextPath() + "', '" + dataUrl + "', " + _isWorkplaneVisible + ")");
+		out.append("window.services.threejs.init('" + getID() + "', '" + context.getContextPath() + "', '" + dataUrl + "', " + _isWorkplaneVisible + ", " + _isInEditMode + ")");
 		HTMLUtil.endScriptAfterRendering(out);
 
 		out.endTag(DIV);

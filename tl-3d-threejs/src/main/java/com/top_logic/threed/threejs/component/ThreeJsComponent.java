@@ -139,6 +139,14 @@ public class ThreeJsComponent extends BuilderComponent
 		getThreeJSControl().setIsWorkplaneVisible(visible);
 	}
 
+	public boolean getIsInEditMode() {
+		return getThreeJSControl().getIsInEditMode();
+	}
+
+	public void setIsInEditMode(boolean editing) {
+		getThreeJSControl().setIsInEditMode(editing);
+	}
+
 	@Override
 	protected void afterModelSet(Object oldModel, Object newModel) {
 		super.afterModelSet(oldModel, newModel);
