@@ -312,17 +312,16 @@ class ThreeJsControl {
     const updateRender = () => this.render();
     this.translateControls.addEventListener('dragging-changed', updateRender);
     this.translateControls.addEventListener('objectChange', updateRender);
-    this.translateControls.enabled = true;
   }
 
   initRotateControls() {
     this.rotateControls = new TransformControls(this.camera, this.renderer.domElement);
     // this.rotateControls.setMode("rotate");
+    // this.translateControls.setSpace("world");
     this.scene.add(this.rotateControls);
     const updateRender = () => this.render();
     this.rotateControls.addEventListener('dragging-changed', updateRender);
     this.rotateControls.addEventListener('objectChange', updateRender);
-    this.rotateControls.enabled = false;
   }
 
   toggleEditMode(editing) {
@@ -346,10 +345,11 @@ class ThreeJsControl {
     if (this.isEditMode && this.selection.length > 0) {
       const object = this.getParentNode(this.selection[0]?.node);
       this.translateControls.enabled = true;
+      this.rotateControls.enabled = true;
       this.translateControls.attach(object);
       this.rotateControls.attach(object);
       this.controls.enabled = false;
-      this.updateTransformControls();
+      // this.updateTransformControls();
       // const tx = this.selection[0].transform;
       // if (tx) {
       //   debugger;
