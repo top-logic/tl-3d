@@ -48,7 +48,7 @@ class ThreeJsControl {
     this.contextPath = contextPath;
     this.dataUrl = dataUrl;
     this.scope = new Scope();
-
+ 
     this.zUpRoot = new Group();
     this.initScene();
     this.initAxesCubeScene();
@@ -58,6 +58,8 @@ class ThreeJsControl {
     this.initAxesCubeControls();
     this.initTransformControls();
     this.render();
+    // this.isEditMode = false;
+    // this.activeControl = null;
     this.loadScene().then(() => setTimeout(() => {
       this.createBoundingBox();
       this.toggleWorkplane(isWorkplaneVisible);
@@ -307,7 +309,6 @@ class ThreeJsControl {
   initTranslateControls() {
     this.translateControls = new TransformControls(this.camera, this.renderer.domElement);
     this.translateControls.setMode("translate");
-    this.translateControls.setSpace("world");
     this.scene.add(this.translateControls);
     const updateRender = () => this.render();
     this.translateControls.addEventListener('dragging-changed', updateRender);
@@ -316,9 +317,8 @@ class ThreeJsControl {
 
   initRotateControls() {
     this.rotateControls = new TransformControls(this.camera, this.renderer.domElement);
-    // this.rotateControls.setMode("rotate");
-    // this.translateControls.setSpace("world");
-    this.scene.add(this.rotateControls);
+    this.rotateControls.setMode("rotate");
+    // this.scene.add(this.rotateControls);
     const updateRender = () => this.render();
     this.rotateControls.addEventListener('dragging-changed', updateRender);
     this.rotateControls.addEventListener('objectChange', updateRender);
@@ -326,12 +326,6 @@ class ThreeJsControl {
 
   toggleEditMode(editing) {
     this.isEditMode = editing;
-    // turn on/off translateControls and rotateControls 
-    // this.translateControls.enabled = editing;
-    // this.rotateControls.enabled = editing;
-    // turn on/off orbitControls 
-    // this.controls.enabled = !editing;
-
     if (editing) {
         this.enableEditing();
     } else {
@@ -349,13 +343,6 @@ class ThreeJsControl {
       this.translateControls.attach(object);
       this.rotateControls.attach(object);
       this.controls.enabled = false;
-      // this.updateTransformControls();
-      // const tx = this.selection[0].transform;
-      // if (tx) {
-      //   debugger;
-      //   this.translateControls.applyMatrix4(toMatrix(tx));
-      // }
-      // object.position.set(object.position.x, object.position.y, object.position.z);
     }
   }
 
@@ -442,10 +429,6 @@ class ThreeJsControl {
     thickestLines.forEach(([start, end]) => {
         gridEdgeCenter.add(createLine(start, end, DARK_BLUE, 3));
     });
-
-    // gridSmall.rotation.x = Math.PI / 2;
-    // gridBig.rotation.x = Math.PI / 2;
-    // gridEdgeCenter.rotation.x = Math.PI / 2;
 
     gridGroup.add(gridSmall);
     gridGroup.add(gridBig);
@@ -856,13 +839,11 @@ class ThreeJsControl {
     const urls = assets.flatMap((asset) => this.contextPath + asset.url);
 
     const gltfs = await Promise.all(urls.flatMap(loadUrl));
-    // .then((gltfs) => {
     let n = 0;
     for (const gltf of gltfs) {
       assets[n++].gltf = gltf;
     }
 
-    // this.scene.rotation.x = -Math.PI / 2;
     this.zUpRoot.rotation.x = -Math.PI / 2;
     this.scene.add(this.zUpRoot);
     this.camera.position.applyMatrix4(this.scene.matrix);
@@ -888,7 +869,6 @@ class ThreeJsControl {
   }
 
   render() {
-    // requestAnimationFrame(() => this.renderer.render(this.scene, this.camera));
     requestAnimationFrame(() => {
       const { renderer, cubeRenderer, scene, camera, cubeScene, cubeCamera } = this;
       renderer.render(scene, camera);
@@ -1145,4 +1125,18 @@ window.services.threejs = {
       control.toggleEditMode(editing);
     }
   },
+
+  // toggleTranslateAxes: function (container, editing) {
+  //   const control = ThreeJsControl.control(container);
+  //   if (control != null) {
+  //     control.toggleTranslateAxes(editing);
+  //   }
+  // },
+
+  // toggleRotateAxes: function (container, editing) {
+  //   const control = ThreeJsControl.control(container);
+  //   if (control != null) {
+  //     control.toggleRotateAxes(editing);
+  //   }
+  // }
 };
