@@ -179,6 +179,7 @@ public class ThreeJsComponent extends BuilderComponent
 			SceneNode root = builder().getModel(getModel(), this);
 			root.visit(this, _nodeByModel);
 			_scene.setRoot(root);
+			_selectionModel.setSelection(nodesForBusinessObjects(selectionChannel().get()));
 			_sceneValid = true;
 		}
 
@@ -213,6 +214,10 @@ public class ThreeJsComponent extends BuilderComponent
 
 	@Override
 	public void handleNewValue(ComponentChannel sender, Object oldValue, Object newValue) {
+		_selectionModel.setSelection(nodesForBusinessObjects(newValue));
+	}
+
+	private Set<SceneNode> nodesForBusinessObjects(Object newValue) {
 		// Component received a new selection.
 		Set<SceneNode> newSelection = new HashSet<>();
 
@@ -229,8 +234,7 @@ public class ThreeJsComponent extends BuilderComponent
 				newSelection.add(node);
 			}
 		}
-
-		_selectionModel.setSelection(newSelection);
+		return newSelection;
 	}
 
 	@Override
