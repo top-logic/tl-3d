@@ -66,24 +66,15 @@
 	>
 		<buttons>
 			${buttons}
-			<button id="rotate" class="com.top_logic.threed.threejs.component.ToggleRotateAxes"
-				group="System"
-				image="css:fa-solid fa-arrow-rotate-right"
-				activeImage="css:fa-solid fa-arrow-rotate-right tl-danger"
-			>
-				<resourceKey key="dynamic.f9609aaa-19cd-42ec-85d1-20c4bf774e6e">
-					<de>Drehen</de>
-					<en>Rotate</en>
-				</resourceKey>
-			</button>
-			<button id="translate" class="com.top_logic.threed.threejs.component.ToggleTranslateAxes"
+			<button id="rorateMode" class="com.top_logic.threed.threejs.component.ToggleRotateAxes"
 				group="System"
 				image="css:fa-solid fa-arrow-right-arrow-left"
-				activeImage="css:fa-solid fa-arrow-right-arrow-left tl-danger"
+				activeImage="css:fa-solid fa-arrow-rotate-right"
+				activeCssClasses=""
 			>
 				<resourceKey key="dynamic.67bd3d24-fa90-40ee-a975-1f5c255a824e">
-					<de>Schieben</de>
-					<en>Move</en>
+					<de>Schieben-Drehen</de>
+					<en>Move-Rotate</en>
 				</resourceKey>
 			</button>
 			<button id="edit" class="com.top_logic.threed.threejs.component.ToggleEditModeCommand"

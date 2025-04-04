@@ -147,6 +147,14 @@ public class ThreeJsComponent extends BuilderComponent
 		getThreeJSControl().setIsInEditMode(editing);
 	}
 
+	public boolean getIsRotateMode() {
+		return getThreeJSControl().getIsRotateMode();
+	}
+
+	public void setIsRotateMode(boolean editing) {
+		getThreeJSControl().setIsRotateMode(editing);
+	}
+
 	@Override
 	protected void afterModelSet(Object oldModel, Object newModel) {
 		super.afterModelSet(oldModel, newModel);

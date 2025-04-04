@@ -54,6 +54,8 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler, L
 
 	private boolean _isInEditMode;
 
+	private boolean _isRotateMode;
+
 	/**
 	 * Whether {@link #_selection} is currently updated with new values from the UI. During that
 	 * period, events from the {@link #_selection} are ignored.
@@ -107,10 +109,20 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler, L
 		return _isInEditMode;
 	}
 
-	public void setIsInEditMode(boolean editing) {
-		_isInEditMode = editing;
+	public void setIsInEditMode(boolean value) {
+		_isInEditMode = value;
 		
-		addUpdate(new JSFunctionCall(getID(), "window.services.threejs", "toggleEditMode", editing));
+		addUpdate(new JSFunctionCall(getID(), "window.services.threejs", "toggleEditMode", value));
+	}
+
+	public boolean getIsRotateMode() {
+		return _isRotateMode;
+	}
+
+	public void setIsRotateMode(boolean value) {
+		_isRotateMode = value;
+
+		addUpdate(new JSFunctionCall(getID(), "window.services.threejs", "toggleRotateMode", value));
 	}
 
 	@Override
@@ -165,7 +177,14 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler, L
 			getFrameScope().getURL(context, this).appendParameter("t", Long.toString(System.nanoTime())).getURL();
 
 		HTMLUtil.beginScriptAfterRendering(out);
-		out.append("window.services.threejs.init('" + getID() + "', '" + context.getContextPath() + "', '" + dataUrl + "', " + _isWorkplaneVisible + ", " + _isInEditMode + ")");
+		out.append("window.services.threejs.init('" + getID() + "', '" + 
+			context.getContextPath() + "', '" + 
+			dataUrl + "', " +
+			_isWorkplaneVisible + ", " + 
+			_isInEditMode + ", " +
+			_isRotateMode +
+			")"
+		);
 		HTMLUtil.endScriptAfterRendering(out);
 
 		out.endTag(DIV);

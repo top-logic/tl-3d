@@ -42,7 +42,7 @@ const CUBE_CAMERA_FAR = 10;
 const CAMERA_MOVE_DURATION = 1.5;
 
 class ThreeJsControl {
-  constructor(controlId, contextPath, dataUrl, isWorkplaneVisible, isInEditMode) {
+  constructor(controlId, contextPath, dataUrl, isWorkplaneVisible, isInEditMode, isRotateMode) {
     this.lastSelectedObject = null;
     this.controlId = controlId;
     this.contextPath = contextPath;
@@ -58,12 +58,12 @@ class ThreeJsControl {
     this.initAxesCubeControls();
     this.initTransformControls();
     this.render();
-    // this.isEditMode = false;
-    // this.activeControl = null;
+    this.isEditMode = false;
     this.loadScene().then(() => setTimeout(() => {
       this.createBoundingBox();
       this.toggleWorkplane(isWorkplaneVisible);
       this.toggleEditMode(isInEditMode);
+      this.toggleRotateMode(isRotateMode);
       this.zoomOut();
     }, 100));
   }
@@ -302,81 +302,98 @@ class ThreeJsControl {
   }
 
   initTransformControls() {
-    this.initTranslateControls();
-    this.initRotateControls();
-  }
-
-  initTranslateControls() {
     this.translateControls = new TransformControls(this.camera, this.renderer.domElement);
     this.translateControls.setMode("translate");
     this.scene.add(this.translateControls);
-    const updateRender = () => this.render();
-    this.translateControls.addEventListener('dragging-changed', updateRender);
-    this.translateControls.addEventListener('objectChange', updateRender);
-  }
+    const updateRenderTranslate = () => this.render();
+    this.translateControls.addEventListener('dragging-changed', updateRenderTranslate);
+    this.translateControls.addEventListener('objectChange', updateRenderTranslate);
 
-  initRotateControls() {
     this.rotateControls = new TransformControls(this.camera, this.renderer.domElement);
     this.rotateControls.setMode("rotate");
-    // this.scene.add(this.rotateControls);
-    const updateRender = () => this.render();
-    this.rotateControls.addEventListener('dragging-changed', updateRender);
-    this.rotateControls.addEventListener('objectChange', updateRender);
+    this.scene.add(this.rotateControls);
+    const updateRenderRotate = () => this.render();
+    this.rotateControls.addEventListener('dragging-changed', updateRenderRotate);
+    this.rotateControls.addEventListener('objectChange', updateRenderRotate);
+
+    this.translateControls.enabled = false;
+    this.rotateControls.enabled = false;
   }
 
   toggleEditMode(editing) {
     this.isEditMode = editing;
     if (editing) {
-        this.enableEditing();
+        this.enableEditing(); 
     } else {
-        this.disableEditing();
+        this.disableEditing(); 
     }
 
-    this.render();
+    this.render(); 
   }
 
   enableEditing() {
     if (this.isEditMode && this.selection.length > 0) {
       const object = this.getParentNode(this.selection[0]?.node);
-      this.translateControls.enabled = true;
-      this.rotateControls.enabled = true;
-      this.translateControls.attach(object);
-      this.rotateControls.attach(object);
+      this.activateControl(object);
       this.controls.enabled = false;
     }
   }
-
+  
   disableEditing() {
     if (this.translateControls) {
       this.translateControls.detach();
+      this.translateControls.enabled = false;
     }
-
+  
     if (this.rotateControls) {
-        this.rotateControls.detach();
+      this.rotateControls.detach();
+      this.rotateControls.enabled = false;
     }
-
-    this.translateControls.enabled = false;
-    this.rotateControls.enabled = false;
+  
     this.controls.enabled = true;
   }
 
-  updateTransformControls() {
-    if (this.translateControls && this.translateControls.object) {
-      const objectPosition = new Vector3();
-      this.translateControls.object.getWorldPosition(objectPosition);
-  
-      this.translateControls.position.copy(objectPosition);
-      this.translateControls.updateMatrixWorld();
+  toggleRotateMode(enable) {
+    if (!this.isEditMode) {
+      return;
     }
-  
-    if (this.rotateControls && this.rotateControls.object) {
-      const objectPosition = new Vector3();
-      this.rotateControls.object.getWorldPosition(objectPosition);
-  
-      this.rotateControls.position.copy(objectPosition);
-      this.rotateControls.updateMatrixWorld();
+
+    if (enable) {
+      this.translateControls.enabled = false;
+      this.translateControls.detach();
+    } else {
+      this.rotateControls.enabled = false;
+      this.rotateControls.detach();
+    }
+
+    this.isRotateMode = enable;
+
+    const object = this.getParentNode(this.selection[0]?.node);
+    this.activateControl(object);
+
+    this.render(); 
+  }
+
+  activateControl(object) {
+    if (object) {
+      const controls = this.isRotateMode ? this.rotateControls : this.translateControls;
+      controls.enabled = true;
+      controls.attach(object);
+      this.render();
     }
   }
+
+  updateTransformControls() {
+    const controls = this.isRotateMode ? this.rotateControls : this.translateControls;
+
+    if (controls && controls.object) {
+      const objectPosition = new Vector3();
+      controls.object.getWorldPosition(objectPosition);
+  
+      controls.position.copy(objectPosition);
+      controls.updateMatrixWorld();
+    }
+  }  
 
   createDetailedGrid(size) {
     const z = 0;
@@ -693,6 +710,10 @@ class ThreeJsControl {
   }
 
   getParentNode(node) {
+    if (!node) {
+        return undefined;
+    }
+
     while (node.parent && node.parent.parent.type !== "Scene") {
       node = node.parent;
     }
@@ -1086,8 +1107,14 @@ class GltfAsset extends SharedObject {
 
 // For sever communication written in legacy JS.
 window.services.threejs = {
-  init: async function (controlId, contextPath, dataUrl, isWorkplaneVisible, isInEditMode) {
-    const control = new ThreeJsControl(controlId, contextPath, dataUrl, isWorkplaneVisible, isInEditMode);
+  init: async function (
+    controlId, contextPath, dataUrl, isWorkplaneVisible, 
+    isInEditMode, isRotateMode
+  ) {
+    const control = new ThreeJsControl(
+      controlId, contextPath, dataUrl, isWorkplaneVisible, 
+      isInEditMode, isRotateMode
+    );
     control.attach();
   },
 
@@ -1119,24 +1146,17 @@ window.services.threejs = {
     }
   },
 
-  toggleEditMode: function (container, editing) {
+  toggleEditMode: function (container, value) {
     const control = ThreeJsControl.control(container);
     if (control != null) {
-      control.toggleEditMode(editing);
+      control.toggleEditMode(value);
     }
   },
 
-  // toggleTranslateAxes: function (container, editing) {
-  //   const control = ThreeJsControl.control(container);
-  //   if (control != null) {
-  //     control.toggleTranslateAxes(editing);
-  //   }
-  // },
-
-  // toggleRotateAxes: function (container, editing) {
-  //   const control = ThreeJsControl.control(container);
-  //   if (control != null) {
-  //     control.toggleRotateAxes(editing);
-  //   }
-  // }
+  toggleRotateMode: function (container, value) {
+    const control = ThreeJsControl.control(container);
+    if (control != null) {
+      control.toggleRotateMode(value);
+    }
+  }
 };

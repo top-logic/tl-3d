@@ -50,11 +50,11 @@ public class ToggleRotateAxes extends ToggleCommandHandler {
 
     @Override
 	protected boolean getState(LayoutComponent component) {
-        return ((ThreeJsComponent) component).getIsInEditMode();
+		return ((ThreeJsComponent) component).getIsRotateMode();
 	}
 
 	@Override
 	protected void setState(DisplayContext context, LayoutComponent component, boolean newValue) {
-        ((ThreeJsComponent) component).setIsInEditMode(newValue);
+		((ThreeJsComponent) component).setIsRotateMode(newValue);
 	}
 }
