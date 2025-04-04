@@ -212,11 +212,13 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 	public void readField(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in, String field) throws java.io.IOException {
 		switch (field) {
 			case TRANSFORM__PROP: {
+				java.util.List<Float> newValue = new java.util.ArrayList<>();
 				in.beginArray();
 				while (in.hasNext()) {
-					addTransform((float) in.nextDouble());
+					newValue.add((float) in.nextDouble());
 				}
 				in.endArray();
+				setTransform(newValue);
 			}
 			break;
 			default: super.readField(scope, in, field);

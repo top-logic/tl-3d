@@ -179,11 +179,13 @@ public class GroupNode extends SceneNode {
 	public void readField(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in, String field) throws java.io.IOException {
 		switch (field) {
 			case CONTENTS__PROP: {
+				java.util.List<com.top_logic.threed.threejs.scene.SceneNode> newValue = new java.util.ArrayList<>();
 				in.beginArray();
 				while (in.hasNext()) {
-					addContent(com.top_logic.threed.threejs.scene.SceneNode.readSceneNode(scope, in));
+					newValue.add(com.top_logic.threed.threejs.scene.SceneNode.readSceneNode(scope, in));
 				}
 				in.endArray();
+				setContents(newValue);
 			}
 			break;
 			default: super.readField(scope, in, field);
