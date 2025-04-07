@@ -333,7 +333,7 @@ class ThreeJsControl {
 
   enableEditing() {
     if (this.isEditMode && this.selection.length > 0) {
-      const object = this.getParentNode(this.selection[0]?.node);
+      const object = this.selection[0]?.node;
       this.activateControl(object);
       this.controls.enabled = false;
     }
@@ -368,7 +368,7 @@ class ThreeJsControl {
 
     this.isRotateMode = enable;
 
-    const object = this.getParentNode(this.selection[0]?.node);
+    const object = this.selection[0]?.node;
     this.activateControl(object);
 
     this.render(); 
@@ -592,7 +592,7 @@ class ThreeJsControl {
   }
 
   zoomToSelection() {
-    const selectedObject = this.getParentNode(this.selection[0]?.node);
+    const selectedObject = this.selection[0]?.node;
     if (!selectedObject) return;
 
     const boundingBox = new Box3().setFromObject(selectedObject);
@@ -709,41 +709,30 @@ class ThreeJsControl {
     });
   }
 
-  getParentNode(node) {
-    if (!node) {
-        return undefined;
-    }
+  /** Applies the changes in the scene as received from the server. */
+  applySceneChanges(changesString) {
+    const changes = JSON.parse(changesString);
+    for (const change of changes) {
+      var command = change[0];
+      var cmdProps = command[1];
 
-    while (node.parent && node.parent.parent.type !== "Scene") {
-      node = node.parent;
-    }
-    return node;
-  }
-
-  /** Applies the changes to the current selection as received from the server. */
-  selectionChanged(changes) {
-    const cmd = JSON.parse(changes);
-    for (const change of cmd.changed) {
-      const sharedNode = this.scope.getNode(change.key);
-      if (sharedNode == null) {
-        continue;
+      var cmd;
+      switch (command[0]) {
+        case 'R': cmd = new RemoveElement(cmdProps["id"]); break;
+        case 'I': cmd = new InsertElement(cmdProps["id"]); break;
+        case 'S': cmd = new SetProperty(cmdProps["id"]); break;
       }
-
-      switch (change.value) {
-        case "ADD":
-          this.setSelected(sharedNode, true);
-          break;
-        case "REMOVE":
-          this.setSelected(sharedNode, false);
-          break;
-      }
-    }
+      change.shift();
+      cmd.loadJson(cmdProps, change);
+      cmd.apply(this.scope);
+	}
     this.render();
   }
 
   /** Changes the selected state of the given shared node to the given value. */
   setSelected(sharedNode, value) {
     const index = this.selection.indexOf(sharedNode);
+    var command;
     if (index >= 0) {
       // Currently selected.
       if (value) {
@@ -752,6 +741,8 @@ class ThreeJsControl {
       }
       this.setColor(sharedNode.node, 0xffffff);
       this.selection.splice(index, 1);
+      
+      command = this.sceneGraph.removeSelected(sharedNode); 
     } else {
       // Currently not selected.
       if (!value) {
@@ -760,9 +751,12 @@ class ThreeJsControl {
       }
       this.setColor(sharedNode.node, 0xff0000);
       this.selection.push(sharedNode);
+      
+      command = this.sceneGraph.addSelected(sharedNode); 
     }
 
     this.enableEditing();
+    return command;
   }
 
   setColor(node, color) {
@@ -777,13 +771,13 @@ class ThreeJsControl {
 
   /** Updates the selection from a click on the canvas. */
   updateSelection(intersects, toggleMode) {
-    const changes = {};
+    const changes = [];
 
     if (!toggleMode) {
-      for (const sharedNode of this.selection) {
-        changes[sharedNode.id] = "REMOVE";
+      var clearCmd = this.clearSelection();
+      if (clearCmd != null) {
+        changes.push(clearCmd);
       }
-      this.clearSelection();
     }
 
     for (let i = 0; i < intersects.length; i++) {
@@ -796,15 +790,16 @@ class ThreeJsControl {
           this.value = toggleMode
             ? !this.selection.includes(sharedNode)
             : true;
-          this.setSelected(sharedNode, this.value);
-
-          changes[sharedNode.id] = this.value ? "ADD" : "REMOVE";
+          var setCmd = this.setSelected(sharedNode, this.value);
+	      if (setCmd != null) {
+	        changes.push(setCmd);
+	      }
 
           // this.addBoxHelpers();
 
           this.render();
 
-          this.sendCommand("updateSelection", { changes: changes });
+          this.sendSceneChanges(changes);
           return;
         }
 
@@ -812,8 +807,8 @@ class ThreeJsControl {
       }
     }
 
-    if (Object.keys(changes).length > 0) {
-      this.sendCommand("updateSelection", { changes: changes });
+    if (changes.length > 0) {
+      this.sendSceneChanges(changes);
     }
   }
 
@@ -824,6 +819,7 @@ class ThreeJsControl {
     this.selection.length = 0;
 
     this.disableEditing();
+    return this.sceneGraph.clearSelection();
   }
 
   get container() {
@@ -871,20 +867,22 @@ class ThreeJsControl {
     this.camera.updateProjectionMatrix();
     this.updateTransformControls();
 
-    this.sceneGraph.build(this.zUpRoot);
-
+    this.sceneGraph.buildGraph(this);
+    
     this.render();
   }
 
-  sendCommand(command, args) {
+  sendSceneChanges(commands) {
+  	const cmds = [];
+  	for (let i = 0; i < commands.length; i++) {
+  		cmds.push(commands[i].extract());
+  	}
+  
     const message = {
-      controlCommand: command,
+      controlCommand: "sceneChanged",
       controlID: this.controlId,
+      json: JSON.stringify(cmds), 
     };
-
-    for (const key in args) {
-      message[key] = args[key];
-    }
 
     services.ajax.execute("dispatchControlCommand", message);
   }
@@ -983,19 +981,16 @@ function toMatrix(tx) {
 }
 
 function transform(zUpRoot, tx) {
+  const group = new Group();
+  zUpRoot.add(group);
   if (tx != null && tx.length > 0) {
-    const group = new Group();
-    zUpRoot.add(group);
-
     if (tx.length == 3) {
       group.position.set(tx[0], tx[1], tx[2]);
     } else {
       group.applyMatrix4(toMatrix(tx));
     }
-    return group;
-  } else {
-    return zUpRoot;
   }
+  return group;
 }
 
 class Scope {
@@ -1044,6 +1039,16 @@ class SceneGraph extends SharedObject {
   constructor(id) {
     super(id);
   }
+  
+  buildGraph(ctrl) {
+  	this.build(ctrl.zUpRoot);
+  	
+  	this.ctrl = ctrl; 
+    for (const sharedNode of this.selection) {
+		ctrl.setSelected(sharedNode, true);
+    }
+
+  }
 
   build(zUpRoot) {
     this.root.build(zUpRoot);
@@ -1051,6 +1056,68 @@ class SceneGraph extends SharedObject {
 
   loadJson(scope, json) {
     this.root = scope.loadJson(json.root);
+    this.selection = scope.loadAll(json.selection);
+  }
+  
+  removeSelected(node) {
+  	var idx = this.selection.indexOf(node);
+  	if (idx < 0) {
+  	  return null;
+  	}
+  	this.selection.splice(idx, 1);
+	return RemoveElement.prototype.create(this.id, 'selection', idx);
+  }
+  
+  addSelected(node) {
+  	var idx = this.selection.indexOf(node);
+  	if (idx >= 0) {
+  	  return null;
+  	}
+  	
+  	this.selection.push(node);
+	return InsertElement.prototype.create(this.id, 'selection', this.selection.length - 1, node.id);
+  }
+  
+  clearSelection() {
+    if (this.selection.length == 0) {
+    	return null;
+    }
+    this.selection.length = 0;
+    return SetProperty.prototype.create(this.id, 'selection', []);
+  } 
+
+  
+  setProperty(scope, property, value) {
+  	switch (property) {
+  		case 'root': this.root = scope.loadJson(value); break;
+  		case 'selection': 
+  			this.selection = scope.loadAll(value);
+  			
+  			this.ctrl.clearSelection();
+		    for (const sharedNode of this.selection) {
+				this.ctrl.setSelected(sharedNode, true);
+    		}
+
+  			break; 
+  	}
+  }
+  
+  insertElementAt(scope, property, idx, value) {
+  	switch (property) {
+  		case 'selection': 
+  			this.selection.splice(idx, 0, scope.loadJson(value)); 
+			this.ctrl.setSelected(this.selection[idx], true);
+  			break; 
+  	}
+  }
+  
+  removeElementAt(scope, property, idx) {
+  	switch (property) {
+  		case 'selection': 
+			this.ctrl.setSelected(this.selection[idx], false);
+  			this.selection.splice(idx, 1);
+  			break; 
+  	}
   }
 }
 
@@ -1062,11 +1129,31 @@ class GroupNode extends SharedObject {
   build(zUpRoot) {
     var group = transform(zUpRoot, this.transform);
     this.contents.forEach((c) => c.build(group));
+    this.node = group;
   }
 
   loadJson(scope, json) {
     this.transform = json.transform;
     this.contents = scope.loadAll(json.contents);
+  }
+  
+  setProperty(scope, property, value) {
+  	switch (property) {
+  		case 'transform': this.transform = value; break;
+  		case 'contents': this.contents = scope.loadAll(value); break; 
+  	}
+  }
+  
+  insertElementAt(scope, property, idx, value) {
+  	switch (property) {
+  		case 'contents': this.contents.splice(idx, 0, scope.loadJson(value)); break; 
+  	}
+  }
+  
+  removeElementAt(scope, property, idx) {
+  	switch (property) {
+  		case 'contents': this.contents.splice(idx, 1); break; 
+  	}
   }
 }
 
@@ -1089,6 +1176,13 @@ class PartNode extends SharedObject {
     this.transform = json.transform;
     this.asset = scope.loadJson(json.asset);
   }
+  
+  setProperty(scope, property, value) {
+  	switch (property) {
+  		case 'transform': this.transform = value; break;
+  		case 'asset': this.asset = scope.loadAll(value); break; 
+  	}
+  }
 }
 
 class GltfAsset extends SharedObject {
@@ -1102,6 +1196,120 @@ class GltfAsset extends SharedObject {
 
   loadJson(scope, json) {
     this.url = json.url;
+  }
+  
+  setProperty(scope, property, value) {
+  	switch (property) {
+  		case 'url': this.url = value; break;
+  	}
+  }
+}
+
+class Command {
+  constructor(id) {
+    this.id = id;
+  }
+  
+  resolveTarget(scope) {
+  	return scope.getNode(this.id);
+  }
+}
+
+class SetProperty extends Command {
+  constructor(id) {
+    super(id);
+  }
+  
+  loadJson(props, additional) {
+    this.property = props["p"];
+    this.value = additional[0];
+  }
+  
+  create(id, property, value) {
+  	const cmd = new SetProperty(id);
+  	cmd.property = property;
+  	cmd.value = value;
+  	return cmd;
+  }
+  
+  apply(scope) {
+  	var target = this.resolveTarget(scope);
+  	if (target == null) {
+  		return;
+  	}
+  	target.setProperty(scope, this.property, this.value);
+  }
+  
+  extract() {
+  	return [["S", {id: this.id, p: this.property}], this.value]; 
+  }
+}
+
+class ListUpdate extends Command {
+  constructor(id) {
+    super(id);
+  }
+}
+
+class InsertElement extends ListUpdate {
+  constructor(id) {
+    super(id);
+  }
+
+  loadJson(props, additional) {
+    this.idx = props["i"];
+    this.property = props["p"];
+    this.element = additional[0];
+  }
+
+  create(id, property, idx, element) {
+  	const cmd = new InsertElement(id);
+  	cmd.property = property;
+  	cmd.idx = idx;
+  	cmd.element = element;
+  	return cmd;
+  }
+  
+ apply(scope) {
+  	var target = this.resolveTarget(scope);
+  	if (target == null) {
+  		return;
+  	}
+  	target.insertElementAt(scope, this.property, this.idx, this.element);
+  }
+
+  extract() {
+  	return [["I", {id: this.id, p: this.property, i: this.idx}], this.element]; 
+  }
+}
+
+class RemoveElement extends ListUpdate {
+  constructor(id) {
+    super(id);
+  }
+  
+  loadJson(props, additional) {
+    this.idx = props["i"];
+    this.property = props["p"];
+  }
+
+  create(id, property, idx, element) {
+  	const cmd = new RemoveElement(id);
+  	cmd.property = property;
+  	cmd.idx = idx;
+  	return cmd;
+  }
+
+  apply(scope) {
+  	var target = this.resolveTarget(scope);
+  	if (target == null) {
+  		return;
+  	}
+  	target.removeElementAt(scope, this.property, this.idx);
+  }
+
+  extract() {
+  	return [["R", {id: this.id, p: this.property, i: this.idx}]]; 
   }
 }
 
@@ -1118,10 +1326,10 @@ window.services.threejs = {
     control.attach();
   },
 
-  selectionChanged: function (container, changes) {
+  sceneChanged: function (container, changes) {
     const control = ThreeJsControl.control(container);
     if (control != null) {
-      control.selectionChanged(changes);
+      control.applySceneChanges(changes);
     }
   },
 

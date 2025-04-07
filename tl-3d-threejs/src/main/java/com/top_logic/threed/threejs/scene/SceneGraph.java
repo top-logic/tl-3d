@@ -18,7 +18,22 @@ public class SceneGraph extends de.haumacher.msgbuf.graph.AbstractSharedGraphNod
 	/** @see #getRoot() */
 	public static final String ROOT__PROP = "root";
 
+	/** @see #getSelection() */
+	public static final String SELECTION__PROP = "selection";
+
 	private com.top_logic.threed.threejs.scene.SceneNode _root = null;
+
+	private final java.util.List<com.top_logic.threed.threejs.scene.SceneNode> _selection = new de.haumacher.msgbuf.util.ReferenceList<>() {
+		@Override
+		protected void beforeAdd(int index, com.top_logic.threed.threejs.scene.SceneNode element) {
+			_listener.beforeAdd(SceneGraph.this, SELECTION__PROP, index, element);
+		}
+
+		@Override
+		protected void afterRemove(int index, com.top_logic.threed.threejs.scene.SceneNode element) {
+			_listener.afterRemove(SceneGraph.this, SELECTION__PROP, index, element);
+		}
+	};
 
 	/**
 	 * Creates a {@link SceneGraph} instance.
@@ -57,6 +72,48 @@ public class SceneGraph extends de.haumacher.msgbuf.graph.AbstractSharedGraphNod
 		return _root != null;
 	}
 
+	/**
+	 * The currently selected {@link SceneNode}s.
+	 */
+	public final java.util.List<com.top_logic.threed.threejs.scene.SceneNode> getSelection() {
+		return _selection;
+	}
+
+	/**
+	 * @see #getSelection()
+	 */
+	public com.top_logic.threed.threejs.scene.SceneGraph setSelection(java.util.List<? extends com.top_logic.threed.threejs.scene.SceneNode> value) {
+		internalSetSelection(value);
+		return this;
+	}
+
+	/** Internal setter for {@link #getSelection()} without chain call utility. */
+	protected final void internalSetSelection(java.util.List<? extends com.top_logic.threed.threejs.scene.SceneNode> value) {
+		if (value == null) throw new IllegalArgumentException("Property 'selection' cannot be null.");
+		_selection.clear();
+		_selection.addAll(value);
+	}
+
+	/**
+	 * Adds a value to the {@link #getSelection()} list.
+	 */
+	public com.top_logic.threed.threejs.scene.SceneGraph addSelection(com.top_logic.threed.threejs.scene.SceneNode value) {
+		internalAddSelection(value);
+		return this;
+	}
+
+	/** Implementation of {@link #addSelection(com.top_logic.threed.threejs.scene.SceneNode)} without chain call utility. */
+	protected final void internalAddSelection(com.top_logic.threed.threejs.scene.SceneNode value) {
+		_selection.add(value);
+	}
+
+	/**
+	 * Removes a value from the {@link #getSelection()} list.
+	 */
+	public final void removeSelection(com.top_logic.threed.threejs.scene.SceneNode value) {
+		_selection.remove(value);
+	}
+
 	@Override
 	public String jsonType() {
 		return SCENE_GRAPH__TYPE;
@@ -64,7 +121,8 @@ public class SceneGraph extends de.haumacher.msgbuf.graph.AbstractSharedGraphNod
 
 	private static java.util.List<String> PROPERTIES = java.util.Collections.unmodifiableList(
 		java.util.Arrays.asList(
-			ROOT__PROP));
+			ROOT__PROP, 
+			SELECTION__PROP));
 
 	@Override
 	public java.util.List<String> properties() {
@@ -75,6 +133,7 @@ public class SceneGraph extends de.haumacher.msgbuf.graph.AbstractSharedGraphNod
 	public Object get(String field) {
 		switch (field) {
 			case ROOT__PROP: return getRoot();
+			case SELECTION__PROP: return getSelection();
 			default: return super.get(field);
 		}
 	}
@@ -83,6 +142,7 @@ public class SceneGraph extends de.haumacher.msgbuf.graph.AbstractSharedGraphNod
 	public void set(String field, Object value) {
 		switch (field) {
 			case ROOT__PROP: internalSetRoot((com.top_logic.threed.threejs.scene.SceneNode) value); break;
+			case SELECTION__PROP: internalSetSelection(de.haumacher.msgbuf.util.Conversions.asList(com.top_logic.threed.threejs.scene.SceneNode.class, value)); break;
 		}
 	}
 
@@ -108,6 +168,12 @@ public class SceneGraph extends de.haumacher.msgbuf.graph.AbstractSharedGraphNod
 			out.name(ROOT__PROP);
 			getRoot().writeTo(scope, out);
 		}
+		out.name(SELECTION__PROP);
+		out.beginArray();
+		for (com.top_logic.threed.threejs.scene.SceneNode x : getSelection()) {
+			x.writeTo(scope, out);
+		}
+		out.endArray();
 	}
 
 	@Override
@@ -121,6 +187,14 @@ public class SceneGraph extends de.haumacher.msgbuf.graph.AbstractSharedGraphNod
 				}
 				break;
 			}
+			case SELECTION__PROP: {
+				out.beginArray();
+				for (com.top_logic.threed.threejs.scene.SceneNode x : getSelection()) {
+					x.writeTo(scope, out);
+				}
+				out.endArray();
+				break;
+			}
 			default: super.writeFieldValue(scope, out, field);
 		}
 	}
@@ -129,7 +203,38 @@ public class SceneGraph extends de.haumacher.msgbuf.graph.AbstractSharedGraphNod
 	public void readField(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in, String field) throws java.io.IOException {
 		switch (field) {
 			case ROOT__PROP: setRoot(com.top_logic.threed.threejs.scene.SceneNode.readSceneNode(scope, in)); break;
+			case SELECTION__PROP: {
+				java.util.List<com.top_logic.threed.threejs.scene.SceneNode> newValue = new java.util.ArrayList<>();
+				in.beginArray();
+				while (in.hasNext()) {
+					newValue.add(com.top_logic.threed.threejs.scene.SceneNode.readSceneNode(scope, in));
+				}
+				in.endArray();
+				setSelection(newValue);
+			}
+			break;
 			default: super.readField(scope, in, field);
+		}
+	}
+
+	@Override
+	public void writeElement(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonWriter out, String field, Object element) throws java.io.IOException {
+		switch (field) {
+			case SELECTION__PROP: {
+				((com.top_logic.threed.threejs.scene.SceneNode) element).writeTo(scope, out);
+				break;
+			}
+			default: super.writeElement(scope, out, field, element);
+		}
+	}
+
+	@Override
+	public Object readElement(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in, String field) throws java.io.IOException {
+		switch (field) {
+			case SELECTION__PROP: {
+				return com.top_logic.threed.threejs.scene.SceneNode.readSceneNode(scope, in);
+			}
+			default: return super.readElement(scope, in, field);
 		}
 	}
 

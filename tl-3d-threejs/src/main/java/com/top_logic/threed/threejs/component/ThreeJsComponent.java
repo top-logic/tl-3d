@@ -5,11 +5,15 @@
  */
 package com.top_logic.threed.threejs.component;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import org.apache.commons.lang3.mutable.MutableBoolean;
 
 import com.top_logic.base.services.simpleajax.HTMLFragment;
 import com.top_logic.basic.CollectionUtil;
@@ -39,6 +43,8 @@ import com.top_logic.threed.threejs.scene.PartNode;
 import com.top_logic.threed.threejs.scene.SceneGraph;
 import com.top_logic.threed.threejs.scene.SceneNode;
 
+import de.haumacher.msgbuf.observer.Listener;
+import de.haumacher.msgbuf.observer.Observable;
 
 /**
  * 3D-Viewer using the <code>Three.js</code> library.
@@ -91,7 +97,7 @@ public class ThreeJsComponent extends BuilderComponent
 
 	}
 
-	private SceneGraph _scene = SceneGraph.create();
+	private final SceneGraph _scene;
 
 	private final SelectionModel _selectionModel;
 
@@ -113,6 +119,96 @@ public class ThreeJsComponent extends BuilderComponent
 		_selectionModel = _multiSelect ? new DefaultMultiSelectionModel(this) : new DefaultSingleSelectionModel(this);
 
 		_selectionModel.addSelectionListener(this);
+
+		_scene = SceneGraph.create();
+
+		connect(_scene, _selectionModel);
+	}
+
+	private void connect(SceneGraph scene, SelectionModel selectionModel) {
+		MutableBoolean ignoreSelectEvent = new MutableBoolean();
+		scene.registerListener(new Listener() {
+
+			@Override
+			public void beforeSet(Observable obj, String property, Object value) {
+
+				switch (property) {
+					case SceneGraph.SELECTION__PROP: {
+						if (ignoreSelectEvent.booleanValue()) {
+							return;
+						}
+						ignoreSelectEvent.setTrue();
+						try {
+							selectionModel.setSelection(CollectionUtil.asSet(value));
+						} finally {
+							ignoreSelectEvent.setFalse();
+						}
+						break;
+					}
+					default: // ignore
+				}
+			}
+
+			@Override
+			public void beforeAdd(Observable obj, String property, int index, Object element) {
+				switch (property) {
+					case SceneGraph.SELECTION__PROP: {
+						if (ignoreSelectEvent.booleanValue()) {
+							return;
+						}
+						ignoreSelectEvent.setTrue();
+						try {
+							selectionModel.setSelected(element, true);
+						} finally {
+							ignoreSelectEvent.setFalse();
+						}
+						break;
+					}
+					default: // ignore
+				}
+			}
+
+			@Override
+			public void afterRemove(Observable obj, String property, int index, Object element) {
+				switch (property) {
+					case SceneGraph.SELECTION__PROP: {
+						if (ignoreSelectEvent.booleanValue()) {
+							return;
+						}
+						ignoreSelectEvent.setTrue();
+						try {
+							selectionModel.setSelected(element, false);
+						} finally {
+							ignoreSelectEvent.setFalse();
+						}
+						break;
+					}
+					default: // ignore
+				}
+			}
+		});
+		selectionModel.addSelectionListener(new SelectionListener() {
+
+			@Override
+			public void notifySelectionChanged(SelectionModel model, Set<?> formerlySelectedObjects,
+					Set<?> selectedObjects) {
+				if (ignoreSelectEvent.booleanValue()) {
+					return;
+				}
+				ignoreSelectEvent.setTrue();
+				try {
+					Set<?> newElements = new HashSet<>(selectedObjects);
+					newElements.removeAll(formerlySelectedObjects);
+					Set<?> removedElements = new HashSet<>(formerlySelectedObjects);
+					removedElements.removeAll(selectedObjects);
+					List<SceneNode> selection = scene.getSelection();
+					selection.removeAll(removedElements);
+					selection.addAll((Collection<? extends SceneNode>) newElements);
+				} finally {
+					ignoreSelectEvent.setFalse();
+				}
+			}
+		});
 	}
 
 	@Override
@@ -164,7 +260,7 @@ public class ThreeJsComponent extends BuilderComponent
 
 	ThreeJsControl getThreeJSControl() {
 		if (_control == null) {
-			_control = new ThreeJsControl(getScene(), getSelectionModel());
+			_control = new ThreeJsControl(getScene());
 		}
 
 		return _control;
@@ -179,7 +275,8 @@ public class ThreeJsComponent extends BuilderComponent
 			SceneNode root = builder().getModel(getModel(), this);
 			root.visit(this, _nodeByModel);
 			_scene.setRoot(root);
-			_selectionModel.setSelection(nodesForBusinessObjects(selectionChannel().get()));
+			_scene.setSelection(addNodesForBusinessObjects(selectionChannel().get(), new ArrayList<>()));
+
 			_sceneValid = true;
 		}
 
@@ -214,27 +311,25 @@ public class ThreeJsComponent extends BuilderComponent
 
 	@Override
 	public void handleNewValue(ComponentChannel sender, Object oldValue, Object newValue) {
-		_selectionModel.setSelection(nodesForBusinessObjects(newValue));
+		// Component received a new selection.
+		_selectionModel.setSelection(addNodesForBusinessObjects(newValue, new HashSet<>()));
 	}
 
-	private Set<SceneNode> nodesForBusinessObjects(Object newValue) {
-		// Component received a new selection.
-		Set<SceneNode> newSelection = new HashSet<>();
-
+	private <T extends Collection<? super SceneNode>> T addNodesForBusinessObjects(Object newValue, T out) {
 		if (newValue instanceof Collection) {
 			for (Object selected : ((Collection<?>) newValue)) {
 				SceneNode node = _nodeByModel.get(selected);
 				if (node != null) {
-					newSelection.add(node);
+					out.add(node);
 				}
 			}
 		} else {
 			SceneNode node = _nodeByModel.get(newValue);
 			if (node != null) {
-				newSelection.add(node);
+				out.add(node);
 			}
 		}
-		return newSelection;
+		return out;
 	}
 
 	@Override

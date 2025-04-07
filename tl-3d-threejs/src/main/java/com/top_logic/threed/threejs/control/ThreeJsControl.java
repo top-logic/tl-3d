@@ -6,10 +6,9 @@
 package com.top_logic.threed.threejs.control;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 import com.top_logic.base.services.simpleajax.JSFunctionCall;
 import com.top_logic.basic.util.ResKey;
@@ -21,34 +20,32 @@ import com.top_logic.layout.URLParser;
 import com.top_logic.layout.UpdateQueue;
 import com.top_logic.layout.basic.AbstractControl;
 import com.top_logic.layout.basic.ControlCommand;
-import com.top_logic.layout.component.model.SelectionListener;
 import com.top_logic.mig.html.HTMLUtil;
-import com.top_logic.mig.html.SelectionModel;
-import com.top_logic.threed.threejs.control.cmds.SelectionChange;
-import com.top_logic.threed.threejs.control.cmds.SelectionChanged;
 import com.top_logic.threed.threejs.scene.SceneGraph;
 import com.top_logic.tool.boundsec.HandlerResult;
 
 import de.haumacher.msgbuf.graph.DefaultScope;
 import de.haumacher.msgbuf.graph.SharedGraphNode;
+import de.haumacher.msgbuf.io.StringR;
+import de.haumacher.msgbuf.io.StringW;
+import de.haumacher.msgbuf.io.Writer;
+import de.haumacher.msgbuf.json.JsonReader;
 import de.haumacher.msgbuf.json.JsonWriter;
-import de.haumacher.msgbuf.observer.Listener;
-import de.haumacher.msgbuf.observer.Observable;
 import de.haumacher.msgbuf.server.io.WriterAdapter;
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * {@link Control} displaying a 3D scene using <code>three.js</code>.
  */
-public class ThreeJsControl extends AbstractControl implements ContentHandler, Listener, SelectionListener {
+public class ThreeJsControl extends AbstractControl implements ContentHandler {
 
-	private static final Map<String, ControlCommand> COMMANDS = createCommandMap(UpdateSelection.INSTANCE);
+	private static final String THREEJS_JS_NS = "window.services.threejs";
+
+	private static final Map<String, ControlCommand> COMMANDS = createCommandMap(ApplySceneChange.INSTANCE);
 
 	private SceneGraph _model;
 
 	private final ExternalScope _scope;
-
-	private final SelectionModel _selection;
 
 	private boolean _isWorkplaneVisible;
 
@@ -57,20 +54,11 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler, L
 	private boolean _isRotateMode;
 
 	/**
-	 * Whether {@link #_selection} is currently updated with new values from the UI. During that
-	 * period, events from the {@link #_selection} are ignored.
-	 */
-	private boolean _selectionUpdating;
-
-	private SelectionChanged _selectionUpdate;
-
-	/**
 	 * Creates a {@link ThreeJsControl}.
 	 */
-	public ThreeJsControl(SceneGraph model, SelectionModel selection) {
+	public ThreeJsControl(SceneGraph model) {
 		super(COMMANDS);
 		_model = model;
-		_selection = selection;
 		_scope = new ExternalScope(2, 0);
 	}
 
@@ -88,11 +76,11 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler, L
 	 * Sends the command to the client to zoom to the current selection.
 	 */
 	public void zoomToSelection() {
-		addUpdate(new JSFunctionCall(getID(), "window.services.threejs", "zoomToSelection"));
+		addUpdate(new JSFunctionCall(getID(), THREEJS_JS_NS, "zoomToSelection"));
 	}
 
 	public void zoomOutFromSelection() {
-    	addUpdate(new JSFunctionCall(getID(), "window.services.threejs", "zoomOutFromSelection"));
+    	addUpdate(new JSFunctionCall(getID(), THREEJS_JS_NS, "zoomOutFromSelection"));
 	}
 
 	public boolean getIsWorkplaneVisible() {
@@ -102,7 +90,7 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler, L
 	public void setIsWorkplaneVisible(boolean visible) {
 		_isWorkplaneVisible = visible;
 		
-		addUpdate(new JSFunctionCall(getID(), "window.services.threejs", "toggleWorkplane", visible));
+		addUpdate(new JSFunctionCall(getID(), THREEJS_JS_NS, "toggleWorkplane", visible));
 	}
 
 	public boolean getIsInEditMode() {
@@ -112,7 +100,7 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler, L
 	public void setIsInEditMode(boolean value) {
 		_isInEditMode = value;
 		
-		addUpdate(new JSFunctionCall(getID(), "window.services.threejs", "toggleEditMode", value));
+		addUpdate(new JSFunctionCall(getID(), THREEJS_JS_NS, "toggleEditMode", value));
 	}
 
 	public boolean getIsRotateMode() {
@@ -122,15 +110,12 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler, L
 	public void setIsRotateMode(boolean value) {
 		_isRotateMode = value;
 
-		addUpdate(new JSFunctionCall(getID(), "window.services.threejs", "toggleRotateMode", value));
+		addUpdate(new JSFunctionCall(getID(), THREEJS_JS_NS, "toggleRotateMode", value));
 	}
 
 	@Override
 	protected void internalAttach() {
 		super.internalAttach();
-
-		_model.registerListener(this);
-		_selection.addSelectionListener(this);
 
 		getFrameScope().registerContentHandler(getID(), this);
 	}
@@ -139,31 +124,28 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler, L
 	protected void internalDetach() {
 		getFrameScope().deregisterContentHandler(this);
 
-		_model.unregisterListener(this);
-		_selection.removeSelectionListener(this);
-
 		super.internalDetach();
 	}
 
 	@Override
-	public void beforeSet(Observable obj, String property, Object value) {
-		requestRepaint();
-	}
-
-	@Override
 	protected boolean hasUpdates() {
-		return super.hasUpdates() || _selectionUpdate != null;
+		return super.hasUpdates() || _scope.hasChanges();
 	}
 
 	@Override
 	protected void internalRevalidate(DisplayContext context, UpdateQueue actions) {
 		super.internalRevalidate(context, actions);
 
-		if (_selectionUpdate != null) {
-			actions.add(new JSFunctionCall(getID(), "window.services.threejs", "selectionChanged",
-				_selectionUpdate.toString()));
-			_selectionUpdate = null;
+		if (_scope.hasChanges()) {
+			Writer out = new StringW();
+			try {
+				_scope.createPatch(new JsonWriter(out));
+			} catch (IOException ex) {
+				throw new UncheckedIOException(ex);
+			}
+			actions.add(new JSFunctionCall(getID(), THREEJS_JS_NS, "sceneChanged", out.toString()));
 		}
+
 	}
 
 	@Override
@@ -177,7 +159,8 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler, L
 			getFrameScope().getURL(context, this).appendParameter("t", Long.toString(System.nanoTime())).getURL();
 
 		HTMLUtil.beginScriptAfterRendering(out);
-		out.append("window.services.threejs.init('" + getID() + "', '" + 
+		out.append(THREEJS_JS_NS);
+		out.append(".init('" + getID() + "', '" + 
 			context.getContextPath() + "', '" + 
 			dataUrl + "', " +
 			_isWorkplaneVisible + ", " + 
@@ -201,89 +184,52 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler, L
 	}
 
 	/**
-	 * Adjusts the selection based on a client-side selection change.
+	 * Adjusts the {@link SceneGraph} based on a client-side change.
 	 */
-	public static class UpdateSelection extends ControlCommand {
+	public static class ApplySceneChange extends ControlCommand {
+
+		private static final String JSON_ARG = "json";
 
 		/**
-		 * Singleton {@link UpdateSelection} instance.
+		 * Singleton {@link ApplySceneChange} instance.
 		 */
-		public static final UpdateSelection INSTANCE = new UpdateSelection();
+		public static final ApplySceneChange INSTANCE = new ApplySceneChange();
 
-		private UpdateSelection() {
-			super("updateSelection");
+		private ApplySceneChange() {
+			super("sceneChanged");
+		}
+
+		@Override
+		public ResKey getI18NKey() {
+			return I18NConstants.APPLY_SCENE_CHANGES;
 		}
 
 		@Override
 		protected HandlerResult execute(DisplayContext commandContext, Control control, Map<String, Object> arguments) {
 			ThreeJsControl self = (ThreeJsControl) control;
 
-			@SuppressWarnings("unchecked")
-			Map<Number, String> changes = (Map<Number, String>) arguments.get("changes");
-
-			self.updateSelection(changes);
+			String change = (String) arguments.get(JSON_ARG);
+			self.applyChange(change);
 			return HandlerResult.DEFAULT_RESULT;
 		}
 
-		@Override
-		public ResKey getI18NKey() {
-			return ResKey.text("updateSelection");
-		}
 	}
 
 	/**
-	 * Applies command from the UI to update the selection set.
+	 * Applies commands from the UI.
 	 */
-	void updateSelection(Map<?, ?> changes) {
-		_selectionUpdating = true;
+	void applyChange(String changes) {
+		if (_scope.hasChanges()) {
+			throw new IllegalStateException("Scope has changes which were not delivered to the client.");
+		}
 		try {
-			Map<Object, SharedGraphNode> index = _scope.index();
-			Set<Object> newSelection = new HashSet<>(_selection.getSelection());
-			for (var entry : changes.entrySet()) {
-				Integer id = Integer.valueOf(Integer.parseInt(entry.getKey().toString()));
-
-				SharedGraphNode node = index.get(id);
-				if (node != null) {
-					switch (entry.getValue().toString()) {
-						case "ADD":
-							newSelection.add(node);
-							break;
-						case "REMOVE":
-							newSelection.remove(node);
-							break;
-					}
-				}
-			}
-
-			// Update model in one call to avoid event chaos.
-			_selection.setSelection(newSelection);
-		} finally {
-			_selectionUpdating = false;
+			_scope.applyChanges(new JsonReader(new StringR(changes)));
+		} catch (IOException ex) {
+			throw new UncheckedIOException(ex);
 		}
+		_scope.dropChanges();
 	}
 
-	@Override
-	public void notifySelectionChanged(SelectionModel model, Set<?> formerlySelectedObjects, Set<?> selectedObjects) {
-		if (_selectionUpdating) {
-			return;
-		}
-
-		// Send command to the UI.
-		if (_selectionUpdate == null) {
-			_selectionUpdate = SelectionChanged.create();
-		}
-		for (Object x : selectedObjects) {
-			if (!formerlySelectedObjects.contains(x)) {
-				_selectionUpdate.getChanged().put(Integer.valueOf(_scope.id((SharedGraphNode) x)), SelectionChange.ADD);
-			}
-		}
-		for (Object x : formerlySelectedObjects) {
-			if (!selectedObjects.contains(x)) {
-				_selectionUpdate.getChanged().put(Integer.valueOf(_scope.id((SharedGraphNode) x)),
-					SelectionChange.REMOVE);
-			}
-		}
-	}
 }
 
 class ExternalScope extends DefaultScope {
@@ -300,6 +246,8 @@ class ExternalScope extends DefaultScope {
 	public void clear() {
 		_objectIds.clear();
 		index().clear();
+
+		dropChanges();
 	}
 
 	@Override

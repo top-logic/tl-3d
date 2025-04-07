@@ -46,4 +46,7 @@ message PartNode extends SceneNode {
 message SceneGraph {
 	/** The top-level {@link SceneNode} of the scene. */
 	SceneNode root;
+
+	/** The currently selected {@link SceneNode}s. */
+	repeated SceneNode selection;
 }
