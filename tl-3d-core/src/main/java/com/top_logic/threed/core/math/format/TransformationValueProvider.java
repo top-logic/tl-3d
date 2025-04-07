@@ -13,8 +13,6 @@ import com.top_logic.threed.core.math.Transformation;
 /**
  * {@link ConfigurationValueProvider} allowing to store {@link Transformation} values in
  * configurations.
- * 
- * @author <a href="mailto:sven.foerster@top-logic.com">Sven Förster</a>
  */
 public class TransformationValueProvider implements ComplexValueProvider<Transformation> {
 

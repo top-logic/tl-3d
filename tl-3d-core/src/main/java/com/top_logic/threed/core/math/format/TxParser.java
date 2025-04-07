@@ -5,6 +5,8 @@
  */
 package com.top_logic.threed.core.math.format;
 
+import java.text.ParseException;
+
 import com.top_logic.threed.core.math.Transformation;
 
 /**
@@ -15,14 +17,14 @@ public class TxParser {
 	/**
 	 * Parses a {@link Transformation} in scene file format.
 	 */
-	public static Transformation parseTx(String tx) {
+	public static Transformation parseTx(String tx) throws ParseException {
 		return parseTx(0, tx);
 	}
 
 	/**
 	 * Parses a {@link Transformation} in scene file format.
 	 */
-	public static Transformation parseTx(int start, String tx) {
+	public static Transformation parseTx(int start, String tx) throws ParseException {
 		return new TxParser(start, tx).parse();
 	}
 
@@ -42,14 +44,15 @@ public class TxParser {
 		_len = str.length();
 	}
 
-	Transformation parse() {
+	Transformation parse() throws ParseException {
 		double a = 1, b = 0, c = 0;
 		double d = 0, e = 1, f = 0;
 		double g = 0, h = 0, i = 1;
 		double x = 0, y = 0, z = 0;
 
 		while (hasNext()) {
-			switch (next()) {
+			char next = next();
+			switch (next) {
 				case 'M': {
 					expect('('); ws();
 					a = readNum(); comma();
@@ -75,8 +78,10 @@ public class TxParser {
 					break;
 				}
 				default: {
-					throw new IllegalArgumentException(
-						"Unexpected token at position " + _offset + " while parsing transformation: " + _str);
+					throw new ParseException(
+						"Unexpected token '" + next + "' at position " + _offset + " while parsing transformation: "
+							+ _str,
+						_offset);
 				}
 			}
 		}
@@ -89,7 +94,7 @@ public class TxParser {
 			x, y, z);
 	}
 
-	private void comma() {
+	private void comma() throws ParseException {
 		ws(); expect(','); ws();
 	}
 
@@ -99,7 +104,7 @@ public class TxParser {
 		}
 	}
 
-	private double readNum() {
+	private double readNum() throws ParseException {
 		int start = _idx;
 		while (hasNext()) {
 			char ch = lookingAt();
@@ -113,25 +118,27 @@ public class TxParser {
 		try {
 			return Double.parseDouble(num);
 		} catch (NumberFormatException ex) {
-			throw new IllegalArgumentException(
-				"Invalid number format in '" + num + "' at position " + (_idx - _offset) + ": "
-					+ ex.getMessage());
+			int position = _idx - _offset;
+			throw new ParseException(
+				"Invalid number format in '" + num + "' at position " + position + ": " + ex.getMessage(),
+				position);
 		}
 	}
 
-	private void expect(char ch) {
+	private void expect(char ch) throws ParseException {
 		expectLookingAt(ch);
 		skip();
 	}
 
-	private void expectLookingAt(char ch) {
+	private void expectLookingAt(char ch) throws ParseException {
 		if (!hasNext()) {
-			throw new IllegalArgumentException(
-				"Missing character in transformation at position " + (_idx - _offset) + ".");
+			int position = _idx - _offset;
+			throw new ParseException("Missing character in transformation at position " + position + ".", position);
 		}
 		if (lookingAt() != ch) {
-			throw new IllegalArgumentException(
-				"Expected character '" + ch + "' in transformation at position " + (_idx - _offset) + ".");
+			int position = _idx - _offset;
+			throw new ParseException(
+				"Expected character '" + ch + "' in transformation at position " + position + ".", position);
 		}
 	}
 

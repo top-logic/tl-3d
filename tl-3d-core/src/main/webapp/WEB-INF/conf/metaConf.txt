@@ -1,1 +1,2 @@
+tl.threed.core.model.config.xml
 tl-3d-core.conf.xml
