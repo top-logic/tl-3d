@@ -20,6 +20,11 @@ public class I18NConstants extends I18NConstantsBase {
 	public static ResKey2 ERROR_TRANSFORMATION_EXPECTED__ACTUAL_EXPR;
 
 	/**
+	 * @en Invalid transformation string {0} received in expression: {1}
+	 */
+	public static ResKey2 ERROR_INVALID_TRANSFORMATION_STRING__ACTUAL_EXPR;
+
+	/**
 	 * @en A transformation expects either 3, 9, or 12 numbers, actually received {0}.
 	 */
 	public static ResKey1 ERROR_INVALID_NUMBER_OF_TRANSFORMATION_ARGUMENTS__ACTUAL;

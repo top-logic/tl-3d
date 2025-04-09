@@ -5,6 +5,7 @@
  */
 package com.top_logic.threed.core.math.script;
 
+import java.text.ParseException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
@@ -24,7 +25,7 @@ import com.top_logic.threed.core.math.format.TxParser;
 import com.top_logic.util.error.TopLogicException;
 
 /**
- * TL-Script constuructor function for {@link Transformation}s.
+ * TL-Script constructor function for {@link Transformation}s.
  */
 public class TransformationConstructor extends GenericMethod {
 
@@ -65,7 +66,12 @@ public class TransformationConstructor extends GenericMethod {
 			if (str.isEmpty()) {
 				return null;
 			}
-			return TxParser.parseTx(str);
+			try {
+				return TxParser.parseTx(str);
+			} catch (ParseException ex) {
+				throw new TopLogicException(I18NConstants.ERROR_INVALID_TRANSFORMATION_STRING__ACTUAL_EXPR
+					.fill(str, self), ex);
+			}
 		} else {
 			throw new TopLogicException(I18NConstants.ERROR_TRANSFORMATION_EXPECTED__ACTUAL_EXPR
 				.fill(object.getClass().getName(), self));
