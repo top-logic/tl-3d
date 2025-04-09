@@ -63,9 +63,11 @@
 		model="${model}"
 		selection="${selection}"
 		multiSelection="${multiSelection}"
+		applyCommand="applyTransform"
 	>
 		<buttons>
 			${buttons}
+			<include name="templates/editComponentCommands.xml"/>
 			<button id="rorateMode" class="com.top_logic.threed.threejs.component.ToggleRotateAxes"
 				group="System"
 				image="css:fa-solid fa-arrow-right-arrow-left"
@@ -75,16 +77,6 @@
 				<resourceKey key="dynamic.67bd3d24-fa90-40ee-a975-1f5c255a824e">
 					<de>Schieben-Drehen</de>
 					<en>Move-Rotate</en>
-				</resourceKey>
-			</button>
-			<button id="edit" class="com.top_logic.threed.threejs.component.ToggleEditModeCommand"
-				group="System"
-				image="css:fa-solid fa-pen"
-				activeImage="css:fa-solid fa-pen tl-danger"
-			>
-				<resourceKey key="dynamic.139be71c-2240-4880-b2bd-da05a09ed8a7">
-					<de>Bearbeiten</de>
-					<en>Edit</en>
 				</resourceKey>
 			</button>
 			<button id="addWorkplane" class="com.top_logic.threed.threejs.component.ToggleWorkplaneCommand"

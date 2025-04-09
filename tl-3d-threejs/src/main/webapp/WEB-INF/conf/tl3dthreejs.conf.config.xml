@@ -40,6 +40,17 @@
 				</modules>
 			</instance>
 		</config>
+
+		<config service-class="com.top_logic.tool.boundsec.CommandHandlerFactory">
+			<instance>
+				<handlers>
+					<handler id="applyTransform" class="com.top_logic.threed.threejs.component.ThreeJsComponent$ApplyTransformCommand" 
+						clique="apply"/>
+					<handler id="saveTransform" class="com.top_logic.threed.threejs.component.ThreeJsComponent$SaveTransformCommand" 
+						clique="save"/>
+				</handlers>
+			</instance>		
+		</config>
 	</services>
 
 	<configs>

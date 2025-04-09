@@ -5,6 +5,8 @@
  */
 package com.top_logic.threed.threejs.component;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodHandles.Lookup;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -24,24 +26,33 @@ import com.top_logic.basic.config.PolymorphicConfiguration;
 import com.top_logic.basic.config.annotation.Name;
 import com.top_logic.basic.config.annotation.defaults.BooleanDefault;
 import com.top_logic.basic.config.annotation.defaults.ItemDefault;
+import com.top_logic.basic.config.annotation.defaults.StringDefault;
 import com.top_logic.layout.DisplayContext;
+import com.top_logic.layout.channel.ChannelSPI;
 import com.top_logic.layout.channel.ComponentChannel;
 import com.top_logic.layout.channel.ComponentChannel.ChannelListener;
 import com.top_logic.layout.component.Selectable;
 import com.top_logic.layout.component.SelectableWithSelectionModel;
 import com.top_logic.layout.component.model.SelectionListener;
+import com.top_logic.layout.form.component.AbstractApplyCommandHandler;
+import com.top_logic.layout.form.component.Editor;
+import com.top_logic.layout.form.component.edit.EditMode;
 import com.top_logic.layout.structure.ContentLayoutControlProvider;
 import com.top_logic.layout.structure.LayoutControlProvider;
 import com.top_logic.layout.table.component.BuilderComponent;
 import com.top_logic.mig.html.DefaultMultiSelectionModel;
 import com.top_logic.mig.html.DefaultSingleSelectionModel;
 import com.top_logic.mig.html.SelectionModel;
+import com.top_logic.mig.html.layout.CommandRegistry;
 import com.top_logic.mig.html.layout.LayoutComponent;
 import com.top_logic.threed.threejs.control.ThreeJsControl;
 import com.top_logic.threed.threejs.scene.GroupNode;
 import com.top_logic.threed.threejs.scene.PartNode;
 import com.top_logic.threed.threejs.scene.SceneGraph;
 import com.top_logic.threed.threejs.scene.SceneNode;
+import com.top_logic.tool.boundsec.HandlerResult;
+import com.top_logic.tool.execution.ExecutabilityRule;
+import com.top_logic.tool.execution.InEditModeExecutable;
 
 import de.haumacher.msgbuf.observer.Listener;
 import de.haumacher.msgbuf.observer.Observable;
@@ -51,12 +62,15 @@ import de.haumacher.msgbuf.observer.Observable;
  */
 public class ThreeJsComponent extends BuilderComponent
 		implements ChannelListener, SelectionListener, SelectableWithSelectionModel,
-		SceneNode.Visitor<Void, Map<Object, SceneNode>, RuntimeException> {
+		SceneNode.Visitor<Void, Map<Object, SceneNode>, RuntimeException>, Editor {
 
 	/**
 	 * {@link ThreeJsComponent} configuration.
 	 */
-	public interface Config extends BuilderComponent.Config, Selectable.SelectableConfig {
+	public interface Config extends BuilderComponent.Config, Selectable.SelectableConfig, Editor.Config {
+
+		/** @see com.top_logic.basic.reflect.DefaultMethodInvoker */
+		Lookup LOOKUP = MethodHandles.lookup();
 
 		@Override
 		PolymorphicConfiguration<? extends SceneBuilder> getModelBuilder();
@@ -75,6 +89,19 @@ public class ThreeJsComponent extends BuilderComponent
 		@Name("multiSelection")
 		boolean hasMultiSelection();
 
+		@Override
+		@StringDefault(ApplyTransformCommand.COMMAND_ID)
+		String getApplyCommand();
+
+		@Override
+		@StringDefault(SaveTransformCommand.COMMAND_ID)
+		String getSaveCommand();
+
+		@Override
+		default void modifyIntrinsicCommands(CommandRegistry registry) {
+			com.top_logic.layout.form.component.Editor.Config.super.modifyIntrinsicCommands(registry);
+			BuilderComponent.Config.super.modifyIntrinsicCommands(registry);
+		}
 	}
 
 	/**
@@ -94,8 +121,13 @@ public class ThreeJsComponent extends BuilderComponent
 			ThreeJsComponent viewer = (ThreeJsComponent) component;
 			return viewer.getThreeJSControl();
 		}
-
 	}
+
+	/**
+	 * @see #channels()
+	 */
+	protected static final Map<String, ChannelSPI> CHANNELS =
+		channels(Selectable.MODEL_AND_SELECTION_CHANNEL, EditMode.EDIT_MODE_SPI);
 
 	private final SceneGraph _scene;
 
@@ -108,7 +140,7 @@ public class ThreeJsComponent extends BuilderComponent
 	private boolean _multiSelect;
 
 	private ThreeJsControl _control;
-
+	
 	/**
 	 * Creates a {@link ThreeJsComponent}.
 	 */
@@ -303,10 +335,17 @@ public class ThreeJsComponent extends BuilderComponent
 	@Override
 	public void linkChannels(Log log) {
 		super.linkChannels(log);
+		Editor.super.linkChannels(log);
 
 		linkSelectionChannel(log);
 
 		selectionChannel().addListener(this);
+	}
+	
+	@Override
+	protected Map<String, ChannelSPI> channels() {
+		// TODO Auto-generated method stub
+		return CHANNELS;
 	}
 
 	@Override
@@ -371,6 +410,57 @@ public class ThreeJsComponent extends BuilderComponent
 		Object userData = self.getUserData();
 		if (userData != null) {
 			arg.put(userData, self);
+		}
+	}
+
+	@Override
+	public void handleComponentModeChange(boolean editMode) {
+		getThreeJSControl().setIsInEditMode(editMode);
+	}
+
+
+	public static class ApplyTransformCommand extends AbstractApplyCommandHandler {
+
+		public interface Config extends AbstractApplyCommandHandler.Config {
+			// No additional properties.
+		}
+
+		@Override
+		@Deprecated
+		public ExecutabilityRule createExecutabilityRule() {
+			return InEditModeExecutable.INSTANCE;
+		}
+
+        public static final String COMMAND_ID = "applyTransform";
+
+        public ApplyTransformCommand(InstantiationContext context, Config config) {
+			super(context, config);
+        }
+
+		@Override
+		public HandlerResult handleCommand(DisplayContext aContext, LayoutComponent aComponent,
+				Object model, Map<String, Object> someArguments) {
+
+			return HandlerResult.DEFAULT_RESULT;
+		}
+    }
+
+	public static class SaveTransformCommand extends ApplyTransformCommand {
+
+		// Constants
+
+		/** ID of this handler. */
+		public static final String COMMAND_ID = "saveTransform";
+
+		public SaveTransformCommand(InstantiationContext context, Config config) {
+	        	super(context, config);
+	        }
+
+		@Override
+		public HandlerResult handleCommand(DisplayContext aContext, LayoutComponent aComponent, Object model,
+				Map<String, Object> someArguments) {
+
+			return HandlerResult.DEFAULT_RESULT;
 		}
 	}
 }
