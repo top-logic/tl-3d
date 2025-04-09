@@ -12,27 +12,24 @@
 		<name key="dynamic.2affe21a-3127-4135-b45a-c6e45b0e3dbf">
 			<de>3D-Viewer</de>
 		</name>
-		<modelBuilder class="com.top_logic.threed.threejs.component.SceneBuilderByExpression">
-			<createScene><![CDATA[scene -> {
-    root = $scene.get(`tl.threed.demo:Scene#root`);
-
-    $root.traverse(
-        descend: node -> $node.get(`tl.threed.demo:Assembly#children`),
-        mapping: node -> switch {
-            $node.instanceOf(`tl.threed.demo:Part`) || $node.get(`tl.threed.demo:Node#asset`) != null: 
-                threejsGltf(
-                    tx:  $node.get(`tl.threed.demo:Node#tx`),
-                    userData: $node,
-                    url: $node.get(`tl.threed.demo:Part#asset`)
-                        .get(`tl.threed.demo:Asset3D#gltfUrl`));
-        },
-        compose: node -> parts -> assembly -> $node != null ? $node : threejsGroup(
-            tx:  $assembly.get(`tl.threed.demo:Node#tx`),
-            userData: $assembly,
-            components: $parts.filter(p -> $p != null))
-    )
-    
-}]]></createScene>
+		<modelBuilder class="com.top_logic.threed.threejs.component.SceneBuilderByExpression"
+			resolveParts="node -> $node.get(`tl.threed.demo:Assembly#children`)"
+			rootNode="scene -> $scene.get(`tl.threed.demo:Scene#root`)"
+			supportsModel="model -> $model.instanceOf(`tl.threed.demo:Scene`)"
+			supportsObject="node -> $node.instanceOf(`tl.threed.demo:Node`)"
+			typesToObserve="tl.threed.demo:Node"
+		>
+			<createNode><![CDATA[node -> switch {
+  $node.instanceOf(`tl.threed.demo:Part`) || $node.get(`tl.threed.demo:Node#asset`) != null: 
+    threejsGltf(
+      tx:  $node.get(`tl.threed.demo:Node#tx`),
+      userData: $node,
+      url: $node.get(`tl.threed.demo:Part#asset`).get(`tl.threed.demo:Asset3D#gltfUrl`));
+  $node.instanceOf(`tl.threed.demo:Assembly`):
+    threejsGroup(
+      tx: $node.get(`tl.threed.demo:Node#tx`),
+      userData: $node);
+}]]></createNode>
 		</modelBuilder>
 		<buttons>
 			<button id="ID_4893bf3f_116f_421c_b560_842f9b4b1073"

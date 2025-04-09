@@ -7,19 +7,21 @@ package com.top_logic.threed.threejs.component;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodHandles.Lookup;
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
 
 import com.top_logic.base.services.simpleajax.HTMLFragment;
 import com.top_logic.basic.CollectionUtil;
 import com.top_logic.basic.Log;
+import com.top_logic.basic.col.FilterUtil;
 import com.top_logic.basic.config.ConfigurationException;
 import com.top_logic.basic.config.InstantiationContext;
 import com.top_logic.basic.config.PolymorphicConfiguration;
@@ -45,6 +47,10 @@ import com.top_logic.mig.html.DefaultSingleSelectionModel;
 import com.top_logic.mig.html.SelectionModel;
 import com.top_logic.mig.html.layout.CommandRegistry;
 import com.top_logic.mig.html.layout.LayoutComponent;
+import com.top_logic.model.TLClass;
+import com.top_logic.model.TLObject;
+import com.top_logic.model.TLStructuredType;
+import com.top_logic.model.util.TLModelUtil;
 import com.top_logic.threed.threejs.control.ThreeJsControl;
 import com.top_logic.threed.threejs.scene.GroupNode;
 import com.top_logic.threed.threejs.scene.PartNode;
@@ -61,8 +67,7 @@ import de.haumacher.msgbuf.observer.Observable;
  * 3D-Viewer using the <code>Three.js</code> library.
  */
 public class ThreeJsComponent extends BuilderComponent
-		implements ChannelListener, SelectionListener, SelectableWithSelectionModel,
-		SceneNode.Visitor<Void, Map<Object, SceneNode>, RuntimeException>, Editor {
+		implements ChannelListener, SelectionListener, SelectableWithSelectionModel, Editor {
 
 	/**
 	 * {@link ThreeJsComponent} configuration.
@@ -135,12 +140,80 @@ public class ThreeJsComponent extends BuilderComponent
 
 	private final Map<Object, SceneNode> _nodeByModel = new HashMap<>();
 
+	private final Map<SceneNode, GroupNode> _parentNodes = new HashMap<>();
+
 	private boolean _sceneValid;
 
 	private boolean _multiSelect;
 
 	private ThreeJsControl _control;
 	
+	private Set<? extends TLStructuredType> _typesToObserve;
+
+	private SceneNode.Visitor<Void, GroupNode, RuntimeException> _addToIndex = new SceneNode.Visitor<>() {
+
+		@Override
+		public Void visit(GroupNode self, GroupNode parent) {
+			add(self, parent);
+			for (SceneNode child : self.getContents()) {
+				child.visit(this, self);
+			}
+			return null;
+		}
+
+		@Override
+		public Void visit(PartNode self, GroupNode parent) {
+			add(self, parent);
+			return null;
+		}
+
+		private void add(SceneNode self, GroupNode parent) {
+			Object userData = self.getUserData();
+			if (userData != null) {
+				SceneNode clash = _nodeByModel.put(userData, self);
+				if (clash != null && clash != self) {
+					throw new IllegalArgumentException(
+						"Multiple nodes for the same user data '" + userData + "': " + clash + " vs. " + self);
+				}
+			}
+			if (parent != null) {
+				GroupNode clash = _parentNodes.put(self, parent);
+				if (clash != null && clash != parent) {
+					throw new IllegalArgumentException(
+						"Multiple parents for the same child '" + self + "': " + clash + " vs. " + parent);
+				}
+			}
+		}
+		
+	};
+
+	private SceneNode.Visitor<Void, Void, RuntimeException> _removeFromIndex = new SceneNode.Visitor<>() {
+
+		@Override
+		public Void visit(GroupNode self, Void arg) {
+			remove(self);
+			for (SceneNode child : self.getContents()) {
+				child.visit(this, arg);
+			}
+			return null;
+		}
+
+		@Override
+		public Void visit(PartNode self, Void arg) {
+			remove(self);
+			return null;
+		}
+
+		private void remove(SceneNode self) {
+			Object userData = self.getUserData();
+			if (userData != null) {
+				_nodeByModel.remove(userData);
+			}
+			_parentNodes.remove(self);
+		}
+
+	};
+
 	/**
 	 * Creates a {@link ThreeJsComponent}.
 	 */
@@ -149,12 +222,11 @@ public class ThreeJsComponent extends BuilderComponent
 
 		_multiSelect = config.hasMultiSelection();
 		_selectionModel = _multiSelect ? new DefaultMultiSelectionModel(this) : new DefaultSingleSelectionModel(this);
-
 		_selectionModel.addSelectionListener(this);
-
 		_scene = SceneGraph.create();
-
 		connect(_scene, _selectionModel);
+
+		_typesToObserve = computeTypesToObserve();
 	}
 
 	private void connect(SceneGraph scene, SelectionModel selectionModel) {
@@ -303,16 +375,21 @@ public class ThreeJsComponent extends BuilderComponent
 		boolean result = super.doValidateModel(context);
 
 		if (!_sceneValid) {
-			_nodeByModel.clear();
-			SceneNode root = builder().getModel(getModel(), this);
-			root.visit(this, _nodeByModel);
-			_scene.setRoot(root);
-			_scene.setSelection(addNodesForBusinessObjects(selectionChannel().get(), new ArrayList<>()));
+			buildScene();
+			internalSetSelection(getSelected());
 
 			_sceneValid = true;
 		}
 
 		return result;
+	}
+
+	private void buildScene() {
+		_nodeByModel.clear();
+		_parentNodes.clear();
+		SceneNode root = builder().getModel(getModel(), this);
+		root.visit(_addToIndex, null);
+		_scene.setRoot(root);
 	}
 
 	private SceneBuilder builder() {
@@ -349,8 +426,75 @@ public class ThreeJsComponent extends BuilderComponent
 	}
 
 	@Override
+	protected Set<? extends TLStructuredType> getTypesToObserve() {
+		return _typesToObserve;
+	}
+
+	private Set<TLClass> computeTypesToObserve() {
+		SceneBuilder builder = builder();
+
+		if (builder != null) {
+			return TLModelUtil.getConcreteSubclasses(FilterUtil.filterSet(TLClass.class, builder.getTypesToObserve()));
+		} else {
+			return Collections.emptySet();
+		}
+	}
+
+	@Override
+	protected void handleTLObjectCreations(Stream<? extends TLObject> createdObjects) {
+		updateNodes(createdObjects);
+	}
+
+	@Override
+	protected void handleTLObjectUpdates(Stream<? extends TLObject> updatedObjects) {
+		updateNodes(updatedObjects);
+	}
+
+	private void updateNodes(Stream<? extends TLObject> updatedObjects) {
+		Object selectedObjects = getSelected();
+		SceneBuilder builder = builder();
+
+		updatedObjects
+			.filter(object -> _typesToObserve.contains(object.tType()))
+			.flatMap(object -> builder.getNodesToUpdate(this, object).stream())
+			.distinct()
+			.filter(object -> builder.supportsObject(ThreeJsComponent.this, object))
+			.forEach(object -> update(object));
+
+		internalSetSelection(selectedObjects);
+	}
+
+	private void update(Object object) {
+		SceneNode sceneNode = _nodeByModel.get(object);
+		if (sceneNode == null) {
+			return;
+		}
+
+		SceneNode newNode = builder().createSubtree(object, this);
+		GroupNode parent = _parentNodes.get(sceneNode);
+		if (parent == null) {
+			assert _scene.getRoot() == sceneNode : "Only the root node has no parent.";
+			_nodeByModel.clear();
+			_parentNodes.clear();
+			newNode.visit(_addToIndex, null);
+			_scene.setRoot(newNode);
+		} else {
+			List<SceneNode> contents = parent.getContents();
+			int idx = contents.indexOf(sceneNode);
+			sceneNode.visit(_removeFromIndex, null);
+			contents.set(idx, newNode);
+			newNode.visit(_addToIndex, parent);
+		}
+
+	}
+
+	@Override
 	public void handleNewValue(ComponentChannel sender, Object oldValue, Object newValue) {
 		// Component received a new selection.
+		internalSetSelection(newValue);
+	}
+
+	private void internalSetSelection(Object newValue) {
 		_selectionModel.setSelection(addNodesForBusinessObjects(newValue, new HashSet<>()));
 	}
 
@@ -391,27 +535,6 @@ public class ThreeJsComponent extends BuilderComponent
 		}
 	}
 
-	@Override
-	public Void visit(GroupNode self, Map<Object, SceneNode> arg) {
-		index(self, arg);
-		for (SceneNode child : self.getContents()) {
-			child.visit(this, arg);
-		}
-		return null;
-	}
-
-	@Override
-	public Void visit(PartNode self, Map<Object, SceneNode> arg) {
-		index(self, arg);
-		return null;
-	}
-
-	private void index(SceneNode self, Map<Object, SceneNode> arg) {
-		Object userData = self.getUserData();
-		if (userData != null) {
-			arg.put(userData, self);
-		}
-	}
 
 	@Override
 	public void handleComponentModeChange(boolean editMode) {

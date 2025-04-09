@@ -204,13 +204,11 @@ public class SceneGraph extends de.haumacher.msgbuf.graph.AbstractSharedGraphNod
 		switch (field) {
 			case ROOT__PROP: setRoot(com.top_logic.threed.threejs.scene.SceneNode.readSceneNode(scope, in)); break;
 			case SELECTION__PROP: {
-				java.util.List<com.top_logic.threed.threejs.scene.SceneNode> newValue = new java.util.ArrayList<>();
 				in.beginArray();
 				while (in.hasNext()) {
-					newValue.add(com.top_logic.threed.threejs.scene.SceneNode.readSceneNode(scope, in));
+					addSelection(com.top_logic.threed.threejs.scene.SceneNode.readSceneNode(scope, in));
 				}
 				in.endArray();
-				setSelection(newValue);
 			}
 			break;
 			default: super.readField(scope, in, field);
