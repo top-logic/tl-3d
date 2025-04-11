@@ -306,17 +306,44 @@ class ThreeJsControl {
     this.translateControls.setMode("translate");
     this.translateControls.setSpace("local");
     this.scene.add(this.translateControls);
-    const updateRenderTranslate = () => this.render();
-    this.translateControls.addEventListener('dragging-changed', updateRenderTranslate);
-    this.translateControls.addEventListener('objectChange', updateRenderTranslate);
+    const outer = this;
+    const updateRenderTransform = function() {
+      var lastMatrix = new Matrix4();
+      var lastObject = null
+      return (event) => {
+ 		const object = event.target.object;
+ 		object.updateMatrix();
+ 		const currentMatrix = object.matrix;
+  
+        if (lastObject != object) {
+          // first event
+          lastObject = object;
+          lastMatrix.copy(currentMatrix);
+        } else if (lastMatrix.equals(currentMatrix)) {
+            // dragging start change. Ignore.
+        } else {
+          // Diff since transform
+          const diffMatrix = new Matrix4();
+          diffMatrix.copy(lastMatrix.invert()).multiply(currentMatrix);
 
+          lastMatrix.copy(currentMatrix);
+
+          const transformedObject = object.userData;
+		  // transformedObject is SharedObject.
+          var command = transformedObject.notifyTransform(diffMatrix);
+          outer.sendSceneChanges([command]);
+        }
+        outer.render();
+      };
+    }();
+    this.translateControls.addEventListener('dragging-changed', updateRenderTransform);
+    this.translateControls.addEventListener('objectChange', () => this.render());
     this.rotateControls = new TransformControls(this.camera, this.renderer.domElement);
     this.rotateControls.setMode("rotate");
     this.rotateControls.setSpace("local");
     this.scene.add(this.rotateControls);
-    const updateRenderRotate = () => this.render();
-    this.rotateControls.addEventListener('dragging-changed', updateRenderRotate);
-    this.rotateControls.addEventListener('objectChange', updateRenderRotate);
+    this.rotateControls.addEventListener('dragging-changed', updateRenderTransform);
+    this.rotateControls.addEventListener('objectChange', () => this.render());
 
     this.translateControls.enabled = false;
     this.rotateControls.enabled = false;
@@ -934,6 +961,13 @@ class SharedObject {
   constructor(id) {
     this.id = id;
   }
+  
+  notifyTransform(diffMatrix) {
+    const currentTransformation = toMatrix(this.transform);
+    const newTransformation = currentTransformation.multiply(diffMatrix);
+    this.transform = toTX(newTransformation);
+    return SetProperty.prototype.create(this.id, 'transform', this.transform);
+  }
 }
 
 function matrix(
@@ -981,6 +1015,11 @@ function toMatrix(tx) {
     default:
       throw new Error("Invalid transform array: " + tx);
   }
+}
+
+function toTX(matrix4) {
+  const el = matrix4.elements;
+  return [ el[0], el[4], el[8], el[1], el[5], el[9], el[2],  el[6],  el[10],  el[12],  el[13],  el[14] ];
 }
 
 function transform(zUpRoot, tx) {
