@@ -457,6 +457,7 @@ class ThreeJsControl {
   addAxesHelper(scene) {
     const axesHelper = new AxesHelper(1000);
     scene.add(axesHelper);
+    axesHelper.rotation.x = -Math.PI / 2;
   }
 
   addBoxHelpers() {
