@@ -711,22 +711,30 @@ class ThreeJsControl {
 
   /** Applies the changes in the scene as received from the server. */
   applySceneChanges(changesString) {
-    const changes = JSON.parse(changesString);
-    for (const change of changes) {
-      var command = change[0];
-      var cmdProps = command[1];
+    console.log(changesString);
 
-      var cmd;
-      switch (command[0]) {
-        case 'R': cmd = new RemoveElement(cmdProps["id"]); break;
-        case 'I': cmd = new InsertElement(cmdProps["id"]); break;
-        case 'S': cmd = new SetProperty(cmdProps["id"]); break;
+    try {
+      const changes = JSON.parse(changesString);
+      for (const change of changes) {
+        var command = change[0];
+        var cmdProps = command[1];
+
+        var cmd;
+        switch (command[0]) {
+          case 'R': cmd = new RemoveElement(cmdProps["id"]); break;
+          case 'I': cmd = new InsertElement(cmdProps["id"]); break;
+          case 'S': cmd = new SetProperty(cmdProps["id"]); break;
+        }
+        change.shift();
+        cmd.loadJson(cmdProps, change);
+        cmd.apply(this.scope);
       }
-      change.shift();
-      cmd.loadJson(cmdProps, change);
-      cmd.apply(this.scope);
-	}
-    this.render();
+
+      this.sceneGraph.reload(this.scope);
+    } catch (ex) { 
+      console.error(ex);
+      throw ex;
+    }
   }
 
   /** Changes the selected state of the given shared node to the given value. */
@@ -757,6 +765,23 @@ class ThreeJsControl {
 
     this.enableEditing();
     return command;
+  }
+
+  // applies red color to selected shared objects from the graphScene
+  applySelection(selectedSharedNodes) {
+    console.log('Previous selection:', this.selection);
+    console.log('New selection:', selectedSharedNodes);
+    // remove selection from the previously selected objects
+    for (const shared3JSNode of this.selection) {
+      this.setColor(shared3JSNode.node, 0xffffff);
+    }
+    this.selection = [];
+
+    // apply selection to new objects that have to be selected
+    for (const shared3JSNode of selectedSharedNodes) {
+      this.setColor(shared3JSNode.node, 0xff0000);
+      this.selection.push(shared3JSNode);
+    }
   }
 
   setColor(node, color) {
@@ -835,31 +860,12 @@ class ThreeJsControl {
   }
 
   async loadScene() {
-    const gltfLoader = new GLTFLoader();
-    const loadUrl = (url) =>
-      new Promise((resolve, reject) => {
-        try {
-          gltfLoader.load(url, resolve, null, reject);
-        } catch (err) {
-          const msg = "Failed to load '" + url + "': " + err;
-          console.log(msg);
-          reject(msg);
-        }
-      });
-
     const dataResponse = await fetch(this.dataUrl);
     const dataJson = await dataResponse.json();
 
     this.sceneGraph = this.scope.loadJson(dataJson);
-
-    const assets = this.scope.assets;
-    const urls = assets.flatMap((asset) => this.contextPath + asset.url);
-
-    const gltfs = await Promise.all(urls.flatMap(loadUrl));
-    let n = 0;
-    for (const gltf of gltfs) {
-      assets[n++].gltf = gltf;
-    }
+    await this.scope.loadAssets(this.contextPath);
+    this.sceneGraph.buildGraph(this);
 
     this.zUpRoot.rotation.x = -Math.PI / 2;
     this.scene.add(this.zUpRoot);
@@ -867,8 +873,6 @@ class ThreeJsControl {
     this.camera.updateProjectionMatrix();
     this.updateTransformControls();
 
-    this.sceneGraph.buildGraph(this);
-    
     this.render();
   }
 
@@ -980,9 +984,9 @@ function toMatrix(tx) {
   }
 }
 
-function transform(zUpRoot, tx) {
-  const group = new Group();
-  zUpRoot.add(group);
+function transform(group, tx) {
+  //   const group = new Group();
+  //   zUpRoot.add(group);
   if (tx != null && tx.length > 0) {
     if (tx.length == 3) {
       group.position.set(tx[0], tx[1], tx[2]);
@@ -990,16 +994,18 @@ function transform(zUpRoot, tx) {
       group.applyMatrix4(toMatrix(tx));
     }
   }
-  return group;
+  //   return group;
 }
 
 class Scope {
   constructor() {
-    this.objects = [];
+    this.objects = {};
+    // cache for gltfs by url
+    this.gltfs = {};
   }
 
   get assets() {
-    return this.objects.filter((obj) => obj instanceof GltfAsset);
+    return Object.values(this.objects).filter((obj) => obj instanceof GltfAsset);
   }
 
   getNode(id) {
@@ -1033,6 +1039,40 @@ class Scope {
       throw new Error("Invalid graph specifier: " + json);
     }
   }
+
+  async loadAssets(contextPath) {
+    const gltfLoader = new GLTFLoader();
+
+    const loadUrl = (url) =>
+      new Promise((resolve, reject) => {
+        try {
+          // if gltf for the given url exists in the cache let's return it
+          if (this.gltfs[url]) {
+            resolve(this.gltfs[url]);
+
+            return;
+          }
+
+          gltfLoader.load(url, (gltf) => {
+            // store gltf in the cache
+            this.gltfs[url] = gltf;
+            resolve(gltf);
+          }, null, reject);
+        } catch (err) {
+          const msg = "Failed to load '" + url + "': " + err;
+          console.log(msg);
+          reject(msg);
+        }
+      });
+
+    const assets = this.assets;
+    const urls = assets.flatMap((asset) => contextPath + asset.url);
+    const gltfs = await Promise.all(urls.flatMap(loadUrl));
+    let n = 0;
+    for (const gltf of gltfs) {
+      assets[n++].gltf = gltf;
+    }  
+  }
 }
 
 class SceneGraph extends SharedObject {
@@ -1045,9 +1085,8 @@ class SceneGraph extends SharedObject {
   	
   	this.ctrl = ctrl; 
     for (const sharedNode of this.selection) {
-		ctrl.setSelected(sharedNode, true);
+		  ctrl.setSelected(sharedNode, true);
     }
-
   }
 
   build(zUpRoot) {
@@ -1065,7 +1104,7 @@ class SceneGraph extends SharedObject {
   	  return null;
   	}
   	this.selection.splice(idx, 1);
-	return RemoveElement.prototype.create(this.id, 'selection', idx);
+    return RemoveElement.prototype.create(this.id, 'selection', idx);
   }
   
   addSelected(node) {
@@ -1086,18 +1125,16 @@ class SceneGraph extends SharedObject {
     return SetProperty.prototype.create(this.id, 'selection', []);
   } 
 
-  
   setProperty(scope, property, value) {
   	switch (property) {
   		case 'root': this.root = scope.loadJson(value); break;
   		case 'selection': 
   			this.selection = scope.loadAll(value);
-  			
-  			this.ctrl.clearSelection();
-		    for (const sharedNode of this.selection) {
-				this.ctrl.setSelected(sharedNode, true);
-    		}
-
+        this.ctrl?.applySelection(this.selection);
+        // this.ctrl.clearSelection();
+		    // for (const sharedNode of this.selection) {
+				// this.ctrl.setSelected(sharedNode, true);
+    		// }
   			break; 
   	}
   }
@@ -1105,8 +1142,8 @@ class SceneGraph extends SharedObject {
   insertElementAt(scope, property, idx, value) {
   	switch (property) {
   		case 'selection': 
-  			this.selection.splice(idx, 0, scope.loadJson(value)); 
-			this.ctrl.setSelected(this.selection[idx], true);
+        const sharedObject = scope.loadJson(value);
+  			this.selection.splice(idx, 0, sharedObject); 
   			break; 
   	}
   }
@@ -1114,10 +1151,18 @@ class SceneGraph extends SharedObject {
   removeElementAt(scope, property, idx) {
   	switch (property) {
   		case 'selection': 
-			this.ctrl.setSelected(this.selection[idx], false);
   			this.selection.splice(idx, 1);
   			break; 
   	}
+  }
+
+  reload(scope) {
+    scope.loadAssets(this.ctrl.contextPath).then(() => {
+      this.ctrl.zUpRoot.clear();
+      this.build(this.ctrl.zUpRoot);
+      this.ctrl.applySelection(this.selection);
+      this.ctrl.render();
+    });
   }
 }
 
@@ -1126,8 +1171,11 @@ class GroupNode extends SharedObject {
     super(id);
   }
 
-  build(zUpRoot) {
-    var group = transform(zUpRoot, this.transform);
+  build(parentGroup) {
+    const group = new Group();
+    parentGroup.add(group);
+  
+    transform(group, this.transform);
     this.contents.forEach((c) => c.build(group));
     this.node = group;
   }
@@ -1162,9 +1210,12 @@ class PartNode extends SharedObject {
     super(id);
   }
 
-  build(zUpRoot) {
-    const node = this.asset.build(zUpRoot);
-    var group = transform(zUpRoot, this.transform);
+  build(parentGroup) {
+    const group = new Group();
+    parentGroup.add(group);
+
+    transform(group, this.transform);
+    const node = this.asset.build();
     group.add(node);
 
     // Link to scene node.
@@ -1190,7 +1241,7 @@ class GltfAsset extends SharedObject {
     super(id);
   }
 
-  build(zUpRoot) {
+  build() {
     return this.gltf.scene.clone();
   }
 
