@@ -304,6 +304,7 @@ class ThreeJsControl {
   initTransformControls() {
     this.translateControls = new TransformControls(this.camera, this.renderer.domElement);
     this.translateControls.setMode("translate");
+    this.translateControls.setSpace("local");
     this.scene.add(this.translateControls);
     const updateRenderTranslate = () => this.render();
     this.translateControls.addEventListener('dragging-changed', updateRenderTranslate);
@@ -311,6 +312,7 @@ class ThreeJsControl {
 
     this.rotateControls = new TransformControls(this.camera, this.renderer.domElement);
     this.rotateControls.setMode("rotate");
+    this.rotateControls.setSpace("local");
     this.scene.add(this.rotateControls);
     const updateRenderRotate = () => this.render();
     this.rotateControls.addEventListener('dragging-changed', updateRenderRotate);
