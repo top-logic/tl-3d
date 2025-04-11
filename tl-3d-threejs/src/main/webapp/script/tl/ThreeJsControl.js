@@ -1129,6 +1129,9 @@ class GroupNode extends SharedObject {
   build(zUpRoot) {
     var group = transform(zUpRoot, this.transform);
     this.contents.forEach((c) => c.build(group));
+
+    // Link to scene node.
+    group.userData = this;
     this.node = group;
   }
 
