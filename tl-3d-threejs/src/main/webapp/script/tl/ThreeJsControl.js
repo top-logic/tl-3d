@@ -1242,7 +1242,15 @@ class GltfAsset extends SharedObject {
   }
 
   build() {
-    return this.gltf.scene.clone();
+    const model = this.gltf.scene.clone();
+    model.traverse(obj => {
+      if (obj.isMesh && obj.material) {
+        obj.userData.originalMaterial = obj.material;
+        obj.material = obj.material.clone();
+        obj.material.userData.originalColor = obj.material.color.clone();
+      }
+    });
+    return model;
   }
 
   loadJson(scope, json) {
