@@ -28,7 +28,6 @@ import com.top_logic.basic.config.PolymorphicConfiguration;
 import com.top_logic.basic.config.annotation.Name;
 import com.top_logic.basic.config.annotation.defaults.BooleanDefault;
 import com.top_logic.basic.config.annotation.defaults.ItemDefault;
-import com.top_logic.basic.config.annotation.defaults.StringDefault;
 import com.top_logic.layout.DisplayContext;
 import com.top_logic.layout.channel.ChannelSPI;
 import com.top_logic.layout.channel.ComponentChannel;
@@ -36,7 +35,6 @@ import com.top_logic.layout.channel.ComponentChannel.ChannelListener;
 import com.top_logic.layout.component.Selectable;
 import com.top_logic.layout.component.SelectableWithSelectionModel;
 import com.top_logic.layout.component.model.SelectionListener;
-import com.top_logic.layout.form.component.AbstractApplyCommandHandler;
 import com.top_logic.layout.form.component.Editor;
 import com.top_logic.layout.form.component.edit.EditMode;
 import com.top_logic.layout.structure.ContentLayoutControlProvider;
@@ -56,9 +54,8 @@ import com.top_logic.threed.threejs.scene.GroupNode;
 import com.top_logic.threed.threejs.scene.PartNode;
 import com.top_logic.threed.threejs.scene.SceneGraph;
 import com.top_logic.threed.threejs.scene.SceneNode;
+import com.top_logic.tool.boundsec.AbstractCommandHandler;
 import com.top_logic.tool.boundsec.HandlerResult;
-import com.top_logic.tool.execution.ExecutabilityRule;
-import com.top_logic.tool.execution.InEditModeExecutable;
 
 import de.haumacher.msgbuf.observer.Listener;
 import de.haumacher.msgbuf.observer.Observable;
@@ -93,14 +90,6 @@ public class ThreeJsComponent extends BuilderComponent
 
 		@Name("multiSelection")
 		boolean hasMultiSelection();
-
-		@Override
-		@StringDefault(ApplyTransformCommand.COMMAND_ID)
-		String getApplyCommand();
-
-		@Override
-		@StringDefault(SaveTransformCommand.COMMAND_ID)
-		String getSaveCommand();
 
 		@Override
 		default void modifyIntrinsicCommands(CommandRegistry registry) {
@@ -542,20 +531,26 @@ public class ThreeJsComponent extends BuilderComponent
 	}
 
 
-	public static class ApplyTransformCommand extends AbstractApplyCommandHandler {
+	/**
+	 * Apply command for the {@link ThreeJsComponent}.
+	 */
+	public static class ApplyTransformCommand extends AbstractCommandHandler {
 
-		public interface Config extends AbstractApplyCommandHandler.Config {
+		/**
+		 * Configuration of the {@link ApplyTransformCommand}.
+		 */
+		public interface Config extends AbstractCommandHandler.Config {
 			// No additional properties.
 		}
 
-		@Override
-		@Deprecated
-		public ExecutabilityRule createExecutabilityRule() {
-			return InEditModeExecutable.INSTANCE;
-		}
-
+		/**
+		 * Default command id for {@link ApplyTransformCommand}.
+		 */
         public static final String COMMAND_ID = "applyTransform";
 
+		/**
+		 * Creates a {@link ApplyTransformCommand}.
+		 */
         public ApplyTransformCommand(InstantiationContext context, Config config) {
 			super(context, config);
         }
@@ -568,22 +563,4 @@ public class ThreeJsComponent extends BuilderComponent
 		}
     }
 
-	public static class SaveTransformCommand extends ApplyTransformCommand {
-
-		// Constants
-
-		/** ID of this handler. */
-		public static final String COMMAND_ID = "saveTransform";
-
-		public SaveTransformCommand(InstantiationContext context, Config config) {
-	        	super(context, config);
-	        }
-
-		@Override
-		public HandlerResult handleCommand(DisplayContext aContext, LayoutComponent aComponent, Object model,
-				Map<String, Object> someArguments) {
-
-			return HandlerResult.DEFAULT_RESULT;
-		}
-	}
 }

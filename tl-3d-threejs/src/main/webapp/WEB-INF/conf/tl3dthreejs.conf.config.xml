@@ -45,9 +45,7 @@
 			<instance>
 				<handlers>
 					<handler id="applyTransform" class="com.top_logic.threed.threejs.component.ThreeJsComponent$ApplyTransformCommand" 
-						clique="apply"/>
-					<handler id="saveTransform" class="com.top_logic.threed.threejs.component.ThreeJsComponent$SaveTransformCommand" 
-						clique="save"/>
+						clique="apply" group="Write" executability="GeneralApply"/>
 				</handlers>
 			</instance>		
 		</config>
