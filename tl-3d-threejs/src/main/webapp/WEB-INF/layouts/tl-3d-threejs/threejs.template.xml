@@ -56,6 +56,7 @@
 	</properties>
 
 	<component class="com.top_logic.threed.threejs.component.ThreeJsComponent"
+		apply-script="${applyScript}"
 		applyCommand="applyTransform"
 		defaultFor="${defaultFor}"
 		dialogs="${dialogs}"
@@ -63,7 +64,6 @@
 		modelBuilder="${modelBuilder}"
 		multiSelection="${multiSelection}"
 		name="3DView"
-		apply-script="${applyScript}"
 		securityObject="${securityObject}"
 		securityProviderClass="${securityProviderClass}"
 		selection="${selection}"
@@ -72,17 +72,22 @@
 		<buttons>
 			${buttons}
 			<include name="templates/editComponentCommands.xml"/>
-			<button id="rorateMode"
+			<button id="rotateMode"
 				activeCssClasses=""
 				activeImage="css:fa-solid fa-arrow-rotate-right"
 				class="com.top_logic.threed.threejs.component.ToggleRotateAxes"
+				executability="InEditMode"
 				group="System"
 				image="css:fa-solid fa-arrow-right-arrow-left"
 			>
 				<resourceKey key="dynamic.67bd3d24-fa90-40ee-a975-1f5c255a824e">
-					<de>Schieben-Drehen</de>
-					<en>Move-Rotate</en>
+					<de>Schieben</de>
+					<en>Move</en>
 				</resourceKey>
+				<activeResourceKey key="dynamic.ff181d05-3e29-4f2d-9e61-0226a489105e">
+					<de>Drehen</de>
+					<en>Rotate</en>
+				</activeResourceKey>
 			</button>
 			<button id="addWorkplane"
 				activeImage="css:bi bi-grid-3x3 tl-danger"
@@ -91,9 +96,13 @@
 				image="css:bi bi-grid-3x3"
 			>
 				<resourceKey key="dynamic.4f78bb6c-0176-41e6-ba2a-6426d5b04562">
-					<de>Arbeitsebene</de>
-					<en>Workplane</en>
+					<de>Arbeitsebene einblenden</de>
+					<en>Show workplane</en>
 				</resourceKey>
+				<activeResourceKey key="dynamic.9f925589-c31d-4493-bb14-a127a5d4d020">
+					<de>Arbeitsebene ausblenden</de>
+					<en>Hide workplane</en>
+				</activeResourceKey>
 			</button>
 			<button id="zoomToSelection"
 				class="com.top_logic.threed.threejs.component.ZoomToSelectionCommand"
