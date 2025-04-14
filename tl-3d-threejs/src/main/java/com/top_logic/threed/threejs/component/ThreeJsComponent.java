@@ -25,9 +25,11 @@ import com.top_logic.basic.col.FilterUtil;
 import com.top_logic.basic.config.ConfigurationException;
 import com.top_logic.basic.config.InstantiationContext;
 import com.top_logic.basic.config.PolymorphicConfiguration;
+import com.top_logic.basic.config.annotation.Label;
 import com.top_logic.basic.config.annotation.Name;
 import com.top_logic.basic.config.annotation.defaults.BooleanDefault;
 import com.top_logic.basic.config.annotation.defaults.ItemDefault;
+import com.top_logic.knowledge.service.Transaction;
 import com.top_logic.layout.DisplayContext;
 import com.top_logic.layout.channel.ChannelSPI;
 import com.top_logic.layout.channel.ComponentChannel;
@@ -36,6 +38,7 @@ import com.top_logic.layout.component.Selectable;
 import com.top_logic.layout.component.SelectableWithSelectionModel;
 import com.top_logic.layout.component.model.SelectionListener;
 import com.top_logic.layout.form.component.Editor;
+import com.top_logic.layout.form.component.TransactionHandler;
 import com.top_logic.layout.form.component.edit.EditMode;
 import com.top_logic.layout.structure.ContentLayoutControlProvider;
 import com.top_logic.layout.structure.LayoutControlProvider;
@@ -48,6 +51,8 @@ import com.top_logic.mig.html.layout.LayoutComponent;
 import com.top_logic.model.TLClass;
 import com.top_logic.model.TLObject;
 import com.top_logic.model.TLStructuredType;
+import com.top_logic.model.search.expr.config.dom.Expr;
+import com.top_logic.model.search.expr.query.QueryExecutor;
 import com.top_logic.model.util.TLModelUtil;
 import com.top_logic.threed.threejs.control.ThreeJsControl;
 import com.top_logic.threed.threejs.scene.GroupNode;
@@ -90,6 +95,13 @@ public class ThreeJsComponent extends BuilderComponent
 
 		@Name("multiSelection")
 		boolean hasMultiSelection();
+
+		/**
+		 * The operation that takes the changes from the client and applies whem to the business
+		 * objects.
+		 */
+		@Label("Store operation")
+		Expr getApplyScript();
 
 		@Override
 		default void modifyIntrinsicCommands(CommandRegistry registry) {
@@ -138,6 +150,52 @@ public class ThreeJsComponent extends BuilderComponent
 	private ThreeJsControl _control;
 	
 	private Set<? extends TLStructuredType> _typesToObserve;
+
+	private final Set<SceneNode> _transformedNodes = new HashSet<>();
+
+	private final AllNodesObserver _transformListener = new AllNodesObserver() {
+
+		@Override
+		public void beforeSet(Observable obj, String property, Object value) {
+			super.beforeSet(obj, property, value);
+			storeTransformed((SceneNode) obj, property);
+		}
+
+		@Override
+		public void beforeAdd(Observable obj, String property, int index, Object element) {
+			super.beforeAdd(obj, property, index, element);
+			storeTransformed((SceneNode) obj, property);
+		}
+
+		@Override
+		public void beforeAdd(Observable obj, String property, Object index, Object element) {
+			super.beforeAdd(obj, property, index, element);
+			storeTransformed((SceneNode) obj, property);
+		}
+
+		@Override
+		public void afterRemove(Observable obj, String property, int index, Object element) {
+			super.afterRemove(obj, property, index, element);
+			storeTransformed((SceneNode) obj, property);
+		}
+
+		@Override
+		public void afterRemove(Observable obj, String property, Object index, Object element) {
+			super.afterRemove(obj, property, index, element);
+			storeTransformed((SceneNode) obj, property);
+		}
+
+		private void storeTransformed(SceneNode changed, String property) {
+			switch (property) {
+				case SceneNode.TRANSFORM__PROP:
+					if (isInEditMode()) {
+						_transformedNodes.add(changed);
+					}
+			}
+		}
+
+
+	};
 
 	private SceneNode.Visitor<Void, GroupNode, RuntimeException> _addToIndex = new SceneNode.Visitor<>() {
 
@@ -203,6 +261,8 @@ public class ThreeJsComponent extends BuilderComponent
 
 	};
 
+	private QueryExecutor _applyScript;
+
 	/**
 	 * Creates a {@link ThreeJsComponent}.
 	 */
@@ -214,8 +274,29 @@ public class ThreeJsComponent extends BuilderComponent
 		_selectionModel.addSelectionListener(this);
 		_scene = SceneGraph.create();
 		connect(_scene, _selectionModel);
+		_scene.registerListener(new Listener() {
+
+			@Override
+			public void beforeSet(Observable obj, String property, Object value) {
+				switch (property) {
+					case SceneGraph.ROOT__PROP: {
+						SceneGraph scene = (SceneGraph) obj;
+						SceneNode oldRoot = scene.getRoot();
+						if (oldRoot != null) {
+							_transformListener.unregisterRecursive(oldRoot);
+						}
+						if (value != null) {
+							_transformListener.registerRecursive((SceneNode) value);
+						}
+					}
+				}
+			}
+
+		});
 
 		_typesToObserve = computeTypesToObserve();
+
+		_applyScript = QueryExecutor.compileOptional(config.getApplyScript());
 	}
 
 	private void connect(SceneGraph scene, SelectionModel selectionModel) {
@@ -348,7 +429,7 @@ public class ThreeJsComponent extends BuilderComponent
 	protected void afterModelSet(Object oldModel, Object newModel) {
 		super.afterModelSet(oldModel, newModel);
 
-		_sceneValid = false;
+		invalidateScene();
 	}
 
 	ThreeJsControl getThreeJSControl() {
@@ -388,7 +469,11 @@ public class ThreeJsComponent extends BuilderComponent
 	@Override
 	public void invalidate() {
 		super.invalidate();
-		_sceneValid = false;
+		invalidateScene();
+	}
+
+	private boolean invalidateScene() {
+		return _sceneValid = false;
 	}
 
 	/**
@@ -528,13 +613,46 @@ public class ThreeJsComponent extends BuilderComponent
 	@Override
 	public void handleComponentModeChange(boolean editMode) {
 		getThreeJSControl().setIsInEditMode(editMode);
+		if (!editMode) {
+			if (!_transformedNodes.isEmpty()) {
+				// Ensure UI is resetted
+				_transformedNodes.clear();
+
+				invalidateScene();
+			}
+		}
 	}
+	
+	HandlerResult applyTransformation() {
+		HandlerResult result = applyTransformation(_transformedNodes);
+		if (result.isSuccess()) {
+			// Reset changed nodes.
+			_transformedNodes.clear();
+		}
+		return result;
+	}
+
+	/**
+	 * Applies the transformation.
+	 *
+	 * @param transformedNodes
+	 *        The actually transformed nodes. May be empty, when no changes happened.
+	 */
+	protected HandlerResult applyTransformation(Set<SceneNode> transformedNodes) {
+		if (!transformedNodes.isEmpty()) {
+			if (_applyScript != null) {
+				_applyScript.execute(transformedNodes, getModel());
+			}
+		}
+		return HandlerResult.DEFAULT_RESULT;
+	}
+
 
 
 	/**
 	 * Apply command for the {@link ThreeJsComponent}.
 	 */
-	public static class ApplyTransformCommand extends AbstractCommandHandler {
+	public static class ApplyTransformCommand extends AbstractCommandHandler implements TransactionHandler {
 
 		/**
 		 * Configuration of the {@link ApplyTransformCommand}.
@@ -558,8 +676,14 @@ public class ThreeJsComponent extends BuilderComponent
 		@Override
 		public HandlerResult handleCommand(DisplayContext aContext, LayoutComponent aComponent,
 				Object model, Map<String, Object> someArguments) {
+			try (Transaction tx = beginTransaction(model)) {
+				HandlerResult result = ((ThreeJsComponent) aComponent).applyTransformation();
+				if (result.isSuccess()) {
+					tx.commit();
+				}
+				return result;
+			}
 
-			return HandlerResult.DEFAULT_RESULT;
 		}
     }
 

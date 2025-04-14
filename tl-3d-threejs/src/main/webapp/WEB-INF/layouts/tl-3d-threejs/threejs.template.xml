@@ -44,6 +44,9 @@
 			<options fun="com.top_logic.layout.form.values.edit.DefaultSecurityProviderKeys"/>
 			<hidden/>
 		</property>
+		<property name="applyScript"
+			type="com.top_logic.model.search.expr.config.dom.Expr"
+		/>
 		<property name="buttons"
 			element-type="com.top_logic.tool.boundsec.CommandHandler$ConfigBase"
 			type="List"
@@ -60,6 +63,7 @@
 		modelBuilder="${modelBuilder}"
 		multiSelection="${multiSelection}"
 		name="3DView"
+		apply-script="${applyScript}"
 		securityObject="${securityObject}"
 		securityProviderClass="${securityProviderClass}"
 		selection="${selection}"
