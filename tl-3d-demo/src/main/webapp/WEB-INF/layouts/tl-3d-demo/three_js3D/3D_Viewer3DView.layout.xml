@@ -34,7 +34,7 @@
 		<applyScript><![CDATA[changedNodes -> model -> {
   $changedNodes.foreach(node -> {
     newTransformation = $node.threejsAccess("transform");
-    $node.threejsAccess("userData").set(`tl.threed.demo:Node#tx`, transform($newTransformation[0],$newTransformation[1],$newTransformation[2],$newTransformation[3],$newTransformation[4],$newTransformation[5],$newTransformation[6],$newTransformation[7],$newTransformation[8],$newTransformation[9],$newTransformation[10],$newTransformation[11]));
+    $node.threejsAccess("userData").set(`tl.threed.demo:Node#tx`, transform($newTransformation));
   });
 }]]></applyScript>
 		<buttons>
