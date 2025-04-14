@@ -79,17 +79,26 @@ public class TransformationConstructor extends GenericMethod {
 	}
 
 	private static Transformation asTx(SearchExpression self, Collection<?> coll) {
+		if (coll.isEmpty()) {
+			throw new TopLogicException(
+				I18NConstants.ERROR_INVALID_NUMBER_OF_TRANSFORMATION_ARGUMENTS__ACTUAL.fill(coll.size()));
+		}
 		Iterator<?> it = coll.iterator();
+		Object first = it.next();
+		if (first instanceof Collection) {
+			// Eventually shortcut. See below.
+			return asTx(self, first);
+		}
 
 		switch (coll.size()) {
 			case 3: {
-				double x = asDouble(self, it.next());
+				double x = asDouble(self, first);
 				double y = asDouble(self, it.next());
 				double z = asDouble(self, it.next());
 				return Transformation.translate(x, y, z);
 			}
 			case 9: {
-				double a = asDouble(self, it.next());
+				double a = asDouble(self, first);
 				double b = asDouble(self, it.next());
 				double c = asDouble(self, it.next());
 				double d = asDouble(self, it.next());
@@ -98,14 +107,13 @@ public class TransformationConstructor extends GenericMethod {
 				double g = asDouble(self, it.next());
 				double h = asDouble(self, it.next());
 				double i = asDouble(self, it.next());
-				return new Transformation(
+				return Transformation.rotate(
 					a, b, c,
 					d, e, f,
-					g, h, i,
-					0, 0, 0);
+					g, h, i);
 			}
 			case 12: {
-				double a = asDouble(self, it.next());
+				double a = asDouble(self, first);
 				double b = asDouble(self, it.next());
 				double c = asDouble(self, it.next());
 				double d = asDouble(self, it.next());

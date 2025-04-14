@@ -195,16 +195,28 @@ public class Transformation extends MapLike {
 	}
 
 	/**
+	 * A pure translation.
+	 */
+	public static Transformation rotate(double a, double b, double c, double d, double e, double f, double g, double h,
+			double i) {
+		return new Transformation(
+			a, b, c,
+			d, e, f,
+			g, h, i,
+			0, 0, 0);
+	}
+
+	/**
 	 * A rotation along the X axis.
 	 */
 	public static Transformation rotateX(double a) {
 		double cosa = cos(a);
 		double sina = sin(a);
 		return new Transformation(
-			1, 0, 0,
+			1,    0,     0,
 			0, cosa, -sina,
-			0, sina, cosa,
-			0, 0, 0);
+			0, sina,  cosa,
+			0,    0,     0);
 	}
 
 	/**
@@ -214,13 +226,11 @@ public class Transformation extends MapLike {
 		double cosa = cos(a);
 		double sina = sin(a);
 		return new Transformation(
-			cosa, 0, sina,
-			0, 1, 0,
+			 cosa, 0, sina,
+			    0, 1,    0,
 			-sina, 0, cosa,
-			0, 0, 0);
+			    0, 0,    0);
 	}
-
-	// TODO SFO inverse..
 
 	/**
 	 * A rotation along the Z axis.
@@ -230,9 +240,9 @@ public class Transformation extends MapLike {
 		double sina = sin(a);
 		return new Transformation(
 			cosa, -sina, 0,
-			sina, cosa, 0,
-			0, 0, 1,
-			0, 0, 0);
+			sina,  cosa, 0,
+			   0,     0, 1,
+			   0,     0, 0);
 	}
 
 	//
