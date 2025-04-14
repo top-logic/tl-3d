@@ -10,8 +10,7 @@
 			<layout-reference resource="tl-3d-demo/scenes/szenenTable.layout.xml">
 				<layoutInfo size="200px"/>
 			</layout-reference>
-			<layout-reference resource="tl-3d-demo/scenes/scene_GraphGrid.layout.xml">
-			</layout-reference>
+			<layout-reference resource="tl-3d-demo/scenes/scene_GraphGrid.layout.xml"/>
 		</components>
 	</arguments>
 </config:template-call>

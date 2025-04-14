@@ -53,43 +53,46 @@
 	</properties>
 
 	<component class="com.top_logic.threed.threejs.component.ThreeJsComponent"
-		name="3DView"
-		securityObject="${securityObject}"
-		securityProviderClass="${securityProviderClass}"
-		titleKey="${name}"
-		modelBuilder="${modelBuilder}"
+		applyCommand="applyTransform"
 		defaultFor="${defaultFor}"
 		dialogs="${dialogs}"
 		model="${model}"
-		selection="${selection}"
+		modelBuilder="${modelBuilder}"
 		multiSelection="${multiSelection}"
-		applyCommand="applyTransform"
+		name="3DView"
+		securityObject="${securityObject}"
+		securityProviderClass="${securityProviderClass}"
+		selection="${selection}"
+		titleKey="${name}"
 	>
 		<buttons>
 			${buttons}
 			<include name="templates/editComponentCommands.xml"/>
-			<button id="rorateMode" class="com.top_logic.threed.threejs.component.ToggleRotateAxes"
+			<button id="rorateMode"
+				activeCssClasses=""
+				activeImage="css:fa-solid fa-arrow-rotate-right"
+				class="com.top_logic.threed.threejs.component.ToggleRotateAxes"
 				group="System"
 				image="css:fa-solid fa-arrow-right-arrow-left"
-				activeImage="css:fa-solid fa-arrow-rotate-right"
-				activeCssClasses=""
 			>
 				<resourceKey key="dynamic.67bd3d24-fa90-40ee-a975-1f5c255a824e">
 					<de>Schieben-Drehen</de>
 					<en>Move-Rotate</en>
 				</resourceKey>
 			</button>
-			<button id="addWorkplane" class="com.top_logic.threed.threejs.component.ToggleWorkplaneCommand"
+			<button id="addWorkplane"
+				activeImage="css:bi bi-grid-3x3 tl-danger"
+				class="com.top_logic.threed.threejs.component.ToggleWorkplaneCommand"
 				group="System"
 				image="css:bi bi-grid-3x3"
-				activeImage="css:bi bi-grid-3x3 tl-danger"
 			>
 				<resourceKey key="dynamic.4f78bb6c-0176-41e6-ba2a-6426d5b04562">
 					<de>Arbeitsebene</de>
 					<en>Workplane</en>
 				</resourceKey>
 			</button>
-			<button id="zoomToSelection" class="com.top_logic.threed.threejs.component.ZoomToSelectionCommand"
+			<button id="zoomToSelection"
+				class="com.top_logic.threed.threejs.component.ZoomToSelectionCommand"
 				group="System"
 				image="css:bi bi-zoom-in"
 			>
@@ -98,15 +101,17 @@
 					<en>Fly to selection</en>
 				</resourceKey>
 			</button>
-			<button id="zoomOutFromSelection" class="com.top_logic.threed.threejs.component.ZoomOutFromSelectionCommand"
+			<button id="zoomOutFromSelection"
+				class="com.top_logic.threed.threejs.component.ZoomOutFromSelectionCommand"
 				group="System"
-				image="css:bi bi-zoom-out">
+				image="css:bi bi-zoom-out"
+			>
 				<resourceKey key="dynamic.329fc91e-90e5-4f67-869b-ad52c2216dae">
 					<de>Vom Selektion weg fliegen</de>
 					<en>Zoom out from selection</en>
 				</resourceKey>
 			</button>
-			
+
 			<include name="templates/editComponentCommands.xml"/>
 		</buttons>
 	</component>
