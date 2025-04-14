@@ -361,11 +361,8 @@ class ThreeJsControl {
   }
 
   enableEditing() {
-    if (this.isEditMode && this.selection.length > 0) {
-      const object = this.selection[0]?.node;
-      this.activateControl(object);
-      this.controls.enabled = false;
-    }
+    this.updateTransformControls();
+    this.controls.enabled = false;
   }
   
   disableEditing() {
@@ -396,10 +393,7 @@ class ThreeJsControl {
     }
 
     this.isRotateMode = enable;
-
-    const object = this.selection[0]?.node;
-    this.activateControl(object);
-
+    this.updateTransformControls();
     this.render(); 
   }
 
@@ -413,14 +407,9 @@ class ThreeJsControl {
   }
 
   updateTransformControls() {
-    const controls = this.isRotateMode ? this.rotateControls : this.translateControls;
-
-    if (controls && controls.object) {
-      const objectPosition = new Vector3();
-      controls.object.getWorldPosition(objectPosition);
-  
-      controls.position.copy(objectPosition);
-      controls.updateMatrixWorld();
+    if (this.isEditMode && this.selection.length) {
+      const object = this.selection[0].node;
+      this.activateControl(object);
     }
   }  
 
@@ -1191,6 +1180,7 @@ class SceneGraph extends SharedObject {
       this.ctrl.zUpRoot.clear();
       this.build(this.ctrl.zUpRoot);
       this.ctrl.applySelection(this.selection);
+      this.ctrl.updateTransformControls();
       this.ctrl.render();
     });
   }
