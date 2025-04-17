@@ -50,6 +50,7 @@ class ThreeJsControl {
     this.scope = new Scope();
  
     this.zUpRoot = new Group();
+    this.multiTransformGroup = new Group();
     this.initScene();
     this.initAxesCubeScene();
     this.initRenderer();
@@ -79,6 +80,11 @@ class ThreeJsControl {
     this.createCamera();
     this.addLights();
     this.addAxesHelper(this.scene);
+
+    this.zUpRoot.rotation.x = -Math.PI / 2;
+    this.scene.add(this.zUpRoot);
+    this.multiTransformGroup.rotation.x = -Math.PI / 2;
+    this.scene.add(this.multiTransformGroup);
   }
 
   initRenderer() {
@@ -302,40 +308,43 @@ class ThreeJsControl {
   }
 
   initTransformControls() {
+    const outer = this;
     this.translateControls = new TransformControls(this.camera, this.renderer.domElement);
     this.translateControls.setMode("translate");
     this.translateControls.setSpace("local");
     this.scene.add(this.translateControls);
-    const outer = this;
+
     const updateRenderTransform = function() {
-      var lastMatrix = new Matrix4();
-      var lastObject = null
+      let lastMatrix = new Matrix4();
+
       return (event) => {
- 		const object = event.target.object;
- 		object.updateMatrix();
- 		const currentMatrix = object.matrix;
-  
-        if (lastObject != object) {
-          // first event
-          lastObject = object;
-          lastMatrix.copy(currentMatrix);
-        } else if (lastMatrix.equals(currentMatrix)) {
-            // dragging start change. Ignore.
-        } else {
-          // Diff since transform
-          const diffMatrix = new Matrix4();
-          diffMatrix.copy(lastMatrix.invert()).multiply(currentMatrix);
+        // Disable/Enable orbit controls when drag starts/ends
+        outer.controls.enabled = !event.value;
 
-          lastMatrix.copy(currentMatrix);
+        const multiGroup = event.target.object;
+        multiGroup.updateMatrix();
 
-          const transformedObject = object.userData;
-		  // transformedObject is SharedObject.
-          var command = transformedObject.notifyTransform(diffMatrix);
-          outer.sendSceneChanges([command]);
+        const currentMatrix = multiGroup.matrix.clone();
+
+        // Drag started when event.value is true
+        if (event.value) {
+          lastMatrix.copy(currentMatrix);
+          return;
         }
-        outer.render();
+
+        // Drag ended when event.value is false
+        const diffMatrix = new Matrix4();
+        diffMatrix.copy(lastMatrix.clone().invert()).multiply(currentMatrix);
+        
+        // re-map shared nodes from selection arrat to array of commands
+        const commands = outer.selection.map(sharedNode => 
+            sharedNode.notifyTransform(diffMatrix.clone())
+        );
+
+        outer.sendSceneChanges(commands);
       };
     }();
+
     this.translateControls.addEventListener('dragging-changed', updateRenderTransform);
     this.translateControls.addEventListener('objectChange', () => this.render());
     this.rotateControls = new TransformControls(this.camera, this.renderer.domElement);
@@ -347,6 +356,106 @@ class ThreeJsControl {
 
     this.translateControls.enabled = false;
     this.rotateControls.enabled = false;
+  }
+
+  /**
+   * Syncs the content of multiTransformGroup and selected shared objects
+   */
+  updateTransformControls() {
+    // Restores original object positions in the scheneGraph (zUpRoot group)
+    this.restoreMultiGroup();
+    // Hides transform controls
+    this.deactivateControl();
+
+    if (this.isEditMode && this.selection.length) {
+      this.activateControl(this.multiTransformGroup);
+      this.prepareMultiGroup();
+    }
+  }
+
+  prepareMultiGroup() {
+    const box = new Box3();
+    const center = new Vector3();
+    this.multiTransformGroup.clear();
+    // reset group position to 0,0,0 before moving selected nodes in it
+    this.multiTransformGroup.position.set(0, 0, 0);
+    this.multiTransformGroup.updateMatrixWorld(true);
+
+    // will update matrixWorld for all nodes in the scheneGraph including selected
+    this.zUpRoot.updateMatrixWorld(true);
+  
+    for (const sharedNode of this.selection) {
+      const node = sharedNode.node;
+      // save the current parent to be able to restore the node in zUpRoot later
+      node.previousParent = node.parent;
+
+      const worldMatrix = node.matrixWorld.clone();
+      // adding an object to a multiTransformGroup
+      this.multiTransformGroup.add(node);
+
+      // calculate the local matrix of the node relative to the new group so that it does not move visually
+      const inverseGroupMatrix = new Matrix4().copy(this.multiTransformGroup.matrixWorld).invert();
+      const localMatrix = new Matrix4().multiplyMatrices(inverseGroupMatrix, worldMatrix);
+
+      // fix the node matrix
+      node.matrixAutoUpdate = false;
+      node.matrix.copy(localMatrix);
+      node.updateMatrixWorld(true);
+
+      // expand the bounding box for the group
+      box.expandByObject(node);
+    }
+
+    // get visual "center" of the multiTransformGroup and position transformControls to it
+    box.getCenter(center);
+    this.transformControls.position.copy(center);
+  }  
+
+  restoreMultiGroup() {
+    this.multiTransformGroup.updateMatrixWorld(true);
+
+    for (const node of this.multiTransformGroup.children.slice()) {
+      // if node was moved from zUpRoot to multiTransformGroup 
+      // then .previousParent should be defined and point to the previous parent node in zUpRoot
+      if (node.previousParent) {
+        const worldMatrix = node.matrixWorld.clone();
+  
+        node.previousParent.add(node);
+        node.updateMatrixWorld(true);
+  
+        const parentInverse = new Matrix4().copy(node.parent.matrixWorld).invert();
+        const localMatrix = new Matrix4().multiplyMatrices(parentInverse, worldMatrix);
+  
+        // recalculate node's position relative to the node.previousParent
+        node.matrixAutoUpdate = false;
+        node.matrix.copy(localMatrix);
+        node.updateMatrixWorld(true);
+  
+        delete node.previousParent;
+      }
+    }
+
+    // after all nodes are moved back to zUpRoot
+    // we can clear the group
+    this.multiTransformGroup.clear();
+  }
+
+  get transformControls() {
+    return this.isRotateMode ? this.rotateControls : this.translateControls;
+  }
+
+  activateControl(object) {
+    if (object) {
+      this.transformControls.enabled = true;
+      this.transformControls.attach(object);
+      this.render();
+    }
+  }
+
+  deactivateControl() {
+    this.transformControls.enabled = false;
+    this.transformControls.detach();
+    this.render();
   }
 
   toggleEditMode(editing) {
@@ -362,7 +471,6 @@ class ThreeJsControl {
 
   enableEditing() {
     this.updateTransformControls();
-    this.controls.enabled = false;
   }
   
   disableEditing() {
@@ -375,8 +483,8 @@ class ThreeJsControl {
       this.rotateControls.detach();
       this.rotateControls.enabled = false;
     }
-  
-    this.controls.enabled = true;
+
+    this.updateTransformControls();
   }
 
   toggleRotateMode(enable) {
@@ -396,23 +504,7 @@ class ThreeJsControl {
     this.updateTransformControls();
     this.render(); 
   }
-
-  activateControl(object) {
-    if (object) {
-      const controls = this.isRotateMode ? this.rotateControls : this.translateControls;
-      controls.enabled = true;
-      controls.attach(object);
-      this.render();
-    }
-  }
-
-  updateTransformControls() {
-    if (this.isEditMode && this.selection.length) {
-      const object = this.selection[0].node;
-      this.activateControl(object);
-    }
-  }  
-
+ 
   createDetailedGrid(size) {
     const z = 0;
     const edge = size / 2;
@@ -780,7 +872,8 @@ class ThreeJsControl {
       command = this.sceneGraph.addSelected(sharedNode); 
     }
 
-    this.enableEditing();
+    this.updateTransformControls();
+
     return command;
   }
 
@@ -882,8 +975,6 @@ class ThreeJsControl {
     await this.scope.loadAssets(this.contextPath);
     this.sceneGraph.buildGraph(this);
 
-    this.zUpRoot.rotation.x = -Math.PI / 2;
-    this.scene.add(this.zUpRoot);
     this.camera.position.applyMatrix4(this.scene.matrix);
     this.camera.updateProjectionMatrix();
     this.updateTransformControls();
@@ -1104,13 +1195,12 @@ class SceneGraph extends SharedObject {
     super(id);
   }
   
-  buildGraph(ctrl) {
-  	this.build(ctrl.zUpRoot);
-  	
+  buildGraph(ctrl) {  	
   	this.ctrl = ctrl; 
-    for (const sharedNode of this.selection) {
-		  ctrl.setSelected(sharedNode, true);
-    }
+
+  	this.build(ctrl.zUpRoot);
+    this.ctrl.applySelection(this.selection);
+    this.ctrl.updateTransformControls();
   }
 
   build(zUpRoot) {
@@ -1178,6 +1268,7 @@ class SceneGraph extends SharedObject {
   reload(scope) {
     scope.loadAssets(this.ctrl.contextPath).then(() => {
       this.ctrl.zUpRoot.clear();
+      this.ctrl.multiTransformGroup.clear();
       this.build(this.ctrl.zUpRoot);
       this.ctrl.applySelection(this.selection);
       this.ctrl.updateTransformControls();
