@@ -313,26 +313,29 @@ class ThreeJsControl {
     this.translateControls.setMode("translate");
     this.translateControls.setSpace("local");
     this.scene.add(this.translateControls);
-
+  
     const updateRenderTransform = function() {
       let lastMatrix = new Matrix4();
-
+      let lastObject = null;
+  
       return (event) => {
-        // Disable/Enable orbit controls when drag starts/ends
+        // disable/enable orbit controls when drag starts/ends
         outer.controls.enabled = !event.value;
-
-        const multiGroup = event.target.object;
-        multiGroup.updateMatrix();
-
-        const currentMatrix = multiGroup.matrix.clone();
-
-        // Drag started when event.value is true
-        if (event.value) {
-          lastMatrix.copy(currentMatrix);
-          return;
-        }
-
-        // Drag ended when event.value is false
+  
+        const object = event.target.object;
+  
+        if (object === outer.multiTransformGroup) {
+          // MULTI-SELECT MODE
+          object.updateMatrix(); 
+          const currentMatrix = object.matrix.clone();
+  
+          // drag started when event.value is true
+          if (event.value) {
+            lastMatrix.copy(currentMatrix);
+            return;
+          }
+  
+        // drag ended when event.value is false
         const diffMatrix = new Matrix4();
         diffMatrix.copy(lastMatrix.clone().invert()).multiply(currentMatrix);
         
@@ -340,42 +343,84 @@ class ThreeJsControl {
         const commands = outer.selection.map(sharedNode => 
             sharedNode.notifyTransform(diffMatrix.clone())
         );
-
-        outer.sendSceneChanges(commands);
+  
+          outer.sendSceneChanges(commands);
+        } else {
+          // SINGLE OBJECT MODE
+          object.updateMatrixWorld(true); 
+          const currentMatrix = object.matrix.clone();
+  
+          if (event.value) {
+            lastMatrix.copy(currentMatrix);
+            lastObject = object;
+            return;
+          }
+  
+          const diffMatrix = new Matrix4();
+          diffMatrix.copy(lastMatrix.clone().invert()).multiply(currentMatrix);
+  
+          const sharedObject = outer.selection[0]; 
+          if (sharedObject) {
+            const commands = [sharedObject.notifyTransform(diffMatrix)];
+            outer.sendSceneChanges(commands);
+          }
+        }
+  
+        outer.render();
       };
     }();
-
-    this.translateControls.addEventListener('dragging-changed', updateRenderTransform);
-    this.translateControls.addEventListener('objectChange', () => this.render());
-    this.rotateControls = new TransformControls(this.camera, this.renderer.domElement);
-    this.rotateControls.setMode("rotate");
-    this.rotateControls.setSpace("local");
-    this.scene.add(this.rotateControls);
-    this.rotateControls.addEventListener('dragging-changed', updateRenderTransform);
-    this.rotateControls.addEventListener('objectChange', () => this.render());
-
-    this.translateControls.enabled = false;
-    this.rotateControls.enabled = false;
+  
+      this.translateControls.addEventListener('dragging-changed', updateRenderTransform);
+      this.translateControls.addEventListener('objectChange', () => this.render());
+      this.rotateControls = new TransformControls(this.camera, this.renderer.domElement);
+      this.rotateControls.setMode("rotate");
+      this.rotateControls.setSpace("local");
+      this.scene.add(this.rotateControls);
+      this.rotateControls.addEventListener('dragging-changed', updateRenderTransform);
+      this.rotateControls.addEventListener('objectChange', () => this.render());
+  
+      this.translateControls.enabled = false;
+      this.rotateControls.enabled = false;
   }
 
   /**
    * Syncs the content of multiTransformGroup and selected shared objects
    */
   updateTransformControls() {
-    // Restores original object positions in the scheneGraph (zUpRoot group)
-    this.restoreMultiGroup();
-    // Hides transform controls
-    this.deactivateControl();
+    if (!this.isEditMode || !this.selection.length) {
 
-    if (this.isEditMode && this.selection.length) {
-      this.activateControl(this.multiTransformGroup);
-      this.prepareMultiGroup();
+      // hides transform controls
+      this.deactivateControl();
+      // restores original object positions in the scheneGraph (zUpRoot group)
+      this.restoreMultiGroup();
+      return;
+    }
+  
+    // ONE OBJECT SELECTED
+    if (this.selection.length === 1) {
+      this.restoreMultiGroup(); 
+      const object = this.selection[0].node;
+      if (object) {
+        this.activateControl(object);
+      } else {
+        console.warn("Single object not found in selection[0]");
+      }
+    }
+    // MULTIPLE OBJECTS SELECTED
+    else if (this.selection.length > 1) {
+      this.prepareMultiGroup(); 
+      if (this.multiTransformGroup) {
+        this.activateControl(this.multiTransformGroup);
+      } else {
+        console.warn("multiTransformGroup not prepared properly");
+      }
     }
   }
 
   prepareMultiGroup() {
     const box = new Box3();
     const center = new Vector3();
+    // 
     this.multiTransformGroup.clear();
     // reset group position to 0,0,0 before moving selected nodes in it
     this.multiTransformGroup.position.set(0, 0, 0);
