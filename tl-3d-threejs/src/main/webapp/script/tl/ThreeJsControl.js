@@ -341,33 +341,33 @@ class ThreeJsControl {
             return;
           }
         
-        // re-map shared nodes from selection array to array of commands
-        const commands = outer.selection.map(sharedNode => {
-          // get the three js node to get to its parent
-          const node = sharedNode.node;
-
+        // re-map multiTransformGroup children to array of commands 
+        const commands = outer.multiTransformGroup.children.map(node => {
+          // find the shared node in selection that corresponds to this Three.js node
+          const sharedNode = outer.selection.find(s => s.node === node);
+          if (!sharedNode) return;
+        
           if (!node.previousParent) {
             console.error('node.previousParent is undefined!');
             return;
           }
-
+        
           const lastMtrx = lastWorldMatrixes[node.id];
           const currMtrx = node.matrixWorld;
-
+        
           // save the world matrix of the previous parent
           const parentMtrx = node.previousParent.matrixWorld;
 
           // transform matrices into a local coordinate system relative to the previous parent node
           const lastLocalMtrx = getLocalMatrix(lastMtrx, parentMtrx);
           const currentLocalMtrx = getLocalMatrix(currMtrx, parentMtrx);
-
+        
           // calculate difference in the local coordinate system
           const diff = getMatrixDiff(lastLocalMtrx, currentLocalMtrx);
-        
-          return sharedNode.notifyTransform(diff);
-        });
 
-        // M(0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0) T(0.0, -1000.0, 0.0)
+          return sharedNode.notifyTransform(diff);
+          // delete undefined if sharedNode is not found
+        }).filter(Boolean);        
   
           outer.sendSceneChanges(commands);
         } else {
@@ -443,37 +443,49 @@ class ThreeJsControl {
   prepareMultiGroup() {
     const box = new Box3();
     const center = new Vector3();
-    // 
+
+    // remove all children from multiTransformGroup
     this.multiTransformGroup.clear();
+
     // reset group position to 0,0,0 before moving selected nodes in it
     this.multiTransformGroup.position.set(0, 0, 0);
     this.multiTransformGroup.updateMatrixWorld(true);
 
-    // will update matrixWorld for all nodes in the scheneGraph including selected
+    // update matrixWorld for all nodes in the sceneGraph including selected ones
     this.zUpRoot.updateMatrixWorld(true);
   
-    for (const sharedNode of this.selection) {
-      const node = sharedNode.node;
+    // get actual Three.js nodes from selection
+    const selectedNodes = this.selection.map(s => s.node);
+
+    // create a Set to check ancestry
+    const selectedSet = new Set(selectedNodes);
+
+    // filter out nodes that are descendants of others to avoid duplicates in the transform group
+    const topLevelNodes = selectedNodes.filter(node =>
+      !isDescendantOfAny(node, selectedSet)
+    );
+  
+    for (const node of topLevelNodes) {
       // save the current parent to be able to restore the node in zUpRoot later
       node.previousParent = node.parent;
-
       const worldMatrix = node.matrixWorld.clone();
-      // adding an object to a multiTransformGroup
-      this.multiTransformGroup.add(node);
 
+      // add the object to multiTransformGroup
+      this.multiTransformGroup.add(node);
+  
       // calculate the local matrix of the node relative to the new group so that it does not move visually
       const inverseGroupMatrix = new Matrix4().copy(this.multiTransformGroup.matrixWorld).invert();
       const localMatrix = new Matrix4().multiplyMatrices(inverseGroupMatrix, worldMatrix);
-
+  
       // fix the node matrix
       node.matrixAutoUpdate = false;
       node.matrix.copy(localMatrix);
       node.updateMatrixWorld(true);
-
+  
       // expand the bounding box for the group
       box.expandByObject(node);
     }
-
+  
     // get visual "center" of the multiTransformGroup and position transformControls to it
     box.getCenter(center);
     this.transformControls.position.copy(center);
@@ -1622,4 +1634,13 @@ function getMatrixDiff(m1, m2) {
   diffMatrix.copy(m1.clone().invert()).multiply(m2);
 
   return diffMatrix;
+}
+
+function isDescendantOfAny(node, selectedSet) {
+  let parent = node.parent;
+  while (parent) {
+    if (selectedSet.has(parent)) return true;
+    parent = parent.parent;
+  }
+  return false;
 }
