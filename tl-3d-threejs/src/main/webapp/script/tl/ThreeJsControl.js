@@ -316,40 +316,65 @@ class ThreeJsControl {
   
     const updateRenderTransform = function() {
       let lastMatrix = new Matrix4();
+      let lastWorldMatrixes = {};
       let lastObject = null;
   
       return (event) => {
         // disable/enable orbit controls when drag starts/ends
         outer.controls.enabled = !event.value;
-  
+        outer.zUpRoot.updateMatrixWorld(true);
+
         const object = event.target.object;
   
         if (object === outer.multiTransformGroup) {
           // MULTI-SELECT MODE
-          object.updateMatrix(); 
-          const currentMatrix = object.matrix.clone();
+          object.updateMatrixWorld(true);
   
           // drag started when event.value is true
           if (event.value) {
-            lastMatrix.copy(currentMatrix);
+            lastWorldMatrixes = {};
+
+            for (const node of outer.multiTransformGroup.children) {
+              lastWorldMatrixes[node.id] = node.matrixWorld.clone();
+            }
+
             return;
           }
-  
-        // drag ended when event.value is false
-        const diffMatrix = new Matrix4();
-        diffMatrix.copy(lastMatrix.clone().invert()).multiply(currentMatrix);
         
-        // re-map shared nodes from selection arrat to array of commands
-        const commands = outer.selection.map(sharedNode => 
-            sharedNode.notifyTransform(diffMatrix.clone())
-        );
+        // re-map shared nodes from selection array to array of commands
+        const commands = outer.selection.map(sharedNode => {
+          // get the three js node to get to its parent
+          const node = sharedNode.node;
+
+          if (!node.previousParent) {
+            console.error('node.previousParent is undefined!');
+            return;
+          }
+
+          const lastMtrx = lastWorldMatrixes[node.id];
+          const currMtrx = node.matrixWorld;
+
+          // save the world matrix of the previous parent
+          const parentMtrx = node.previousParent.matrixWorld;
+
+          // transform matrices into a local coordinate system relative to the previous parent node
+          const lastLocalMtrx = getLocalMatrix(lastMtrx, parentMtrx);
+          const currentLocalMtrx = getLocalMatrix(currMtrx, parentMtrx);
+
+          // calculate difference in the local coordinate system
+          const diff = getMatrixDiff(lastLocalMtrx, currentLocalMtrx);
+        
+          return sharedNode.notifyTransform(diff);
+        });
+
+        // M(0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0) T(0.0, -1000.0, 0.0)
   
           outer.sendSceneChanges(commands);
         } else {
           // SINGLE OBJECT MODE
           object.updateMatrixWorld(true); 
           const currentMatrix = object.matrix.clone();
-  
+
           if (event.value) {
             lastMatrix.copy(currentMatrix);
             lastObject = object;
@@ -387,32 +412,30 @@ class ThreeJsControl {
    * Syncs the content of multiTransformGroup and selected shared objects
    */
   updateTransformControls() {
-    if (!this.isEditMode || !this.selection.length) {
+    // restores original object positions in the scheneGraph (zUpRoot group)
+    this.restoreMultiGroup();
+    // hides transform controls
+    this.deactivateControl();
 
-      // hides transform controls
-      this.deactivateControl();
-      // restores original object positions in the scheneGraph (zUpRoot group)
-      this.restoreMultiGroup();
-      return;
-    }
-  
+    if (this.isEditMode && this.selection.length) {
     // ONE OBJECT SELECTED
-    if (this.selection.length === 1) {
-      this.restoreMultiGroup(); 
-      const object = this.selection[0].node;
-      if (object) {
-        this.activateControl(object);
-      } else {
-        console.warn("Single object not found in selection[0]");
+      if (this.selection.length === 1) {
+        this.restoreMultiGroup(); 
+        const object = this.selection[0].node;
+        if (object) {
+          this.activateControl(object);
+        } else {
+          console.warn("Single object not found in selection[0]");
+        }
       }
-    }
-    // MULTIPLE OBJECTS SELECTED
-    else if (this.selection.length > 1) {
-      this.prepareMultiGroup(); 
-      if (this.multiTransformGroup) {
-        this.activateControl(this.multiTransformGroup);
-      } else {
-        console.warn("multiTransformGroup not prepared properly");
+      // MULTIPLE OBJECTS SELECTED
+      else {
+        this.prepareMultiGroup(); 
+        if (this.multiTransformGroup) {
+          this.activateControl(this.multiTransformGroup);
+        } else {
+          console.warn("multiTransformGroup not prepared properly");
+        }
       }
     }
   }
@@ -480,8 +503,7 @@ class ThreeJsControl {
       }
     }
 
-    // after all nodes are moved back to zUpRoot
-    // we can clear the group
+    // after all nodes are moved back to zUpRoot we can clear the group
     this.multiTransformGroup.clear();
   }
 
@@ -1586,3 +1608,18 @@ window.services.threejs = {
     }
   }
 };
+
+function getLocalMatrix(objectMatrixWorld, parentMatrixWorld) {
+  const worldMatrix = objectMatrixWorld.clone();
+  const parentInverse = new Matrix4().copy(parentMatrixWorld).invert();
+  const localMatrix = new Matrix4().multiplyMatrices(parentInverse, worldMatrix);
+
+  return localMatrix;
+}
+
+function getMatrixDiff(m1, m2) {
+  const diffMatrix = new Matrix4();
+  diffMatrix.copy(m1.clone().invert()).multiply(m2);
+
+  return diffMatrix;
+}
