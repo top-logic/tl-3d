@@ -27,7 +27,7 @@ abstract message SceneNode {
 	transient java.lang.Object userData;
 
 	/** Optional transformation applied to this and all potential sub-nodes. */
-	repeated float transform;
+	repeated double transform;
 }
 
 /** A collection of {@link SceneNode}s. */

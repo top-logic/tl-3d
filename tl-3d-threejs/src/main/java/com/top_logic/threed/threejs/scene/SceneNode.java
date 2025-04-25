@@ -36,14 +36,14 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 
 	private transient java.lang.Object _userData = null;
 
-	private final java.util.List<Float> _transform = new de.haumacher.msgbuf.util.ReferenceList<>() {
+	private final java.util.List<Double> _transform = new de.haumacher.msgbuf.util.ReferenceList<>() {
 		@Override
-		protected void beforeAdd(int index, Float element) {
+		protected void beforeAdd(int index, Double element) {
 			_listener.beforeAdd(SceneNode.this, TRANSFORM__PROP, index, element);
 		}
 
 		@Override
-		protected void afterRemove(int index, Float element) {
+		protected void afterRemove(int index, Double element) {
 			_listener.afterRemove(SceneNode.this, TRANSFORM__PROP, index, element);
 		}
 	};
@@ -89,20 +89,20 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 	/**
 	 * Optional transformation applied to this and all potential sub-nodes.
 	 */
-	public final java.util.List<Float> getTransform() {
+	public final java.util.List<Double> getTransform() {
 		return _transform;
 	}
 
 	/**
 	 * @see #getTransform()
 	 */
-	public com.top_logic.threed.threejs.scene.SceneNode setTransform(java.util.List<? extends Float> value) {
+	public com.top_logic.threed.threejs.scene.SceneNode setTransform(java.util.List<? extends Double> value) {
 		internalSetTransform(value);
 		return this;
 	}
 
 	/** Internal setter for {@link #getTransform()} without chain call utility. */
-	protected final void internalSetTransform(java.util.List<? extends Float> value) {
+	protected final void internalSetTransform(java.util.List<? extends Double> value) {
 		_transform.clear();
 		_transform.addAll(value);
 	}
@@ -110,20 +110,20 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 	/**
 	 * Adds a value to the {@link #getTransform()} list.
 	 */
-	public com.top_logic.threed.threejs.scene.SceneNode addTransform(float value) {
+	public com.top_logic.threed.threejs.scene.SceneNode addTransform(double value) {
 		internalAddTransform(value);
 		return this;
 	}
 
-	/** Implementation of {@link #addTransform(float)} without chain call utility. */
-	protected final void internalAddTransform(float value) {
+	/** Implementation of {@link #addTransform(double)} without chain call utility. */
+	protected final void internalAddTransform(double value) {
 		_transform.add(value);
 	}
 
 	/**
 	 * Removes a value from the {@link #getTransform()} list.
 	 */
-	public final void removeTransform(float value) {
+	public final void removeTransform(double value) {
 		_transform.remove(value);
 	}
 
@@ -150,7 +150,7 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 	public void set(String field, Object value) {
 		switch (field) {
 			case USER_DATA__PROP: internalSetUserData((java.lang.Object) value); break;
-			case TRANSFORM__PROP: internalSetTransform(de.haumacher.msgbuf.util.Conversions.asList(Float.class, value)); break;
+			case TRANSFORM__PROP: internalSetTransform(de.haumacher.msgbuf.util.Conversions.asList(Double.class, value)); break;
 		}
 	}
 
@@ -180,7 +180,7 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 		super.writeFields(scope, out);
 		out.name(TRANSFORM__PROP);
 		out.beginArray();
-		for (float x : getTransform()) {
+		for (double x : getTransform()) {
 			out.value(x);
 		}
 		out.endArray();
@@ -198,7 +198,7 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 			}
 			case TRANSFORM__PROP: {
 				out.beginArray();
-				for (float x : getTransform()) {
+				for (double x : getTransform()) {
 					out.value(x);
 				}
 				out.endArray();
@@ -212,10 +212,10 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 	public void readField(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in, String field) throws java.io.IOException {
 		switch (field) {
 			case TRANSFORM__PROP: {
-				java.util.List<Float> newValue = new java.util.ArrayList<>();
+				java.util.List<Double> newValue = new java.util.ArrayList<>();
 				in.beginArray();
 				while (in.hasNext()) {
-					newValue.add((float) in.nextDouble());
+					newValue.add(in.nextDouble());
 				}
 				in.endArray();
 				setTransform(newValue);
@@ -229,7 +229,7 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 	public void writeElement(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonWriter out, String field, Object element) throws java.io.IOException {
 		switch (field) {
 			case TRANSFORM__PROP: {
-				out.value(((float) element));
+				out.value(((double) element));
 				break;
 			}
 			default: super.writeElement(scope, out, field, element);
@@ -240,7 +240,7 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 	public Object readElement(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in, String field) throws java.io.IOException {
 		switch (field) {
 			case TRANSFORM__PROP: {
-				return (float) in.nextDouble();
+				return in.nextDouble();
 			}
 			default: return super.readElement(scope, in, field);
 		}

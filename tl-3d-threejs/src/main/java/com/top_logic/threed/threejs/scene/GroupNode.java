@@ -93,13 +93,13 @@ public class GroupNode extends SceneNode {
 	}
 
 	@Override
-	public com.top_logic.threed.threejs.scene.GroupNode setTransform(java.util.List<? extends Float> value) {
+	public com.top_logic.threed.threejs.scene.GroupNode setTransform(java.util.List<? extends Double> value) {
 		internalSetTransform(value);
 		return this;
 	}
 
 	@Override
-	public com.top_logic.threed.threejs.scene.GroupNode addTransform(float value) {
+	public com.top_logic.threed.threejs.scene.GroupNode addTransform(double value) {
 		internalAddTransform(value);
 		return this;
 	}

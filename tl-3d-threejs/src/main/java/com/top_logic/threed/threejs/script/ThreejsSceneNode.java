@@ -52,15 +52,15 @@ public abstract class ThreejsSceneNode<T extends SceneNode> extends GenericMetho
 		return node;
 	}
 
-	private static List<Float> asTx(Transformation tx) {
+	private static List<Double> asTx(Transformation tx) {
 		if (tx == null) {
 			return Collections.emptyList();
 		}
 		return Arrays.asList(
-			(float) tx.a(), (float) tx.b(), (float) tx.c(),
-			(float) tx.d(), (float) tx.e(), (float) tx.f(),
-			(float) tx.g(), (float) tx.h(), (float) tx.i(),
-			(float) tx.x(), (float) tx.y(), (float) tx.z());
+			tx.a(), tx.b(), tx.c(),
+			tx.d(), tx.e(), tx.f(),
+			tx.g(), tx.h(), tx.i(),
+			tx.x(), tx.y(), tx.z());
 	}
 
 	/**
