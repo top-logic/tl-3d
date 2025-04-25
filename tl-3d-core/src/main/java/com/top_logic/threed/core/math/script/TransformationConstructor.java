@@ -22,6 +22,7 @@ import com.top_logic.model.search.expr.config.operations.AbstractSimpleMethodBui
 import com.top_logic.model.search.expr.config.operations.ArgumentDescriptor;
 import com.top_logic.threed.core.math.Transformation;
 import com.top_logic.threed.core.math.format.TxParser;
+import com.top_logic.threed.core.model.TlThreedCoreFactory;
 import com.top_logic.util.error.TopLogicException;
 
 /**
@@ -43,7 +44,7 @@ public class TransformationConstructor extends GenericMethod {
 
 	@Override
 	public TLType getType(List<TLType> argumentTypes) {
-		return null;
+		return TlThreedCoreFactory.getTransformationType();
 	}
 
 	@Override

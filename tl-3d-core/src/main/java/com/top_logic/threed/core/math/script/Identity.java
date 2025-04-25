@@ -16,8 +16,8 @@ import com.top_logic.model.search.expr.SearchExpression;
 import com.top_logic.model.search.expr.config.dom.Expr;
 import com.top_logic.model.search.expr.config.operations.AbstractSimpleMethodBuilder;
 import com.top_logic.model.search.expr.config.operations.MethodBuilder;
-import com.top_logic.model.util.TLModelUtil;
 import com.top_logic.threed.core.math.Transformation;
+import com.top_logic.threed.core.model.TlThreedCoreFactory;
 
 /**
  * {@link SearchExpression} creating an identity transformation matrix.
@@ -40,7 +40,7 @@ public class Identity extends GenericMethod {
 
 	@Override
 	public TLType getType(List<TLType> argumentTypes) {
-		return TLModelUtil.findType("tl.uber3d:Transformation");
+		return TlThreedCoreFactory.getTransformationType();
 	}
 
 	@Override
