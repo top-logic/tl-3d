@@ -1122,10 +1122,10 @@ class SharedObject {
   }
   
   notifyTransform(diffMatrix) {
-    const currentTransformation = toMatrix(this.transform);
+    const currentTransformation = toMatrix(this.layoutPoint.transform);
     const newTransformation = currentTransformation.multiply(diffMatrix);
-    this.transform = toTX(newTransformation);
-    return SetProperty.prototype.create(this.id, 'transform', this.transform);
+    this.layoutPoint.transform = toTX(newTransformation);
+    return SetProperty.prototype.create(this.layoutPoint.id, 'transform', this.layoutPoint.transform);
   }
 }
 
@@ -1222,6 +1222,7 @@ class Scope {
 				case 'GroupNode': obj = new GroupNode(id); break;
 				case 'PartNode': obj = new PartNode(id); break;
 				case 'GltfAsset': obj = new GltfAsset(id); break;
+				case 'ConnectionPoint': obj = new ConnectionPoint(id); break;
       }
       this.objects[id] = obj;
       obj.loadJson(this, json[2]);
@@ -1356,6 +1357,18 @@ class SceneGraph extends SharedObject {
   }
 }
 
+class ConnectionPoint extends SharedObject {
+  constructor(id) {
+    super(id);
+  }
+
+  loadJson(scope, json) {
+    this.transform = json.transform;
+    this.classifiers = json.classifiers;
+  }
+  
+}
+
 class GroupNode extends SharedObject {
   constructor(id) {
     super(id);
@@ -1365,7 +1378,7 @@ class GroupNode extends SharedObject {
     const group = new Group();
     parentGroup.add(group);
   
-    transform(group, this.transform);
+    transform(group, this.layoutPoint.transform);
     this.contents.forEach((c) => c.build(group));
 
     // Link to scene node.
@@ -1374,26 +1387,30 @@ class GroupNode extends SharedObject {
   }
 
   loadJson(scope, json) {
-    this.transform = json.transform;
+    this.layoutPoint = scope.loadJson(json.layoutPoint);
     this.contents = scope.loadAll(json.contents);
+    this.snappingPoints = scope.loadAll(json.snappingPoints);
   }
   
   setProperty(scope, property, value) {
   	switch (property) {
-  		case 'transform': this.transform = value; break;
+  		case 'layoutPoint': this.layoutPoint = scope.loadAll(value); break; 
   		case 'contents': this.contents = scope.loadAll(value); break; 
+  		case 'snappingPoints': this.snappingPoints = scope.loadAll(value); break; 
   	}
   }
   
   insertElementAt(scope, property, idx, value) {
   	switch (property) {
   		case 'contents': this.contents.splice(idx, 0, scope.loadJson(value)); break; 
+  		case 'snappingPoints': this.snappingPoints.splice(idx, 0, scope.loadJson(value)); break; 
   	}
   }
   
   removeElementAt(scope, property, idx) {
   	switch (property) {
   		case 'contents': this.contents.splice(idx, 1); break; 
+  		case 'snappingPoints': this.snappingPoints.splice(idx, 1); break; 
   	}
   }
 }
@@ -1407,7 +1424,7 @@ class PartNode extends SharedObject {
     const group = new Group();
     parentGroup.add(group);
 
-    transform(group, this.transform);
+    transform(group, this.layoutPoint.transform);
     const node = this.asset.build();
     group.add(node);
 
@@ -1417,14 +1434,28 @@ class PartNode extends SharedObject {
   }
 
   loadJson(scope, json) {
-    this.transform = json.transform;
+    this.layoutPoint = scope.loadJson(json.layoutPoint);
     this.asset = scope.loadJson(json.asset);
+    this.snappingPoints = scope.loadAll(json.snappingPoints);
   }
   
   setProperty(scope, property, value) {
   	switch (property) {
-  		case 'transform': this.transform = value; break;
+  		case 'layoutPoint': this.layoutPoint = scope.loadAll(value); break; 
   		case 'asset': this.asset = scope.loadAll(value); break; 
+  		case 'snappingPoints': this.snappingPoints = scope.loadAll(value); break; 
+  	}
+  }
+  
+  insertElementAt(scope, property, idx, value) {
+  	switch (property) {
+  		case 'snappingPoints': this.snappingPoints.splice(idx, 0, scope.loadJson(value)); break; 
+  	}
+  }
+  
+  removeElementAt(scope, property, idx) {
+  	switch (property) {
+  		case 'snappingPoints': this.snappingPoints.splice(idx, 1); break; 
   	}
   }
 }

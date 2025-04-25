@@ -378,7 +378,7 @@ public class Transformation extends MapLike {
 	/**
 	 * Cast to {@link Transformation}.
 	 */
-	public static Transformation asTransformation(Object object) {
+	public static Transformation cast(Object object) {
 		if (object instanceof Transformation) {
 			return (Transformation) object;
 		} else {

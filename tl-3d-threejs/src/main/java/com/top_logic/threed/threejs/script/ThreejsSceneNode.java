@@ -5,7 +5,6 @@
  */
 package com.top_logic.threed.threejs.script;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -15,6 +14,7 @@ import com.top_logic.model.search.expr.GenericMethod;
 import com.top_logic.model.search.expr.SearchExpression;
 import com.top_logic.threed.core.math.Transformation;
 import com.top_logic.threed.core.math.script.TransformationConstructor;
+import com.top_logic.threed.threejs.scene.ConnectionPoint;
 import com.top_logic.threed.threejs.scene.SceneNode;
 
 /**
@@ -43,24 +43,37 @@ public abstract class ThreejsSceneNode<T extends SceneNode> extends GenericMetho
 	 * Allocates the nodes and fills its properties.
 	 */
 	protected T createNode(Object[] arguments) {
-		Transformation tx = TransformationConstructor.asTx(getArguments()[1], arguments[1]);
-		Object userData = arguments[2];
-
 		T node = allocate();
-		node.setTransform(asTx(tx));
+
+		ConnectionPoint layoutPoint = toConnectionPoint(getArguments()[1], arguments[1]);
+		node.setLayoutPoint(layoutPoint);
+
+		List<ConnectionPoint> snappingPoints = toConnectionPointList(getArguments()[2], arguments[2]);
+		node.setSnappingPoints(snappingPoints);
+
+		Object userData = arguments[3];
 		node.setUserData(userData);
 		return node;
 	}
 
-	private static List<Double> asTx(Transformation tx) {
-		if (tx == null) {
-			return Collections.emptyList();
+	private List<ConnectionPoint> toConnectionPointList(SearchExpression expr, Object value) {
+		List<?> valueList = asList(value);
+		return valueList.stream().map(v -> toConnectionPointNonNull(expr, v)).toList();
+	}
+
+	private ConnectionPoint toConnectionPointNonNull(SearchExpression expr, Object value) {
+		return notNull(expr, toConnectionPoint(expr, value));
+	}
+
+	private ConnectionPoint toConnectionPoint(SearchExpression expr, Object value) {
+		if (value instanceof ConnectionPoint) {
+			return (ConnectionPoint) value;
 		}
-		return Arrays.asList(
-			tx.a(), tx.b(), tx.c(),
-			tx.d(), tx.e(), tx.f(),
-			tx.g(), tx.h(), tx.i(),
-			tx.x(), tx.y(), tx.z());
+		if (value == null) {
+			return null;
+		}
+		Transformation tx = TransformationConstructor.asTx(expr, value);
+		return ThreejsCp.newConnectionPoint(tx, this, Collections.emptyList());
 	}
 
 	/**

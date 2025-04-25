@@ -93,14 +93,20 @@ public class GroupNode extends SceneNode {
 	}
 
 	@Override
-	public com.top_logic.threed.threejs.scene.GroupNode setTransform(java.util.List<? extends Double> value) {
-		internalSetTransform(value);
+	public com.top_logic.threed.threejs.scene.GroupNode setLayoutPoint(com.top_logic.threed.threejs.scene.ConnectionPoint value) {
+		internalSetLayoutPoint(value);
 		return this;
 	}
 
 	@Override
-	public com.top_logic.threed.threejs.scene.GroupNode addTransform(double value) {
-		internalAddTransform(value);
+	public com.top_logic.threed.threejs.scene.GroupNode setSnappingPoints(java.util.List<? extends com.top_logic.threed.threejs.scene.ConnectionPoint> value) {
+		internalSetSnappingPoints(value);
+		return this;
+	}
+
+	@Override
+	public com.top_logic.threed.threejs.scene.GroupNode addSnappingPoint(com.top_logic.threed.threejs.scene.ConnectionPoint value) {
+		internalAddSnappingPoint(value);
 		return this;
 	}
 

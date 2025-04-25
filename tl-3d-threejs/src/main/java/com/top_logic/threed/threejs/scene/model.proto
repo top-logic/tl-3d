@@ -21,13 +21,30 @@ message Cube extends Asset {
 	float depth;
 }
 
+/** Class defining a point in a {@link SceneNode} where other {@link ConnectionPoint}s can be connected. */
+message ConnectionPoint {
+
+	/** The {@link SceneNode} where this {@link ConnectionPoint} is a part of. */
+	@Container
+	SceneNode owner;
+
+	/** Transformation where the connection point in its {@link SceneNode} lies. */
+	repeated double transform;
+	
+	/** List of classifiers which defines which {@link ConnectionPoint}s can be connected. */
+	repeated string classifiers;
+}
+
 /** Base class for a node in a {@link SceneGraph} */
 abstract message SceneNode {
 	/** Reference to a custom object that is represented by this scene node. */
 	transient java.lang.Object userData;
 
-	/** Optional transformation applied to this and all potential sub-nodes. */
-	repeated double transform;
+	/** Optional {@link ConnectionPoint} defining the point where this node can be connected. */
+	ConnectionPoint layoutPoint;
+	
+	/** Optional {@link ConnectionPoint}s defining points where other {@link SceneNode}s can be connected with its {@link SceneNode#layoutPoint}. */
+	repeated ConnectionPoint snappingPoints;
 }
 
 /** A collection of {@link SceneNode}s. */

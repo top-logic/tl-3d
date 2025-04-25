@@ -69,14 +69,20 @@ public class PartNode extends SceneNode {
 	}
 
 	@Override
-	public com.top_logic.threed.threejs.scene.PartNode setTransform(java.util.List<? extends Double> value) {
-		internalSetTransform(value);
+	public com.top_logic.threed.threejs.scene.PartNode setLayoutPoint(com.top_logic.threed.threejs.scene.ConnectionPoint value) {
+		internalSetLayoutPoint(value);
 		return this;
 	}
 
 	@Override
-	public com.top_logic.threed.threejs.scene.PartNode addTransform(double value) {
-		internalAddTransform(value);
+	public com.top_logic.threed.threejs.scene.PartNode setSnappingPoints(java.util.List<? extends com.top_logic.threed.threejs.scene.ConnectionPoint> value) {
+		internalSetSnappingPoints(value);
+		return this;
+	}
+
+	@Override
+	public com.top_logic.threed.threejs.scene.PartNode addSnappingPoint(com.top_logic.threed.threejs.scene.ConnectionPoint value) {
+		internalAddSnappingPoint(value);
 		return this;
 	}
 

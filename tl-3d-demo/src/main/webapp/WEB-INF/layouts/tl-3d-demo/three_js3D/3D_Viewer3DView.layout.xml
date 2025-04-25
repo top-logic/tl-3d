@@ -5,6 +5,7 @@
 	template="tl-3d-threejs/threejs.template.xml"
 >
 	<arguments
+		applyScript="node -> tx -> model -> $node.set(`tl.threed.demo:Node#tx`, $tx)"
 		model="model(tl-3d-demo/three_js3D/sceneGrid.layout.xml#Grid)"
 		multiSelection="true"
 		selection="selection(tl-3d-demo/three_js3D/sceneGrid.layout.xml#Grid)"
@@ -31,12 +32,6 @@
       userData: $node);
 }]]></createNode>
 		</modelBuilder>
-		<applyScript><![CDATA[changedNodes -> model -> {
-  $changedNodes.foreach(node -> {
-    newTransformation = $node.threejsAccess("transform");
-    $node.threejsAccess("userData").set(`tl.threed.demo:Node#tx`, transform($newTransformation));
-  });
-}]]></applyScript>
 		<buttons>
 			<button id="ID_4893bf3f_116f_421c_b560_842f9b4b1073"
 				class="com.top_logic.layout.form.component.InvalidateCommand"

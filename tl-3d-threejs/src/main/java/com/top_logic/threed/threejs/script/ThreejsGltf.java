@@ -39,7 +39,7 @@ public class ThreejsGltf extends ThreejsSceneNode<PartNode> {
 
 	@Override
 	protected PartNode createNode(Object[] arguments) {
-		String url = (String) arguments[3];
+		String url = (String) arguments[4];
 		return super.createNode(arguments)
 			.setAsset(GltfAsset.create().setUrl(url));
 	}
@@ -52,6 +52,7 @@ public class ThreejsGltf extends ThreejsSceneNode<PartNode> {
 		private static final ArgumentDescriptor DESCRIPTOR = ArgumentDescriptor.builder()
 			.optional("name")
 			.optional("tx")
+			.optional("snappingPoints")
 			.optional("userData")
 			.optional("url")
 			.build();

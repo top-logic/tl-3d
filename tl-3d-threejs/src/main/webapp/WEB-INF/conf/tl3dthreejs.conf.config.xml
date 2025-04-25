@@ -29,6 +29,7 @@
 				<methods>
 					<method name="threejsGltf" class="com.top_logic.threed.threejs.script.ThreejsGltf$Builder"/>
 					<method name="threejsGroup" class="com.top_logic.threed.threejs.script.ThreejsGroup$Builder"/>
+					<method name="threejsCp" class="com.top_logic.threed.threejs.script.ThreejsCp$Builder"/>
 					<method name="threejsAccess" class="com.top_logic.threed.threejs.script.ThreejsSceneNodeAccess$Builder"/>
 				</methods>
 			</instance>

@@ -54,7 +54,9 @@ import com.top_logic.model.TLStructuredType;
 import com.top_logic.model.search.expr.config.dom.Expr;
 import com.top_logic.model.search.expr.query.QueryExecutor;
 import com.top_logic.model.util.TLModelUtil;
+import com.top_logic.threed.core.math.TransformationUtil;
 import com.top_logic.threed.threejs.control.ThreeJsControl;
+import com.top_logic.threed.threejs.scene.ConnectionPoint;
 import com.top_logic.threed.threejs.scene.GroupNode;
 import com.top_logic.threed.threejs.scene.PartNode;
 import com.top_logic.threed.threejs.scene.SceneGraph;
@@ -97,7 +99,7 @@ public class ThreeJsComponent extends BuilderComponent
 		boolean hasMultiSelection();
 
 		/**
-		 * The operation that takes the changes from the client and applies whem to the business
+		 * The operation that takes the changes from the client and applies them to the business
 		 * objects.
 		 */
 		@Label("Store operation")
@@ -153,43 +155,80 @@ public class ThreeJsComponent extends BuilderComponent
 
 	private final Set<SceneNode> _transformedNodes = new HashSet<>();
 
-	private final AllNodesObserver _transformListener = new AllNodesObserver() {
+	private final AllNodesObserver _sceneNodeListener = new AllNodesObserver() {
+
+		@Override
+		public void registerRecursive(SceneNode node) {
+			super.registerRecursive(node);
+			addTransformListener(node.getLayoutPoint());
+		}
+
+		@Override
+		public void unregisterRecursive(SceneNode node) {
+			removeTransformListener(node.getLayoutPoint());
+			super.unregisterRecursive(node);
+		}
 
 		@Override
 		public void beforeSet(Observable obj, String property, Object value) {
 			super.beforeSet(obj, property, value);
-			storeTransformed((SceneNode) obj, property);
+			if (obj instanceof SceneNode) {
+				switch (property) {
+					case SceneNode.LAYOUT_POINT__PROP: {
+						SceneNode node = (SceneNode) obj;
+						removeTransformListener(node.getLayoutPoint());
+						addTransformListener((ConnectionPoint) value);
+					}
+				}
+			}
+		}
+
+		void addTransformListener(ConnectionPoint cp) {
+			if (cp != null) {
+				cp.registerListener(_transformListener);
+			}
+		}
+
+		void removeTransformListener(ConnectionPoint cp) {
+			if (cp != null) {
+				cp.unregisterListener(_transformListener);
+			}
+		}
+
+	};
+
+	private final Listener _transformListener = new Listener() {
+
+		@Override
+		public void beforeSet(Observable obj, String property, Object value) {
+			storeTransformed((ConnectionPoint) obj, property);
 		}
 
 		@Override
 		public void beforeAdd(Observable obj, String property, int index, Object element) {
-			super.beforeAdd(obj, property, index, element);
-			storeTransformed((SceneNode) obj, property);
+			storeTransformed((ConnectionPoint) obj, property);
 		}
 
 		@Override
 		public void beforeAdd(Observable obj, String property, Object index, Object element) {
-			super.beforeAdd(obj, property, index, element);
-			storeTransformed((SceneNode) obj, property);
+			storeTransformed((ConnectionPoint) obj, property);
 		}
 
 		@Override
 		public void afterRemove(Observable obj, String property, int index, Object element) {
-			super.afterRemove(obj, property, index, element);
-			storeTransformed((SceneNode) obj, property);
+			storeTransformed((ConnectionPoint) obj, property);
 		}
 
 		@Override
 		public void afterRemove(Observable obj, String property, Object index, Object element) {
-			super.afterRemove(obj, property, index, element);
-			storeTransformed((SceneNode) obj, property);
+			storeTransformed((ConnectionPoint) obj, property);
 		}
 
-		private void storeTransformed(SceneNode changed, String property) {
+		private void storeTransformed(ConnectionPoint changed, String property) {
 			switch (property) {
-				case SceneNode.TRANSFORM__PROP:
+				case ConnectionPoint.TRANSFORM__PROP:
 					if (isInEditMode()) {
-						_transformedNodes.add(changed);
+						_transformedNodes.add(changed.getOwner());
 					}
 			}
 		}
@@ -283,10 +322,10 @@ public class ThreeJsComponent extends BuilderComponent
 						SceneGraph scene = (SceneGraph) obj;
 						SceneNode oldRoot = scene.getRoot();
 						if (oldRoot != null) {
-							_transformListener.unregisterRecursive(oldRoot);
+							_sceneNodeListener.unregisterRecursive(oldRoot);
 						}
 						if (value != null) {
-							_transformListener.registerRecursive((SceneNode) value);
+							_sceneNodeListener.registerRecursive((SceneNode) value);
 						}
 					}
 				}
@@ -641,7 +680,10 @@ public class ThreeJsComponent extends BuilderComponent
 	protected HandlerResult applyTransformation(Set<SceneNode> transformedNodes) {
 		if (!transformedNodes.isEmpty()) {
 			if (_applyScript != null) {
-				_applyScript.execute(transformedNodes, getModel());
+				for (SceneNode node : transformedNodes) {
+					_applyScript.execute(node.getUserData(),
+						TransformationUtil.fromList(node.getLayoutPoint().getTransform()), getModel());
+				}
 			}
 		}
 		return HandlerResult.DEFAULT_RESULT;
