@@ -177,6 +177,71 @@ public class Transformation extends MapLike {
 	}
 
 	/**
+	 * Determines the Euler angle with which this {@link Transformation} rotates around the x-axis,
+	 * when the rotation is interpreted as rotation first around the x-axis, then around the y-axis
+	 * and finally around the z-axis.
+	 * 
+	 * @implSpec See https://eecs.qmul.ac.uk/~gslabaugh/publications/euler.pdf
+	 */
+	public double getRotationX() {
+		if (g() == -1) {
+			return atan2(b(), c());
+		}
+		if (g() == 1) {
+			return atan2(-b(), -c());
+		}
+		double cos = cos(theta());
+		if (cos < 0) {
+			return atan2(-h(), -i());
+		} else {
+			return atan2(h(), i());
+		}
+	}
+
+	/**
+	 * Determines the Euler angle with which this {@link Transformation} rotates around the y-axis,
+	 * when the rotation is interpreted as rotation first around the x-axis, then around the y-axis
+	 * and finally around the z-axis.
+	 * 
+	 * @implSpec See https://eecs.qmul.ac.uk/~gslabaugh/publications/euler.pdf
+	 */
+	public double getRotationY() {
+		if (g() == -1) {
+			return PI / 2;
+		}
+		if (g() == 1) {
+			return -PI / 2;
+		}
+		return theta();
+	}
+
+	/**
+	 * Determines the Euler angle with which this {@link Transformation} rotates around the z-axis,
+	 * when the rotation is interpreted as rotation first around the x-axis, then around the y-axis
+	 * and finally around the z-axis.
+	 * 
+	 * @implSpec See https://eecs.qmul.ac.uk/~gslabaugh/publications/euler.pdf
+	 */
+	public double getRotationZ() {
+		if (g() == -1) {
+			return 0;
+		}
+		if (g() == 1) {
+			return 0;
+		}
+		double cos = cos(theta());
+		if (cos < 0) {
+			return atan2(-d(), -a());
+		} else {
+			return atan2(d(), a());
+		}
+	}
+
+	private double theta() {
+		return -asin(g());
+	}
+
+	/**
 	 * The identity transformation.
 	 */
 	public static Transformation identity() {
