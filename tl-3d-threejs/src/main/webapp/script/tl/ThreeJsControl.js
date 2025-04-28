@@ -1358,6 +1358,28 @@ class ConnectionPoint extends SharedObject {
 
     this.node = group;
   }
+  
+  setProperty(scope, property, value) {
+  	switch (property) {
+   		case 'transform': this.transform = value; break;
+   		case 'classifiers': this.classifiers = value; break;
+  	}
+  }
+  
+  insertElementAt(scope, property, idx, value) {
+  	switch (property) {
+   		case 'transform': this.transform.splice(idx, 0, value); break;
+   		case 'classifiers': this.classifiers.splice(idx, 0, value); break;
+  	}
+  }
+  
+  removeElementAt(scope, property, idx) {
+  	switch (property) {
+   		case 'transform': this.transform.splice(idx, 1); break;
+   		case 'classifiers': this.classifiers.splice(idx, 1); break;
+  	}
+  }
+  
 }
 
 class GroupNode extends SharedObject {
