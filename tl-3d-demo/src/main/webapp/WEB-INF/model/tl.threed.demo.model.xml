@@ -52,6 +52,14 @@
 						</storage-algorithm>
 					</annotations>
 				</property>
+				<reference name="snappingPoints"
+					composite="true"
+					kind="forwards"
+					multiple="true"
+					navigate="true"
+					ordered="true"
+					type="ConnectionPoint"
+				/>
 			</attributes>
 		</class>
 		<class name="AssetCollection">
@@ -87,6 +95,21 @@
 			<attributes>
 				<property name="name"
 					mandatory="true"
+					type="tl.core:String"
+				/>
+			</attributes>
+		</class>
+		<class name="ConnectionPoint">
+			<generalizations>
+				<generalization type="tl.model:TLObject"/>
+			</generalizations>
+			<attributes>
+				<property name="tx"
+					mandatory="true"
+					type="tl.threed.core:Transformation"
+				/>
+				<property name="classifiers"
+					multiple="true"
 					type="tl.core:String"
 				/>
 			</attributes>

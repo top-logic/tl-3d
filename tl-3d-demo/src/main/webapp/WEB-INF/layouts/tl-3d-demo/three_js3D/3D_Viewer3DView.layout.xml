@@ -25,7 +25,16 @@
     threejsGltf(
       tx:  $node.get(`tl.threed.demo:Node#tx`),
       userData: $node,
-      url: $node.get(`tl.threed.demo:Part#asset`).get(`tl.threed.demo:Asset3D#gltfUrl`));
+      url: $node.get(`tl.threed.demo:Part#asset`).get(`tl.threed.demo:Asset3D#gltfUrl`),
+      snappingPoints : $node.get(`tl.threed.demo:Part#asset`)
+          .get(`tl.threed.demo:Asset3D#snappingPoints`)
+          .map(cp -> 
+            threejsCp(
+              tx: $cp.get(`tl.threed.demo:ConnectionPoint#tx`),
+              classifiers: $cp.get(`tl.threed.demo:ConnectionPoint#classifiers`)
+            )
+          )
+      );
   $node.instanceOf(`tl.threed.demo:Assembly`):
     threejsGroup(
       tx: $node.get(`tl.threed.demo:Node#tx`),
