@@ -41,7 +41,7 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 
 	private com.top_logic.threed.threejs.scene.ConnectionPoint _layoutPoint = null;
 
-	private final java.util.List<com.top_logic.threed.threejs.scene.ConnectionPoint> _snappingPoints = new de.haumacher.msgbuf.util.ReferenceList<>() {
+	private final java.util.List<com.top_logic.threed.threejs.scene.ConnectionPoint> _snappingPoints = new de.haumacher.msgbuf.util.ReferenceList<com.top_logic.threed.threejs.scene.ConnectionPoint>() {
 		@Override
 		protected void beforeAdd(int index, com.top_logic.threed.threejs.scene.ConnectionPoint element) {
 			com.top_logic.threed.threejs.scene.ConnectionPoint added = element;
@@ -58,6 +58,11 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 			com.top_logic.threed.threejs.scene.ConnectionPoint removed = element;
 			removed.internalSetOwner(null);
 			_listener.afterRemove(SceneNode.this, SNAPPING_POINTS__PROP, index, element);
+		}
+
+		@Override
+		protected void afterChanged() {
+			_listener.afterChanged(SceneNode.this, SNAPPING_POINTS__PROP);
 		}
 	};
 
@@ -90,6 +95,7 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 	protected final void internalSetUserData(java.lang.Object value) {
 		_listener.beforeSet(this, USER_DATA__PROP, value);
 		_userData = value;
+		_listener.afterChanged(this, USER_DATA__PROP);
 	}
 
 	/**
@@ -132,6 +138,7 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 		if (after != null) {
 			after.internalSetOwner(this);
 		}
+		_listener.afterChanged(this, LAYOUT_POINT__PROP);
 	}
 
 	/**
@@ -189,9 +196,18 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 			LAYOUT_POINT__PROP, 
 			SNAPPING_POINTS__PROP));
 
+	private static java.util.Set<String> TRANSIENT_PROPERTIES = java.util.Collections.unmodifiableSet(new java.util.HashSet<>(
+			java.util.Arrays.asList(
+				USER_DATA__PROP)));
+
 	@Override
 	public java.util.List<String> properties() {
 		return PROPERTIES;
+	}
+
+	@Override
+	public java.util.Set<String> transientProperties() {
+		return TRANSIENT_PROPERTIES;
 	}
 
 	@Override

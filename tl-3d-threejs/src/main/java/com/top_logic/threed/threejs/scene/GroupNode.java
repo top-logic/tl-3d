@@ -18,7 +18,7 @@ public class GroupNode extends SceneNode {
 	/** @see #getContents() */
 	public static final String CONTENTS__PROP = "contents";
 
-	private final java.util.List<com.top_logic.threed.threejs.scene.SceneNode> _contents = new de.haumacher.msgbuf.util.ReferenceList<>() {
+	private final java.util.List<com.top_logic.threed.threejs.scene.SceneNode> _contents = new de.haumacher.msgbuf.util.ReferenceList<com.top_logic.threed.threejs.scene.SceneNode>() {
 		@Override
 		protected void beforeAdd(int index, com.top_logic.threed.threejs.scene.SceneNode element) {
 			_listener.beforeAdd(GroupNode.this, CONTENTS__PROP, index, element);
@@ -27,6 +27,11 @@ public class GroupNode extends SceneNode {
 		@Override
 		protected void afterRemove(int index, com.top_logic.threed.threejs.scene.SceneNode element) {
 			_listener.afterRemove(GroupNode.this, CONTENTS__PROP, index, element);
+		}
+
+		@Override
+		protected void afterChanged() {
+			_listener.afterChanged(GroupNode.this, CONTENTS__PROP);
 		}
 	};
 
@@ -119,9 +124,18 @@ public class GroupNode extends SceneNode {
 		java.util.Arrays.asList(
 			CONTENTS__PROP));
 
+	private static java.util.Set<String> TRANSIENT_PROPERTIES = java.util.Collections.unmodifiableSet(new java.util.HashSet<>(
+			java.util.Arrays.asList(
+				)));
+
 	@Override
 	public java.util.List<String> properties() {
 		return PROPERTIES;
+	}
+
+	@Override
+	public java.util.Set<String> transientProperties() {
+		return TRANSIENT_PROPERTIES;
 	}
 
 	@Override

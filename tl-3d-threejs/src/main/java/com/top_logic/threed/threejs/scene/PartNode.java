@@ -53,6 +53,7 @@ public class PartNode extends SceneNode {
 	protected final void internalSetAsset(com.top_logic.threed.threejs.scene.Asset value) {
 		_listener.beforeSet(this, ASSET__PROP, value);
 		_asset = value;
+		_listener.afterChanged(this, ASSET__PROP);
 	}
 
 	/**
@@ -95,9 +96,18 @@ public class PartNode extends SceneNode {
 		java.util.Arrays.asList(
 			ASSET__PROP));
 
+	private static java.util.Set<String> TRANSIENT_PROPERTIES = java.util.Collections.unmodifiableSet(new java.util.HashSet<>(
+			java.util.Arrays.asList(
+				)));
+
 	@Override
 	public java.util.List<String> properties() {
 		return PROPERTIES;
+	}
+
+	@Override
+	public java.util.Set<String> transientProperties() {
+		return TRANSIENT_PROPERTIES;
 	}
 
 	@Override

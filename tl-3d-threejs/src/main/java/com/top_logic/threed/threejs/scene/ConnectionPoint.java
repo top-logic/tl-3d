@@ -26,7 +26,7 @@ public class ConnectionPoint extends de.haumacher.msgbuf.graph.AbstractSharedGra
 
 	private com.top_logic.threed.threejs.scene.SceneNode _owner = null;
 
-	private final java.util.List<Double> _transform = new de.haumacher.msgbuf.util.ReferenceList<>() {
+	private final java.util.List<Double> _transform = new de.haumacher.msgbuf.util.ReferenceList<Double>() {
 		@Override
 		protected void beforeAdd(int index, Double element) {
 			_listener.beforeAdd(ConnectionPoint.this, TRANSFORM__PROP, index, element);
@@ -36,9 +36,14 @@ public class ConnectionPoint extends de.haumacher.msgbuf.graph.AbstractSharedGra
 		protected void afterRemove(int index, Double element) {
 			_listener.afterRemove(ConnectionPoint.this, TRANSFORM__PROP, index, element);
 		}
+
+		@Override
+		protected void afterChanged() {
+			_listener.afterChanged(ConnectionPoint.this, TRANSFORM__PROP);
+		}
 	};
 
-	private final java.util.List<String> _classifiers = new de.haumacher.msgbuf.util.ReferenceList<>() {
+	private final java.util.List<String> _classifiers = new de.haumacher.msgbuf.util.ReferenceList<String>() {
 		@Override
 		protected void beforeAdd(int index, String element) {
 			_listener.beforeAdd(ConnectionPoint.this, CLASSIFIERS__PROP, index, element);
@@ -47,6 +52,11 @@ public class ConnectionPoint extends de.haumacher.msgbuf.graph.AbstractSharedGra
 		@Override
 		protected void afterRemove(int index, String element) {
 			_listener.afterRemove(ConnectionPoint.this, CLASSIFIERS__PROP, index, element);
+		}
+
+		@Override
+		protected void afterChanged() {
+			_listener.afterChanged(ConnectionPoint.this, CLASSIFIERS__PROP);
 		}
 	};
 
@@ -81,6 +91,7 @@ public class ConnectionPoint extends de.haumacher.msgbuf.graph.AbstractSharedGra
 			throw new IllegalStateException("Object may not be part of two different containers.");
 		}
 		_owner = value;
+		_listener.afterChanged(this, OWNER__PROP);
 	}
 
 	/**
@@ -183,9 +194,18 @@ public class ConnectionPoint extends de.haumacher.msgbuf.graph.AbstractSharedGra
 			TRANSFORM__PROP, 
 			CLASSIFIERS__PROP));
 
+	private static java.util.Set<String> TRANSIENT_PROPERTIES = java.util.Collections.unmodifiableSet(new java.util.HashSet<>(
+			java.util.Arrays.asList(
+				)));
+
 	@Override
 	public java.util.List<String> properties() {
 		return PROPERTIES;
+	}
+
+	@Override
+	public java.util.Set<String> transientProperties() {
+		return TRANSIENT_PROPERTIES;
 	}
 
 	@Override

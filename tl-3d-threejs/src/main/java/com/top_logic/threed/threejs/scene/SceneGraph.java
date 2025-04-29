@@ -23,7 +23,7 @@ public class SceneGraph extends de.haumacher.msgbuf.graph.AbstractSharedGraphNod
 
 	private com.top_logic.threed.threejs.scene.SceneNode _root = null;
 
-	private final java.util.List<com.top_logic.threed.threejs.scene.SceneNode> _selection = new de.haumacher.msgbuf.util.ReferenceList<>() {
+	private final java.util.List<com.top_logic.threed.threejs.scene.SceneNode> _selection = new de.haumacher.msgbuf.util.ReferenceList<com.top_logic.threed.threejs.scene.SceneNode>() {
 		@Override
 		protected void beforeAdd(int index, com.top_logic.threed.threejs.scene.SceneNode element) {
 			_listener.beforeAdd(SceneGraph.this, SELECTION__PROP, index, element);
@@ -32,6 +32,11 @@ public class SceneGraph extends de.haumacher.msgbuf.graph.AbstractSharedGraphNod
 		@Override
 		protected void afterRemove(int index, com.top_logic.threed.threejs.scene.SceneNode element) {
 			_listener.afterRemove(SceneGraph.this, SELECTION__PROP, index, element);
+		}
+
+		@Override
+		protected void afterChanged() {
+			_listener.afterChanged(SceneGraph.this, SELECTION__PROP);
 		}
 	};
 
@@ -63,6 +68,7 @@ public class SceneGraph extends de.haumacher.msgbuf.graph.AbstractSharedGraphNod
 	protected final void internalSetRoot(com.top_logic.threed.threejs.scene.SceneNode value) {
 		_listener.beforeSet(this, ROOT__PROP, value);
 		_root = value;
+		_listener.afterChanged(this, ROOT__PROP);
 	}
 
 	/**
@@ -124,9 +130,18 @@ public class SceneGraph extends de.haumacher.msgbuf.graph.AbstractSharedGraphNod
 			ROOT__PROP, 
 			SELECTION__PROP));
 
+	private static java.util.Set<String> TRANSIENT_PROPERTIES = java.util.Collections.unmodifiableSet(new java.util.HashSet<>(
+			java.util.Arrays.asList(
+				)));
+
 	@Override
 	public java.util.List<String> properties() {
 		return PROPERTIES;
+	}
+
+	@Override
+	public java.util.Set<String> transientProperties() {
+		return TRANSIENT_PROPERTIES;
 	}
 
 	@Override

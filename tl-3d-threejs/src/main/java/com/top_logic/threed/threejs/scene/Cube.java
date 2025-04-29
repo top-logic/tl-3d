@@ -57,6 +57,7 @@ public class Cube extends Asset {
 	protected final void internalSetWidth(float value) {
 		_listener.beforeSet(this, WIDTH__PROP, value);
 		_width = value;
+		_listener.afterChanged(this, WIDTH__PROP);
 	}
 
 	public final float getHeight() {
@@ -75,6 +76,7 @@ public class Cube extends Asset {
 	protected final void internalSetHeight(float value) {
 		_listener.beforeSet(this, HEIGHT__PROP, value);
 		_height = value;
+		_listener.afterChanged(this, HEIGHT__PROP);
 	}
 
 	public final float getDepth() {
@@ -93,6 +95,7 @@ public class Cube extends Asset {
 	protected final void internalSetDepth(float value) {
 		_listener.beforeSet(this, DEPTH__PROP, value);
 		_depth = value;
+		_listener.afterChanged(this, DEPTH__PROP);
 	}
 
 	@Override
@@ -106,9 +109,18 @@ public class Cube extends Asset {
 			HEIGHT__PROP, 
 			DEPTH__PROP));
 
+	private static java.util.Set<String> TRANSIENT_PROPERTIES = java.util.Collections.unmodifiableSet(new java.util.HashSet<>(
+			java.util.Arrays.asList(
+				)));
+
 	@Override
 	public java.util.List<String> properties() {
 		return PROPERTIES;
+	}
+
+	@Override
+	public java.util.Set<String> transientProperties() {
+		return TRANSIENT_PROPERTIES;
 	}
 
 	@Override
