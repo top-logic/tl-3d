@@ -19,11 +19,14 @@ import {
   Line,
   Mesh,
   MeshStandardMaterial,
+  MeshBasicMaterial,
+  SphereGeometry,
   EdgesGeometry,
   LineBasicMaterial,
   LineSegments,
   CanvasTexture,
-  FrontSide
+  FrontSide,
+  Euler
 } from "three";
 
 import { OrbitControls } from "OrbitControls";
@@ -35,11 +38,15 @@ const WHITE_LIGHT = "#ffffff";
 const LIGHT_GREY = "#cccccc";
 const DARK_GREY = "#333333";
 const YELLOW = 0xffff00;
+const GREEN = 0x00ff00;
 const LIGHT_BLUE = 0x77aacc;
 const MIDDLE_BLUE = 0x447799;
 const DARK_BLUE = 0x001122;
 const CUBE_CAMERA_FAR = 10;
 const CAMERA_MOVE_DURATION = 1.5;
+const C_P_RADIUS = 100;
+const WIDTH_SEGMENTS = 8;
+const HEIGHT_SEGMENTS = 8
 
 class ThreeJsControl {
   constructor(controlId, contextPath, dataUrl, isWorkplaneVisible, isInEditMode, isRotateMode) {
@@ -293,7 +300,7 @@ class ThreeJsControl {
       this.boundingBox.getSize(boxSize);
       const gridSize = Math.max(boxSize.x, boxSize.y, boxSize.z) * 1.5;
 
-      this.workplane = this.createDetailedGrid(gridSize);
+      this.workplane = createDetailedGrid(gridSize);
       this.workplane.rotation.x = Math.PI / 2;
     }
 
@@ -313,23 +320,23 @@ class ThreeJsControl {
     this.translateControls.setMode("translate");
     this.translateControls.setSpace("local");
     this.scene.add(this.translateControls);
-  
-    const updateRenderTransform = function() {
+
+    const updateRenderTransform = (function () {
       let lastMatrix = new Matrix4();
       let lastWorldMatrixes = {};
       let lastObject = null;
-  
+
       return (event) => {
         // disable/enable orbit controls when drag starts/ends
         outer.controls.enabled = !event.value;
         outer.zUpRoot.updateMatrixWorld(true);
 
         const object = event.target.object;
-  
+
         if (object === outer.multiTransformGroup) {
           // MULTI-SELECT MODE
           object.updateMatrixWorld(true);
-  
+
           // drag started when event.value is true
           if (event.value) {
             lastWorldMatrixes = {};
@@ -340,39 +347,39 @@ class ThreeJsControl {
 
             return;
           }
-        
-        // re-map multiTransformGroup children to array of commands 
+
+          // re-map multiTransformGroup children to array of commands
         const commands = outer.multiTransformGroup.children.map(node => {
-          // find the shared node in selection that corresponds to this Three.js node
-          const sharedNode = outer.selection.find(s => s.node === node);
-          if (!sharedNode) return;
-        
-          if (!node.previousParent) {
-            console.error('node.previousParent is undefined!');
-            return;
-          }
-        
-          const lastMtrx = lastWorldMatrixes[node.id];
-          const currMtrx = node.matrixWorld;
-        
-          // save the world matrix of the previous parent
-          const parentMtrx = node.previousParent.matrixWorld;
+              // find the shared node in selection that corresponds to this Three.js node
+              const sharedNode = outer.selection.find((s) => s.node === node);
+              if (!sharedNode) return;
 
-          // transform matrices into a local coordinate system relative to the previous parent node
-          const lastLocalMtrx = getLocalMatrix(lastMtrx, parentMtrx);
-          const currentLocalMtrx = getLocalMatrix(currMtrx, parentMtrx);
-        
-          // calculate difference in the local coordinate system
-          const diff = getMatrixDiff(lastLocalMtrx, currentLocalMtrx);
+              if (!node.previousParent) {
+                console.error("node.previousParent is undefined!");
+                return;
+              }
 
-          return sharedNode.notifyTransform(diff);
-          // delete undefined if sharedNode is not found
+              const lastMtrx = lastWorldMatrixes[node.id];
+              const currMtrx = node.matrixWorld;
+
+              // save the world matrix of the previous parent
+              const parentMtrx = node.previousParent.matrixWorld;
+
+              // transform matrices into a local coordinate system relative to the previous parent node
+              const lastLocalMtrx = getLocalMatrix(lastMtrx, parentMtrx);
+              const currentLocalMtrx = getLocalMatrix(currMtrx, parentMtrx);
+
+              // calculate difference in the local coordinate system
+              const diff = getMatrixDiff(lastLocalMtrx, currentLocalMtrx);
+
+              return sharedNode.notifyTransform(diff);
+              // delete undefined if sharedNode is not found
         }).filter(Boolean);        
-  
+
           outer.sendSceneChanges(commands);
         } else {
           // SINGLE OBJECT MODE
-          object.updateMatrixWorld(true); 
+          object.updateMatrixWorld(true);
           const currentMatrix = object.matrix.clone();
 
           if (event.value) {
@@ -380,32 +387,35 @@ class ThreeJsControl {
             lastObject = object;
             return;
           }
-  
+
+          outer.snapObject(object);
+
+          const updatedMatrix = object.matrix.clone();
           const diffMatrix = new Matrix4();
-          diffMatrix.copy(lastMatrix.clone().invert()).multiply(currentMatrix);
-  
-          const sharedObject = outer.selection[0]; 
+          diffMatrix.copy(lastMatrix.clone().invert()).multiply(updatedMatrix);
+
+          const sharedObject = outer.selection[0];
           if (sharedObject) {
             const commands = [sharedObject.notifyTransform(diffMatrix)];
             outer.sendSceneChanges(commands);
           }
         }
-  
+
         outer.render();
       };
-    }();
-  
-      this.translateControls.addEventListener('dragging-changed', updateRenderTransform);
-      this.translateControls.addEventListener('objectChange', () => this.render());
-      this.rotateControls = new TransformControls(this.camera, this.renderer.domElement);
-      this.rotateControls.setMode("rotate");
-      this.rotateControls.setSpace("local");
-      this.scene.add(this.rotateControls);
-      this.rotateControls.addEventListener('dragging-changed', updateRenderTransform);
-      this.rotateControls.addEventListener('objectChange', () => this.render());
-  
-      this.translateControls.enabled = false;
-      this.rotateControls.enabled = false;
+    })();
+
+    this.translateControls.addEventListener("dragging-changed", updateRenderTransform);
+    this.translateControls.addEventListener("objectChange", () => this.render());
+    this.rotateControls = new TransformControls(this.camera, this.renderer.domElement);
+    this.rotateControls.setMode("rotate");
+    this.rotateControls.setSpace("local");
+    this.scene.add(this.rotateControls);
+    this.rotateControls.addEventListener("dragging-changed", updateRenderTransform);
+    this.rotateControls.addEventListener("objectChange", () => this.render());
+
+    this.translateControls.enabled = false;
+    this.rotateControls.enabled = false;
   }
 
   /**
@@ -583,64 +593,89 @@ class ThreeJsControl {
     this.updateTransformControls();
     this.render(); 
   }
- 
-  createDetailedGrid(size) {
-    const z = 0;
-    const edge = size / 2;
-    const gridGroup = new Group();
 
-    const smallCell = 200;
-    const bigCell = smallCell * 10;
-
-    function createLine(start, end, color, linewidth) {
-        const geometry = new BufferGeometry().setFromPoints([start, end]);
-        const material = new LineBasicMaterial({ color, linewidth });
-        return new Line(geometry, material);
+  snapObject(selectedObj) {
+    if (
+      !selectedObj ||
+      !selectedObj.userData ||
+      !selectedObj.userData.snappingPoints ||
+      selectedObj.userData.snappingPoints.length === 0
+    ) {
+      return;
     }
-
-    const gridSmall = new Group();
-    // vertical lines
-    for (let i = 0; i <= edge; i += smallCell) {
-      gridSmall.add(createLine(new Vector3(-i, -edge, z), new Vector3(-i, edge, z), LIGHT_BLUE, 1));
-      gridSmall.add(createLine(new Vector3(i, -edge, z), new Vector3(i, edge, z), LIGHT_BLUE, 1));
-    }
-    // horizontal lines
-    for (let i = z; i <= edge; i += smallCell) {
-      gridSmall.add(createLine(new Vector3(-edge, -i, z), new Vector3(edge, -i, z), LIGHT_BLUE, 1));
-      gridSmall.add(createLine(new Vector3(-edge, i, z), new Vector3(edge, i, z), LIGHT_BLUE, 1));
-    }
-
-    const gridBig = new Group();
-    for (let i = bigCell; i <= edge; i += bigCell) {
-      // vertical lines
-      gridBig.add(createLine(new Vector3(-i, -edge, z), new Vector3(-i, edge, z), MIDDLE_BLUE, 2));
-      gridBig.add(createLine(new Vector3(i, -edge, z), new Vector3(i, edge, z), MIDDLE_BLUE, 2));
-      // horizontal lines
-      gridBig.add(createLine(new Vector3(-edge, -i, z), new Vector3(edge, -i, z), MIDDLE_BLUE, 2));
-      gridBig.add(createLine(new Vector3(-edge, i, z), new Vector3(edge, i, z), MIDDLE_BLUE, 2));
-  }
-
-    const gridEdgeCenter = new Group();
-    const thickestLines = [
-      // vertical outer lines
-      [new Vector3(-edge, -edge, z), new Vector3(-edge, edge, z)],
-      [new Vector3(edge, -edge, z), new Vector3(edge, edge, z)],
-      // horizontal outer lines
-      [new Vector3(-edge, -edge, z), new Vector3(edge, -edge, z)],
-      [new Vector3(-edge, edge, z), new Vector3(edge, edge, z)],
-      // central lines
-      [new Vector3(0, -edge, z), new Vector3(0, edge, z)],
-      [new Vector3(-edge, 0, z), new Vector3(edge, 0, z)]
-    ];
-    thickestLines.forEach(([start, end]) => {
-        gridEdgeCenter.add(createLine(start, end, DARK_BLUE, 3));
+  
+    // find all other objects in the scene that have snapping points
+    const snappableObjects = [];
+    this.zUpRoot.traverse((node) => {
+      if (
+        node !== selectedObj &&
+        node.userData &&
+        node.userData.snappingPoints &&
+        node.userData.snappingPoints.length > 0
+      ) {
+        snappableObjects.push(node);
+      }
     });
+  
+    if (snappableObjects.length === 0) return;
+  
+    selectedObj.updateMatrixWorld(true);
+  
+    // find the closest pair of snapping points
+    let closestDistance = 1000;
+    let closestPointPosition = null;
 
-    gridGroup.add(gridSmall);
-    gridGroup.add(gridBig);
-    gridGroup.add(gridEdgeCenter);
+    const selectedWorldPosition = new Vector3();
+    selectedObj.getWorldPosition(selectedWorldPosition);
+  
+    for (const otherObject of snappableObjects) {
+      otherObject.updateMatrixWorld(true);
+  
+      for (const otherPoint of otherObject.userData.snappingPoints) {
+        // const scale = new Vector3();
+        // const rotation = new Euler();
+        const position = new Vector3();
 
-    return gridGroup;
+        otherPoint.node.getWorldPosition(position);
+        // otherPoint.node.matrixWorld.decompose(position, rotation, scale);
+        const distance = selectedWorldPosition.distanceTo(position);
+  
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestPointPosition = position;
+        }
+      }
+    }
+  
+    if (closestPointPosition) {
+      // calculate the offset for snapping objects' points (vector from the point of the moving object to the point of another)
+      const offset = new Vector3().subVectors(
+        closestPointPosition,
+        selectedWorldPosition
+      );
+  
+      // apply the offset to the object's world position
+      selectedWorldPosition.add(offset);
+  
+      // convert the new world position back to local position relative to the parent
+      const newLocalPosition = selectedWorldPosition.clone();
+      if (selectedObj.parent) {
+        selectedObj.parent.updateMatrixWorld(true);
+
+        const parentWorldInverse = new Matrix4()
+          .copy(selectedObj.parent.matrixWorld)
+          .invert();
+
+        newLocalPosition.applyMatrix4(parentWorldInverse);
+      }
+  
+      // set the new position
+      selectedObj.position.copy(newLocalPosition);
+      selectedObj.updateMatrix();
+      selectedObj.updateMatrixWorld(true);
+    }
+  
+    this.render();
   }
 
   addAxesHelper(scene) {
@@ -1085,37 +1120,6 @@ class ThreeJsControl {
   }
 }
 
-function getRaycaster(event, camera, canvas) {
-  const raycaster = new Raycaster();
-  const mouse = new Vector2();
-
-  const rect = canvas.getBoundingClientRect();
-  const mousePos = {
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top
-  };
-  mouse.x = (mousePos.x / canvas.clientWidth) * 2 - 1;
-  mouse.y = -(mousePos.y / canvas.clientHeight) * 2 + 1;
-
-  raycaster.setFromCamera(mouse, camera);
-
-  return raycaster;
-}
-
-function calculateCubeCameraPosition(cameraPosition, controlsTarget) {
-  const subAxesOffset = new Vector3().subVectors(cameraPosition, controlsTarget);
-  return subAxesOffset.normalize().multiplyScalar(CUBE_CAMERA_FAR);
-}
-
-function calculateMainCameraPosition(cubeCameraPosition, cameraPosition, controlsTarget) {
-  let subMainOffset = new Vector3(...cubeCameraPosition.toArray());
-  const cameraOffset = new Vector3().subVectors(cameraPosition, controlsTarget);
-
-  subMainOffset.normalize().multiplyScalar(cameraOffset.length());
-  subMainOffset = new Vector3().addVectors(subMainOffset, controlsTarget);
-  return subMainOffset;
-}
-
 class SharedObject {
   constructor(id) {
     this.id = id;
@@ -1126,68 +1130,6 @@ class SharedObject {
     const newTransformation = currentTransformation.multiply(diffMatrix);
     this.layoutPoint.transform = toTX(newTransformation);
     return SetProperty.prototype.create(this.layoutPoint.id, 'transform', this.layoutPoint.transform);
-  }
-}
-
-function matrix(
-	a, b, c, d,
-	e, f, g, h,
-	i, j, k, l,
-	m, n, o, p
-) {
-  const result = new Matrix4();
-	result.set(
-		a, b, c, d,
-		e, f, g, h,
-		i, j, k, l,
-		m, n, o, p
-	);
-  return result;
-}
-
-function toMatrix(tx) {
-  switch (tx.length) {
-    case 3:
-		return matrix(
-			1, 0, 0, tx[0],
-			0, 1, 0, tx[1],
-			0, 0, 1, tx[2],
-			0, 0, 0, 1);
-    case 9:
-      return matrix(
-			tx[0], tx[1], tx[2], 0,
-			tx[3], tx[4], tx[5], 0,
-			tx[6], tx[7], tx[8], 0,
-			0,     0,     0,     1);
-    case 12:
-      return matrix(
-			tx[0], tx[1], tx[2], tx[9],
-			tx[3], tx[4], tx[5], tx[10],
-			tx[6], tx[7], tx[8], tx[11],
-			0,     0,     0,     1);
-    case 16:
-      return matrix(
-			tx[0],  tx[1],  tx[2],  tx[3],
-			tx[4],  tx[5],  tx[6],  tx[7],
-			tx[8],  tx[9],  tx[10], tx[11],
-			tx[12], tx[13], tx[14], tx[15]);
-    default:
-      throw new Error("Invalid transform array: " + tx);
-  }
-}
-
-function toTX(matrix4) {
-  const el = matrix4.elements;
-  return [ el[0], el[4], el[8], el[1], el[5], el[9], el[2],  el[6],  el[10],  el[12],  el[13],  el[14] ];
-}
-
-function transform(group, tx) {
-  if (tx != null && tx.length > 0) {
-    if (tx.length == 3) {
-      group.position.set(tx[0], tx[1], tx[2]);
-    } else {
-      group.applyMatrix4(toMatrix(tx));
-    }
   }
 }
 
@@ -1367,6 +1309,20 @@ class ConnectionPoint extends SharedObject {
     this.classifiers = json.classifiers;
   }
   
+  build(parentGroup) {
+    const group = new Group();
+    parentGroup.add(group);
+
+    transform(group, this.transform);
+
+    const snappingSphere = new Mesh(
+      new SphereGeometry(C_P_RADIUS, WIDTH_SEGMENTS, HEIGHT_SEGMENTS), 
+      new MeshBasicMaterial({ color: GREEN })
+    );
+    group.add(snappingSphere);
+
+    this.node = group;
+  }
 }
 
 class GroupNode extends SharedObject {
@@ -1377,9 +1333,20 @@ class GroupNode extends SharedObject {
   build(parentGroup) {
     const group = new Group();
     parentGroup.add(group);
-  
-    transform(group, this.layoutPoint.transform);
+
+    if (this.layoutPoint) {
+      const layoutSphere = new Mesh(
+        new SphereGeometry(C_P_RADIUS, WIDTH_SEGMENTS, HEIGHT_SEGMENTS),
+        new MeshBasicMaterial({ color: 0xffff00 })
+      );
+      group.add(layoutSphere);
+
+      transform(group, this.layoutPoint.transform);
+    }
+
+    // transform(group, this.layoutPoint.transform);
     this.contents.forEach((c) => c.build(group));
+    this.snappingPoints?.forEach((point) => point.build(group));
 
     // Link to scene node.
     group.userData = this;
@@ -1391,27 +1358,27 @@ class GroupNode extends SharedObject {
     this.contents = scope.loadAll(json.contents);
     this.snappingPoints = scope.loadAll(json.snappingPoints);
   }
-  
+
   setProperty(scope, property, value) {
-  	switch (property) {
+    switch (property) {
   		case 'layoutPoint': this.layoutPoint = scope.loadAll(value); break; 
   		case 'contents': this.contents = scope.loadAll(value); break; 
   		case 'snappingPoints': this.snappingPoints = scope.loadAll(value); break; 
-  	}
+    }
   }
-  
+
   insertElementAt(scope, property, idx, value) {
-  	switch (property) {
+    switch (property) {
   		case 'contents': this.contents.splice(idx, 0, scope.loadJson(value)); break; 
   		case 'snappingPoints': this.snappingPoints.splice(idx, 0, scope.loadJson(value)); break; 
-  	}
+    }
   }
-  
+
   removeElementAt(scope, property, idx) {
-  	switch (property) {
+    switch (property) {
   		case 'contents': this.contents.splice(idx, 1); break; 
   		case 'snappingPoints': this.snappingPoints.splice(idx, 1); break; 
-  	}
+    }
   }
 }
 
@@ -1424,13 +1391,25 @@ class PartNode extends SharedObject {
     const group = new Group();
     parentGroup.add(group);
 
-    transform(group, this.layoutPoint.transform);
+    if (this.layoutPoint && this.layoutPoint.transform) {
+      const layoutSphere = new Mesh(
+        new SphereGeometry(C_P_RADIUS, WIDTH_SEGMENTS, HEIGHT_SEGMENTS),
+        new MeshBasicMaterial({ color: 0xffff00 })
+      );
+      group.add(layoutSphere);
+
+      transform(group, this.layoutPoint.transform);
+    }
+
+    // this.layoutPoint.build(group);
+    this.snappingPoints?.forEach((point) => point.build(group));
+
     const node = this.asset.build();
     group.add(node);
 
     // Link to scene node.
-    node.userData = this;
-    this.node = node;
+    group.userData = this;
+    this.node = group;
   }
 
   loadJson(scope, json) {
@@ -1438,25 +1417,25 @@ class PartNode extends SharedObject {
     this.asset = scope.loadJson(json.asset);
     this.snappingPoints = scope.loadAll(json.snappingPoints);
   }
-  
+
   setProperty(scope, property, value) {
-  	switch (property) {
+    switch (property) {
   		case 'layoutPoint': this.layoutPoint = scope.loadAll(value); break; 
   		case 'asset': this.asset = scope.loadAll(value); break; 
   		case 'snappingPoints': this.snappingPoints = scope.loadAll(value); break; 
-  	}
+    }
   }
-  
+
   insertElementAt(scope, property, idx, value) {
-  	switch (property) {
+    switch (property) {
   		case 'snappingPoints': this.snappingPoints.splice(idx, 0, scope.loadJson(value)); break; 
-  	}
+    }
   }
-  
+
   removeElementAt(scope, property, idx) {
-  	switch (property) {
+    switch (property) {
   		case 'snappingPoints': this.snappingPoints.splice(idx, 1); break; 
-  	}
+    }
   }
 }
 
@@ -1467,7 +1446,7 @@ class GltfAsset extends SharedObject {
 
   build() {
     const model = this.gltf.scene.clone();
-    model.traverse(obj => {
+    model.traverse((obj) => {
       if (obj.isMesh && obj.material) {
         obj.userData.originalMaterial = obj.material;
         obj.material = obj.material.clone();
@@ -1480,11 +1459,11 @@ class GltfAsset extends SharedObject {
   loadJson(scope, json) {
     this.url = json.url;
   }
-  
+
   setProperty(scope, property, value) {
-  	switch (property) {
+    switch (property) {
   		case 'url': this.url = value; break;
-  	}
+    }
   }
 }
 
@@ -1596,6 +1575,182 @@ class RemoveElement extends ListUpdate {
   }
 }
 
+function getRaycaster(event, camera, canvas) {
+  const raycaster = new Raycaster();
+  const mouse = new Vector2();
+
+  const rect = canvas.getBoundingClientRect();
+  const mousePos = {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+  };
+  mouse.x = (mousePos.x / canvas.clientWidth) * 2 - 1;
+  mouse.y = -(mousePos.y / canvas.clientHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+
+  return raycaster;
+}
+
+function calculateCubeCameraPosition(cameraPosition, controlsTarget) {
+  const subAxesOffset = new Vector3().subVectors(cameraPosition, controlsTarget);
+  return subAxesOffset.normalize().multiplyScalar(CUBE_CAMERA_FAR);
+}
+
+function calculateMainCameraPosition(cubeCameraPosition, cameraPosition, controlsTarget) {
+  let subMainOffset = new Vector3(...cubeCameraPosition.toArray());
+  const cameraOffset = new Vector3().subVectors(cameraPosition, controlsTarget);
+
+  subMainOffset.normalize().multiplyScalar(cameraOffset.length());
+  subMainOffset = new Vector3().addVectors(subMainOffset, controlsTarget);
+  return subMainOffset;
+}
+
+function getLocalMatrix(objectMatrixWorld, parentMatrixWorld) {
+  const worldMatrix = objectMatrixWorld.clone();
+  const parentInverse = new Matrix4().copy(parentMatrixWorld).invert();
+  const localMatrix = new Matrix4().multiplyMatrices(parentInverse, worldMatrix);
+
+  return localMatrix;
+}
+
+function getMatrixDiff(m1, m2) {
+  const diffMatrix = new Matrix4();
+  diffMatrix.copy(m1.clone().invert()).multiply(m2);
+
+  return diffMatrix;
+}
+
+function isDescendantOfAny(node, selectedSet) {
+  let parent = node.parent;
+  while (parent) {
+    if (selectedSet.has(parent)) return true;
+    parent = parent.parent;
+  }
+  return false;
+}
+
+function matrix(
+	a, b, c, d,
+	e, f, g, h,
+	i, j, k, l,
+	m, n, o, p
+) {
+  const result = new Matrix4();
+	result.set(
+		a, b, c, d,
+		e, f, g, h,
+		i, j, k, l,
+		m, n, o, p
+	);
+  return result;
+}
+
+function toMatrix(tx) {
+  switch (tx.length) {
+    case 3:
+		return matrix(
+			1, 0, 0, tx[0],
+			0, 1, 0, tx[1],
+			0, 0, 1, tx[2],
+			0, 0, 0, 1);
+    case 9:
+      return matrix(
+			tx[0], tx[1], tx[2], 0,
+			tx[3], tx[4], tx[5], 0,
+			tx[6], tx[7], tx[8], 0,
+			0,     0,     0,     1);
+    case 12:
+      return matrix(
+			tx[0], tx[1], tx[2], tx[9],
+			tx[3], tx[4], tx[5], tx[10],
+			tx[6], tx[7], tx[8], tx[11],
+			0,     0,     0,     1);
+    case 16:
+      return matrix(
+			tx[0],  tx[1],  tx[2],  tx[3],
+			tx[4],  tx[5],  tx[6],  tx[7],
+			tx[8],  tx[9],  tx[10], tx[11],
+			tx[12], tx[13], tx[14], tx[15]);
+    default:
+      throw new Error("Invalid transform array: " + tx);
+  }
+}
+
+function toTX(matrix4) {
+  const el = matrix4.elements;
+  return [ el[0], el[4], el[8], el[1], el[5], el[9], el[2],  el[6],  el[10],  el[12],  el[13],  el[14] ];
+}
+
+function transform(group, tx) {
+  if (tx != null && tx.length > 0) {
+    if (tx.length == 3) {
+      group.position.set(tx[0], tx[1], tx[2]);
+    } else {
+      group.applyMatrix4(toMatrix(tx));
+    }
+  }
+}
+
+function createDetailedGrid(size) {
+  const z = 0;
+  const edge = size / 2;
+  const gridGroup = new Group();
+
+  const smallCell = 200;
+  const bigCell = smallCell * 10;
+
+  function createLine(start, end, color, linewidth) {
+      const geometry = new BufferGeometry().setFromPoints([start, end]);
+      const material = new LineBasicMaterial({ color, linewidth });
+      return new Line(geometry, material);
+  }
+
+  const gridSmall = new Group();
+  // vertical lines
+  for (let i = 0; i <= edge; i += smallCell) {
+    gridSmall.add(createLine(new Vector3(-i, -edge, z), new Vector3(-i, edge, z), LIGHT_BLUE, 1));
+    gridSmall.add(createLine(new Vector3(i, -edge, z), new Vector3(i, edge, z), LIGHT_BLUE, 1));
+  }
+  // horizontal lines
+  for (let i = z; i <= edge; i += smallCell) {
+    gridSmall.add(createLine(new Vector3(-edge, -i, z), new Vector3(edge, -i, z), LIGHT_BLUE, 1));
+    gridSmall.add(createLine(new Vector3(-edge, i, z), new Vector3(edge, i, z), LIGHT_BLUE, 1));
+  }
+
+  const gridBig = new Group();
+  for (let i = bigCell; i <= edge; i += bigCell) {
+    // vertical lines
+    gridBig.add(createLine(new Vector3(-i, -edge, z), new Vector3(-i, edge, z), MIDDLE_BLUE, 2));
+    gridBig.add(createLine(new Vector3(i, -edge, z), new Vector3(i, edge, z), MIDDLE_BLUE, 2));
+    // horizontal lines
+    gridBig.add(createLine(new Vector3(-edge, -i, z), new Vector3(edge, -i, z), MIDDLE_BLUE, 2));
+    gridBig.add(createLine(new Vector3(-edge, i, z), new Vector3(edge, i, z), MIDDLE_BLUE, 2));
+}
+
+  const gridEdgeCenter = new Group();
+  const thickestLines = [
+    // vertical outer lines
+    [new Vector3(-edge, -edge, z), new Vector3(-edge, edge, z)],
+    [new Vector3(edge, -edge, z), new Vector3(edge, edge, z)],
+    // horizontal outer lines
+    [new Vector3(-edge, -edge, z), new Vector3(edge, -edge, z)],
+    [new Vector3(-edge, edge, z), new Vector3(edge, edge, z)],
+    // central lines
+    [new Vector3(0, -edge, z), new Vector3(0, edge, z)],
+    [new Vector3(-edge, 0, z), new Vector3(edge, 0, z)]
+  ];
+  thickestLines.forEach(([start, end]) => {
+      gridEdgeCenter.add(createLine(start, end, DARK_BLUE, 3));
+  });
+
+  gridGroup.add(gridSmall);
+  gridGroup.add(gridBig);
+  gridGroup.add(gridEdgeCenter);
+
+  return gridGroup;
+}
+
 // For sever communication written in legacy JS.
 window.services.threejs = {
   init: async function (
@@ -1651,27 +1806,3 @@ window.services.threejs = {
     }
   }
 };
-
-function getLocalMatrix(objectMatrixWorld, parentMatrixWorld) {
-  const worldMatrix = objectMatrixWorld.clone();
-  const parentInverse = new Matrix4().copy(parentMatrixWorld).invert();
-  const localMatrix = new Matrix4().multiplyMatrices(parentInverse, worldMatrix);
-
-  return localMatrix;
-}
-
-function getMatrixDiff(m1, m2) {
-  const diffMatrix = new Matrix4();
-  diffMatrix.copy(m1.clone().invert()).multiply(m2);
-
-  return diffMatrix;
-}
-
-function isDescendantOfAny(node, selectedSet) {
-  let parent = node.parent;
-  while (parent) {
-    if (selectedSet.has(parent)) return true;
-    parent = parent.parent;
-  }
-  return false;
-}
