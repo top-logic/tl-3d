@@ -21,11 +21,19 @@ public class GroupNode extends SceneNode {
 	private final java.util.List<com.top_logic.threed.threejs.scene.SceneNode> _contents = new de.haumacher.msgbuf.util.ReferenceList<com.top_logic.threed.threejs.scene.SceneNode>() {
 		@Override
 		protected void beforeAdd(int index, com.top_logic.threed.threejs.scene.SceneNode element) {
+			com.top_logic.threed.threejs.scene.SceneNode added = element;
+			com.top_logic.threed.threejs.scene.ScenePart oldContainer = added.getParent();
+			if (oldContainer != null && oldContainer != GroupNode.this) {
+				throw new IllegalStateException("Object may not be part of two different containers.");
+			}
 			_listener.beforeAdd(GroupNode.this, CONTENTS__PROP, index, element);
+			added.internalSetParent(GroupNode.this);
 		}
 
 		@Override
 		protected void afterRemove(int index, com.top_logic.threed.threejs.scene.SceneNode element) {
+			com.top_logic.threed.threejs.scene.SceneNode removed = element;
+			removed.internalSetParent(null);
 			_listener.afterRemove(GroupNode.this, CONTENTS__PROP, index, element);
 		}
 

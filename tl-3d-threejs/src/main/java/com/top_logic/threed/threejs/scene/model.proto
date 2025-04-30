@@ -35,10 +35,18 @@ message ConnectionPoint {
 	repeated string classifiers;
 }
 
+/** Base class for a part in a {@link SceneGraph} */
+abstract message ScenePart {
+}
+
 /** Base class for a node in a {@link SceneGraph} */
-abstract message SceneNode {
+abstract message SceneNode extends ScenePart {
 	/** Reference to a custom object that is represented by this scene node. */
 	transient java.lang.Object userData;
+	
+	/** The {@link SceneNode} where this {@link SceneNode} is a part of. */
+	@Container
+	ScenePart parent;
 
 	/** Optional {@link ConnectionPoint} defining the point where this node can be connected. */
 	ConnectionPoint layoutPoint;
@@ -60,10 +68,11 @@ message PartNode extends SceneNode {
 }
 
 /** The top-level object of a scene. */
-message SceneGraph {
+message SceneGraph extends ScenePart {
 	/** The top-level {@link SceneNode} of the scene. */
 	SceneNode root;
 
 	/** The currently selected {@link SceneNode}s. */
+	@Ref
 	repeated SceneNode selection;
 }

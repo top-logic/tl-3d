@@ -3,19 +3,7 @@ package com.top_logic.threed.threejs.scene;
 /**
  * Base class for a node in a {@link SceneGraph}
  */
-public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractSharedGraphNode {
-
-	/** Type codes for the {@link com.top_logic.threed.threejs.scene.SceneNode} hierarchy. */
-	public enum TypeKind {
-
-		/** Type literal for {@link com.top_logic.threed.threejs.scene.GroupNode}. */
-		GROUP_NODE,
-
-		/** Type literal for {@link com.top_logic.threed.threejs.scene.PartNode}. */
-		PART_NODE,
-		;
-
-	}
+public abstract class SceneNode extends ScenePart {
 
 	/** Visitor interface for the {@link com.top_logic.threed.threejs.scene.SceneNode} hierarchy.*/
 	public interface Visitor<R,A,E extends Throwable> {
@@ -31,6 +19,9 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 	/** @see #getUserData() */
 	public static final String USER_DATA__PROP = "userData";
 
+	/** @see #getParent() */
+	public static final String PARENT__PROP = "parent";
+
 	/** @see #getLayoutPoint() */
 	public static final String LAYOUT_POINT__PROP = "layoutPoint";
 
@@ -38,6 +29,8 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 	public static final String SNAPPING_POINTS__PROP = "snappingPoints";
 
 	private transient java.lang.Object _userData = null;
+
+	private com.top_logic.threed.threejs.scene.ScenePart _parent = null;
 
 	private com.top_logic.threed.threejs.scene.ConnectionPoint _layoutPoint = null;
 
@@ -73,9 +66,6 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 		super();
 	}
 
-	/** The type code of this instance. */
-	public abstract TypeKind kind();
-
 	/**
 	 * Reference to a custom object that is represented by this scene node.
 	 */
@@ -103,6 +93,38 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 	 */
 	public final boolean hasUserData() {
 		return _userData != null;
+	}
+
+	/**
+	 * The {@link SceneNode} where this {@link SceneNode} is a part of.
+	 */
+	public final com.top_logic.threed.threejs.scene.ScenePart getParent() {
+		return _parent;
+	}
+
+	/**
+	 * Internal setter for updating derived field.
+	 */
+	com.top_logic.threed.threejs.scene.SceneNode setParent(com.top_logic.threed.threejs.scene.ScenePart value) {
+		internalSetParent(value);
+		return this;
+	}
+
+	/** Internal setter for {@link #getParent()} without chain call utility. */
+	protected final void internalSetParent(com.top_logic.threed.threejs.scene.ScenePart value) {
+		_listener.beforeSet(this, PARENT__PROP, value);
+		if (value != null && _parent != null) {
+			throw new IllegalStateException("Object may not be part of two different containers.");
+		}
+		_parent = value;
+		_listener.afterChanged(this, PARENT__PROP);
+	}
+
+	/**
+	 * Checks, whether {@link #getParent()} has a value.
+	 */
+	public final boolean hasParent() {
+		return _parent != null;
 	}
 
 	/**
@@ -193,6 +215,7 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 	private static java.util.List<String> PROPERTIES = java.util.Collections.unmodifiableList(
 		java.util.Arrays.asList(
 			USER_DATA__PROP, 
+			PARENT__PROP, 
 			LAYOUT_POINT__PROP, 
 			SNAPPING_POINTS__PROP));
 
@@ -214,6 +237,7 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 	public Object get(String field) {
 		switch (field) {
 			case USER_DATA__PROP: return getUserData();
+			case PARENT__PROP: return getParent();
 			case LAYOUT_POINT__PROP: return getLayoutPoint();
 			case SNAPPING_POINTS__PROP: return getSnappingPoints();
 			default: return super.get(field);
@@ -226,6 +250,7 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 			case USER_DATA__PROP: internalSetUserData((java.lang.Object) value); break;
 			case LAYOUT_POINT__PROP: internalSetLayoutPoint((com.top_logic.threed.threejs.scene.ConnectionPoint) value); break;
 			case SNAPPING_POINTS__PROP: internalSetSnappingPoints(de.haumacher.msgbuf.util.Conversions.asList(com.top_logic.threed.threejs.scene.ConnectionPoint.class, value)); break;
+			default: super.set(field, value); break;
 		}
 	}
 
@@ -270,6 +295,14 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 		switch (field) {
 			case USER_DATA__PROP: {
 				if (hasUserData()) {
+				} else {
+					out.nullValue();
+				}
+				break;
+			}
+			case PARENT__PROP: {
+				if (hasParent()) {
+					getParent().writeTo(scope, out);
 				} else {
 					out.nullValue();
 				}
@@ -336,5 +369,10 @@ public abstract class SceneNode extends de.haumacher.msgbuf.graph.AbstractShared
 
 	/** Accepts the given visitor. */
 	public abstract <R,A,E extends Throwable> R visit(Visitor<R,A,E> v, A arg) throws E;
+
+	@Override
+	public final <R,A,E extends Throwable> R visit(com.top_logic.threed.threejs.scene.ScenePart.Visitor<R,A,E> v, A arg) throws E {
+		return visit((com.top_logic.threed.threejs.scene.SceneNode.Visitor<R,A,E>) v, arg);
+	}
 
 }

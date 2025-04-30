@@ -3,7 +3,7 @@ package com.top_logic.threed.threejs.scene;
 /**
  * The top-level object of a scene.
  */
-public class SceneGraph extends de.haumacher.msgbuf.graph.AbstractSharedGraphNode {
+public class SceneGraph extends ScenePart {
 
 	/**
 	 * Creates a {@link com.top_logic.threed.threejs.scene.SceneGraph} instance.
@@ -49,6 +49,11 @@ public class SceneGraph extends de.haumacher.msgbuf.graph.AbstractSharedGraphNod
 		super();
 	}
 
+	@Override
+	public TypeKind kind() {
+		return TypeKind.SCENE_GRAPH;
+	}
+
 	/**
 	 * The top-level {@link SceneNode} of the scene.
 	 */
@@ -66,8 +71,22 @@ public class SceneGraph extends de.haumacher.msgbuf.graph.AbstractSharedGraphNod
 
 	/** Internal setter for {@link #getRoot()} without chain call utility. */
 	protected final void internalSetRoot(com.top_logic.threed.threejs.scene.SceneNode value) {
+		com.top_logic.threed.threejs.scene.SceneNode before = _root;
+		com.top_logic.threed.threejs.scene.SceneNode after = value;
+		if (after != null) {
+			com.top_logic.threed.threejs.scene.ScenePart oldContainer = after.getParent();
+			if (oldContainer != null && oldContainer != this) {
+				throw new IllegalStateException("Object may not be part of two different containers.");
+			}
+		}
 		_listener.beforeSet(this, ROOT__PROP, value);
+		if (before != null) {
+			before.internalSetParent(null);
+		}
 		_root = value;
+		if (after != null) {
+			after.internalSetParent(this);
+		}
 		_listener.afterChanged(this, ROOT__PROP);
 	}
 
@@ -158,6 +177,7 @@ public class SceneGraph extends de.haumacher.msgbuf.graph.AbstractSharedGraphNod
 		switch (field) {
 			case ROOT__PROP: internalSetRoot((com.top_logic.threed.threejs.scene.SceneNode) value); break;
 			case SELECTION__PROP: internalSetSelection(de.haumacher.msgbuf.util.Conversions.asList(com.top_logic.threed.threejs.scene.SceneNode.class, value)); break;
+			default: super.set(field, value); break;
 		}
 	}
 
@@ -251,6 +271,11 @@ public class SceneGraph extends de.haumacher.msgbuf.graph.AbstractSharedGraphNod
 			}
 			default: return super.readElement(scope, in, field);
 		}
+	}
+
+	@Override
+	public <R,A,E extends Throwable> R visit(com.top_logic.threed.threejs.scene.ScenePart.Visitor<R,A,E> v, A arg) throws E {
+		return v.visit(this, arg);
 	}
 
 }
