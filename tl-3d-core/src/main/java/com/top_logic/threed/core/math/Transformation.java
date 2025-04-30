@@ -10,7 +10,6 @@ import static java.lang.Math.*;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
 
 import org.apache.commons.math3.linear.LUDecomposition;
 import org.apache.commons.math3.linear.MatrixUtils;
@@ -476,7 +475,19 @@ public class Transformation extends MapLike {
 	@Override
 	public int hashCode() {
 		final int prime = 31;
-		int result = prime + Objects.hash(_a, _b, _c, _d, _e, _f, _g, _h, _i, _x, _y, _z);
+		int result = prime;
+		result = prime * result + Double.hashCode(_a);
+		result = prime * result + Double.hashCode(_b);
+		result = prime * result + Double.hashCode(_c);
+		result = prime * result + Double.hashCode(_d);
+		result = prime * result + Double.hashCode(_e);
+		result = prime * result + Double.hashCode(_f);
+		result = prime * result + Double.hashCode(_g);
+		result = prime * result + Double.hashCode(_h);
+		result = prime * result + Double.hashCode(_i);
+		result = prime * result + Double.hashCode(_x);
+		result = prime * result + Double.hashCode(_y);
+		result = prime * result + Double.hashCode(_z);
 		return result;
 	}
 
