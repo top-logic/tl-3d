@@ -238,7 +238,12 @@ public class Transformation extends MapLike {
 	}
 
 	private double theta() {
-		return -asin(g());
+		double asin = asin(g());
+		if (asin == 0.0) {
+			// Avoid display of -0.0
+			return 0.0;
+		}
+		return -asin;
 	}
 
 	/**
