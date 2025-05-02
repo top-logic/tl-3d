@@ -25,8 +25,7 @@ import {
   LineBasicMaterial,
   LineSegments,
   CanvasTexture,
-  FrontSide,
-  Euler
+  FrontSide
 } from "three";
 
 import { OrbitControls } from "OrbitControls";
@@ -37,6 +36,7 @@ import { gsap } from "gsap";
 const WHITE_LIGHT = "#ffffff";
 const LIGHT_GREY = "#cccccc";
 const DARK_GREY = "#333333";
+const RED = 0xff0000;
 const YELLOW = 0xffff00;
 const GREEN = 0x00ff00;
 const LIGHT_BLUE = 0x77aacc;
@@ -594,6 +594,7 @@ class ThreeJsControl {
     this.render(); 
   }
 
+  // "M(0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0) T(1826.0, 0.0, 2300.0)"
   snapObject(selectedObj) {
     if (
       !selectedObj ||
@@ -623,7 +624,8 @@ class ThreeJsControl {
   
     // find the closest pair of snapping points
     let closestDistance = 1000;
-    let closestPointPosition = null;
+    let closestSnappingPoint = null;
+    let closestSnappingPointObject = null;
 
     const selectedWorldPosition = new Vector3();
     selectedObj.getWorldPosition(selectedWorldPosition);
@@ -632,46 +634,48 @@ class ThreeJsControl {
       otherObject.updateMatrixWorld(true);
   
       for (const otherPoint of otherObject.userData.snappingPoints) {
-        // const scale = new Vector3();
-        // const rotation = new Euler();
         const position = new Vector3();
-
         otherPoint.node.getWorldPosition(position);
-        // otherPoint.node.matrixWorld.decompose(position, rotation, scale);
+        
         const distance = selectedWorldPosition.distanceTo(position);
-  
+
         if (distance < closestDistance) {
           closestDistance = distance;
-          closestPointPosition = position;
+          closestSnappingPoint = otherPoint;
+          closestSnappingPointObject = otherObject;
         }
       }
     }
   
-    if (closestPointPosition) {
-      // calculate the offset for snapping objects' points (vector from the point of the moving object to the point of another)
-      const offset = new Vector3().subVectors(
-        closestPointPosition,
-        selectedWorldPosition
-      );
-  
-      // apply the offset to the object's world position
-      selectedWorldPosition.add(offset);
-  
-      // convert the new world position back to local position relative to the parent
-      const newLocalPosition = selectedWorldPosition.clone();
+    if (closestSnappingPoint) {
+      closestSnappingPointObject.updateMatrixWorld(true);
+      closestSnappingPoint.node.updateMatrixWorld(true);
+      selectedObj.updateMatrixWorld(true);
+      
+      const snappingPointWorldMatrix = closestSnappingPoint.node.matrixWorld.clone();
+      
+      // convert the world matrix to a local matrix
       if (selectedObj.parent) {
         selectedObj.parent.updateMatrixWorld(true);
-
-        const parentWorldInverse = new Matrix4()
-          .copy(selectedObj.parent.matrixWorld)
-          .invert();
-
-        newLocalPosition.applyMatrix4(parentWorldInverse);
+        
+        // get the inverse of the parent's world matrix
+        const parentWorldInverse = new Matrix4().copy(selectedObj.parent.matrixWorld).invert();
+        
+        // apply the parent's inverse world matrix to get the local matrix
+        // convert the snapping point's world matrix to be relative to the selected object's parent
+        const localMatrix = new Matrix4().copy(snappingPointWorldMatrix).premultiply(parentWorldInverse);
+        
+        // apply the local matrix directly to the object's matrix
+        selectedObj.matrix.copy(localMatrix);
+        
+        // IMPORTANT! Disable automatic matrix updates so manual matrix assignment (via .matrix.copy) is saved
+        selectedObj.matrixAutoUpdate = false;
+      } else {
+        // if there's no parent, apply the world matrix directly
+        selectedObj.matrix.copy(snappingPointWorldMatrix);
+        selectedObj.matrixAutoUpdate = false;
       }
-  
-      // set the new position
-      selectedObj.position.copy(newLocalPosition);
-      selectedObj.updateMatrix();
+      
       selectedObj.updateMatrixWorld(true);
     }
   
@@ -980,7 +984,7 @@ class ThreeJsControl {
         // Cannot remove from selection.
         return;
       }
-      this.setColor(sharedNode.node, 0xff0000);
+      this.setColor(sharedNode.node, RED);
       this.selection.push(sharedNode);
       
       command = this.sceneGraph.addSelected(sharedNode); 
@@ -1001,7 +1005,7 @@ class ThreeJsControl {
 
     // apply selection to new objects that have to be selected
     for (const shared3JSNode of selectedSharedNodes) {
-      this.setColor(shared3JSNode.node, 0xff0000);
+      this.setColor(shared3JSNode.node, RED);
       this.selection.push(shared3JSNode);
     }
   }
@@ -1337,7 +1341,7 @@ class GroupNode extends SharedObject {
     if (this.layoutPoint) {
       const layoutSphere = new Mesh(
         new SphereGeometry(C_P_RADIUS, WIDTH_SEGMENTS, HEIGHT_SEGMENTS),
-        new MeshBasicMaterial({ color: 0xffff00 })
+        new MeshBasicMaterial({ color: YELLOW })
       );
       group.add(layoutSphere);
 
@@ -1394,7 +1398,7 @@ class PartNode extends SharedObject {
     if (this.layoutPoint && this.layoutPoint.transform) {
       const layoutSphere = new Mesh(
         new SphereGeometry(C_P_RADIUS, WIDTH_SEGMENTS, HEIGHT_SEGMENTS),
-        new MeshBasicMaterial({ color: 0xffff00 })
+        new MeshBasicMaterial({ color: YELLOW })
       );
       group.add(layoutSphere);
 
