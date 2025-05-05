@@ -422,17 +422,18 @@ class ThreeJsControl {
    * Syncs the content of multiTransformGroup and selected shared objects
    */
   updateTransformControls() {
-    // restores original object positions in the scheneGraph (zUpRoot group)
-    this.restoreMultiGroup();
     // hides transform controls
     this.deactivateControl();
+    // restores original object positions in the scheneGraph (zUpRoot group)
+    this.restoreMultiGroup();
+
 
     if (this.isEditMode && this.selection.length) {
     // ONE OBJECT SELECTED
-      if (this.selection.length === 1) {
-        this.restoreMultiGroup(); 
+      if (this.selection.length === 1) { 
         const object = this.selection[0].node;
         if (object) {
+          this.transformControls.position.set(0, 0, 0);
           this.activateControl(object);
         } else {
           console.warn("Single object not found in selection[0]");
@@ -498,7 +499,7 @@ class ThreeJsControl {
   
     // get visual "center" of the multiTransformGroup and position transformControls to it
     box.getCenter(center);
-    this.transformControls.position.copy(center);
+    this.transformControls.position.copy(center); // set transformControls.position manually
   }  
 
   restoreMultiGroup() {
@@ -522,6 +523,8 @@ class ThreeJsControl {
         node.updateMatrixWorld(true);
   
         delete node.previousParent;
+      } else {
+        console.error(`Node ${node.name} has no previousParent`);
       }
     }
 
@@ -689,24 +692,50 @@ class ThreeJsControl {
   }
 
   addBoxHelpers() {
-    // show bounding box around the selected object
-    if (this.lastSelectedObject) {
-      this.lastSelectedObject.remove(this.lastSelectedBoxHelper);
-      this.lastSelectedBoxHelper = null;
-    }
-    if (this.value) {
-      const boxHelper = new BoxHelper(this.candidate, YELLOW);
-      this.scene.add(boxHelper);
-      this.lastSelectedObject = this.candidate;
-      this.lastSelectedBoxHelper = boxHelper;
-    } else {
-      this.lastSelectedObject = null;
-    }
 
     // show bounding box around all objects
-    this.boundingBoxHelper = new Box3Helper(this.boundingBox, YELLOW);
-    this.scene.add(this.boundingBoxHelper);
+    // this.boundingBoxHelper = new Box3Helper(this.boundingBox, YELLOW);
+    // this.scene.add(this.boundingBoxHelper);
+    // this.render();
+    this.removeBoxHelpers();
+
+    if (this.selection.length === 0) {
+      return;
+    }
+    
+    this.boxHelpers = [];
+    
+    if (this.selection.length > 1 && this.multiTransformGroup.children.length > 0) {
+      // create a box helper for the entire multigroup
+      const multiGroupHelper = new BoxHelper(this.multiTransformGroup, YELLOW);
+      this.scene.add(multiGroupHelper);
+      this.boxHelpers.push(multiGroupHelper);
+    } else {
+      // create individual box helpers for each selected object
+      for (const sharedNode of this.selection) {
+        if (sharedNode && sharedNode.node) {
+          const boxHelper = new BoxHelper(sharedNode.node, YELLOW);
+          this.scene.add(boxHelper);
+          this.boxHelpers.push(boxHelper);
+        }
+      }
+    }
     this.render();
+  }
+
+  removeBoxHelpers() {
+    if (this.boxHelpers && this.boxHelpers.length > 0) {
+      for (const helper of this.boxHelpers) {
+        this.scene.remove(helper);
+      }
+      this.boxHelpers = [];
+    }
+    
+    if (this.lastSelectedBoxHelper) {
+      this.scene.remove(this.lastSelectedBoxHelper);
+      this.lastSelectedBoxHelper = null;
+      this.lastSelectedObject = null;
+    }
   }
 
   createBoundingBox() {
@@ -989,7 +1018,6 @@ class ThreeJsControl {
       
       command = this.sceneGraph.addSelected(sharedNode); 
     }
-
     this.updateTransformControls();
 
     return command;
@@ -1046,7 +1074,7 @@ class ThreeJsControl {
 	        changes.push(setCmd);
 	      }
 
-          // this.addBoxHelpers();
+          this.addBoxHelpers();
 
           this.render();
 
