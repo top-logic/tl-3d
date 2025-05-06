@@ -72,6 +72,11 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 		return true;
 	}
 
+	@Override
+	protected String getTypeCssClass() {
+		return "cThreeJs";
+	}
+
 	/**
 	 * Sends the command to the client to zoom to the current selection.
 	 */
@@ -151,8 +156,7 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 	@Override
 	protected void internalWrite(DisplayContext context, TagWriter out) throws IOException {
 		out.beginBeginTag(DIV);
-		out.writeAttribute(ID_ATTR, getID());
-		out.writeAttribute(STYLE_ATTR, "position: absolute; width: 100%; height: 100%; background-color: skyblue;");
+		writeControlAttributes(context, out);
 		out.endBeginTag();
 		
 		String dataUrl =
