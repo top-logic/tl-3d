@@ -475,7 +475,7 @@ class ThreeJsControl {
     const topLevelNodes = selectedNodes.filter(node =>
       !isDescendantOfAny(node, selectedSet)
     );
-  
+
     for (const node of topLevelNodes) {
       // save the current parent to be able to restore the node in zUpRoot later
       node.previousParent = node.parent;
@@ -486,20 +486,24 @@ class ThreeJsControl {
   
       // calculate the local matrix of the node relative to the new group so that it does not move visually
       const inverseGroupMatrix = new Matrix4().copy(this.multiTransformGroup.matrixWorld).invert();
-      const localMatrix = new Matrix4().multiplyMatrices(inverseGroupMatrix, worldMatrix);
-  
-      // fix the node matrix
-      node.matrixAutoUpdate = false;
-      node.matrix.copy(localMatrix);
-      node.updateMatrixWorld(true);
+      const localMatrix = new Matrix4()
+        .multiplyMatrices(inverseGroupMatrix, worldMatrix)
+        .multiply(node.matrix.clone().invert());
+
+      node.applyMatrix4(localMatrix);
   
       // expand the bounding box for the group
       box.expandByObject(node);
     }
+
+    // const firstPos = new Vector3();
+    // first.matrixWorld.clone();
+    // this.transformControls.position.copy(firstPos);
   
     // get visual "center" of the multiTransformGroup and position transformControls to it
     box.getCenter(center);
     this.transformControls.position.copy(center); // set transformControls.position manually
+    
   }  
 
   restoreMultiGroup() {
@@ -515,12 +519,11 @@ class ThreeJsControl {
         node.updateMatrixWorld(true);
   
         const parentInverse = new Matrix4().copy(node.parent.matrixWorld).invert();
-        const localMatrix = new Matrix4().multiplyMatrices(parentInverse, worldMatrix);
+        const localMatrix = new Matrix4()
+          .multiplyMatrices(parentInverse, worldMatrix)
+          .multiply(node.matrix.clone().invert());
   
-        // recalculate node's position relative to the node.previousParent
-        node.matrixAutoUpdate = false;
-        node.matrix.copy(localMatrix);
-        node.updateMatrixWorld(true);
+        node.applyMatrix4(localMatrix);
   
         delete node.previousParent;
       } else {
