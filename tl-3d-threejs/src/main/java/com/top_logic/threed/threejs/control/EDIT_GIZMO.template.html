@@ -1,0 +1,40 @@
+<div id="{id}" class="{cssClass}">
+
+	<div class="title">
+		<div class="text">Layouting</div>
+		<div class="buttons">{collapseButton}</div>
+	</div>
+	<tl:if test="!minimized">
+	<div class="content">
+		<div class="translate">
+			<span class="label">{translateXLabel}</span>
+			{translateX}
+		</div>
+
+		<div class="rotate">
+			<span class="label">{rotateXLabel}</span>
+			{rotateX}
+		</div>
+
+		<div class="translate">
+			<span class="label">{translateYLabel}</span>
+			{translateY}
+		</div>
+
+		<div class="rotate">
+			<span class="label">{rotateYLabel}</span>
+			{rotateY}
+		</div>
+
+		<div class="translate">
+			<span class="label">{translateZLabel}</span>
+			{translateZ}
+		</div>
+
+		<div class="rotate">
+			<span class="label">{rotateZLabel}</span>
+			{rotateZ}
+		</div>
+	</div>
+	</tl:if>
+</div>

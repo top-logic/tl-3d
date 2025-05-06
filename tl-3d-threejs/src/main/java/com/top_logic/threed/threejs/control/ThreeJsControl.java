@@ -7,7 +7,9 @@ package com.top_logic.threed.threejs.control;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.top_logic.base.services.simpleajax.JSFunctionCall;
@@ -21,7 +23,11 @@ import com.top_logic.layout.UpdateQueue;
 import com.top_logic.layout.basic.AbstractControl;
 import com.top_logic.layout.basic.ControlCommand;
 import com.top_logic.mig.html.HTMLUtil;
+import com.top_logic.threed.core.math.TransformationUtil;
+import com.top_logic.threed.threejs.scene.ConnectionPoint;
 import com.top_logic.threed.threejs.scene.SceneGraph;
+import com.top_logic.threed.threejs.scene.SceneNode;
+import com.top_logic.threed.threejs.scene.ScenePart;
 import com.top_logic.tool.boundsec.HandlerResult;
 
 import de.haumacher.msgbuf.graph.DefaultScope;
@@ -31,6 +37,8 @@ import de.haumacher.msgbuf.io.StringW;
 import de.haumacher.msgbuf.io.Writer;
 import de.haumacher.msgbuf.json.JsonReader;
 import de.haumacher.msgbuf.json.JsonWriter;
+import de.haumacher.msgbuf.observer.Listener;
+import de.haumacher.msgbuf.observer.Observable;
 import de.haumacher.msgbuf.server.io.WriterAdapter;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -52,6 +60,112 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 	private boolean _isInEditMode;
 
 	private boolean _isRotateMode;
+
+	private class SceneListener implements Listener {
+
+		private Map<Observable, List<SceneNode>> _upcomingSelectionChange = new HashMap<>();
+
+		private Listener transformationListener = new Listener() {
+			
+			@Override
+			public void afterChanged(Observable obj, String property) {
+				switch (property) {
+					case ConnectionPoint.TRANSFORM__PROP: {
+						updateGizmoControl(((ConnectionPoint) obj).getOwner());
+					}
+				}
+			}
+
+			@Override
+			public void beforeSet(Observable obj, String property, Object value) {
+				// Nothing to do here. See afterChanged(...)
+			}
+
+		};
+
+		void attach(SceneGraph graph) {
+			graph.registerListener(this);
+
+			List<SceneNode> selection = graph.getSelection();
+			SceneNode gizmoNode = findGizmoNode(selection);
+			registerTxListener(gizmoNode);
+		}
+
+		void detach(SceneGraph graph) {
+			List<SceneNode> selection = graph.getSelection();
+			selection.forEach(this::unregisterTXListener);
+
+			graph.unregisterListener(this);
+		}
+
+		private void registerTxListener(SceneNode node) {
+			updateGizmoControl(node);
+			if (node != null) {
+				ConnectionPoint layoutPoint = node.getLayoutPoint();
+				if (layoutPoint != null) {
+					layoutPoint.registerListener(transformationListener);
+				}
+			}
+
+		}
+
+		private void unregisterTXListener(SceneNode node) {
+			ConnectionPoint layoutPoint = node.getLayoutPoint();
+			if (layoutPoint != null) {
+				layoutPoint.unregisterListener(transformationListener);
+			}
+		}
+
+		@Override
+		public void afterChanged(Observable obj, String property) {
+			switch (property) {
+				case SceneGraph.SELECTION__PROP: {
+					List<SceneNode> oldSelection = _upcomingSelectionChange.remove(obj);
+					oldSelection.forEach(this::unregisterTXListener);
+					SceneNode gizmoNode = findGizmoNode(((SceneGraph) obj).getSelection());
+					registerTxListener(gizmoNode);
+				}
+			}
+		}
+
+		@Override
+		public void beforeSet(Observable obj, String property, Object value) {
+			switch (property) {
+				case SceneGraph.SELECTION__PROP: {
+					_upcomingSelectionChange.put(obj, ((SceneGraph) obj).getSelection());
+				}
+			}
+		}
+
+		@Override
+		public void beforeAdd(Observable obj, String property, int index, Object element) {
+			switch (property) {
+				case SceneGraph.SELECTION__PROP: {
+					if (!_upcomingSelectionChange.containsKey(obj)) {
+						_upcomingSelectionChange.put(obj, ((SceneGraph) obj).getSelection());
+					}
+				}
+			}
+		}
+
+		@Override
+		public void afterRemove(Observable obj, String property, int index, Object element) {
+			switch (property) {
+				case SceneGraph.SELECTION__PROP: {
+					if (!_upcomingSelectionChange.containsKey(obj)) {
+						List<SceneNode> currSelection = new ArrayList<>(((SceneGraph) obj).getSelection());
+						currSelection.add(index, (SceneNode) element);
+						_upcomingSelectionChange.put(obj, currSelection);
+					}
+				}
+			}
+		}
+
+	}
+
+	private SceneListener _sceneListener = new SceneListener();
+
+	private GizmoControl _gizmoControl = new GizmoControl();
 
 	/**
 	 * Creates a {@link ThreeJsControl}.
@@ -104,6 +218,7 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 
 	public void setIsInEditMode(boolean value) {
 		_isInEditMode = value;
+		_gizmoControl.setEditable(value);
 		
 		addUpdate(new JSFunctionCall(getID(), THREEJS_JS_NS, "toggleEditMode", value));
 	}
@@ -122,12 +237,66 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 	protected void internalAttach() {
 		super.internalAttach();
 
+		_sceneListener.attach(_model);
+		updateGizmoControl(findGizmoNode(_model.getSelection()));
+
 		getFrameScope().registerContentHandler(getID(), this);
+	}
+
+	private void updateGizmoControl(SceneNode node) {
+		if (node == null) {
+			_gizmoControl.setConsumer(null);
+			_gizmoControl.setModel(null);
+		} else {
+			ConnectionPoint layoutPoint = node.getLayoutPoint();
+			if (layoutPoint == null) {
+				_gizmoControl.setConsumer(null);
+				_gizmoControl.setModel(null);
+			} else {
+				List<Double> transform = layoutPoint.getTransform();
+				if (transform.size() == 12) {
+					_gizmoControl.setConsumer(null);
+					_gizmoControl.setModel(TransformationUtil.fromList(transform));
+					_gizmoControl.setConsumer(tx -> {
+						layoutPoint.setTransform(TransformationUtil.toList(tx));
+					});
+				}
+			}
+		}
+	}
+
+	private SceneNode findGizmoNode(List<SceneNode> selection) {
+		SceneNode[] potentialGizmoNodes = selection.stream()
+			.filter(n -> n.getLayoutPoint() != null)
+			.toArray(SceneNode[]::new);
+		int selectionCnt = potentialGizmoNodes.length;
+		switch (selectionCnt) {
+			case 0:
+				return null;
+			case 1:
+				return potentialGizmoNodes[0];
+			default: {
+				SceneNode first = potentialGizmoNodes[0];
+				List<ScenePart> pathToRoot = new ArrayList<>();
+				ScenePart p = first;
+				do {
+					pathToRoot.add(p);
+					p = p.getParent();
+				} while (p != null);
+
+				int maxIdx = 0;
+				for (int i = 1; i < selectionCnt; i++) {
+					maxIdx = Math.max(maxIdx, pathToRoot.indexOf(potentialGizmoNodes[i]));
+				}
+				return (SceneNode) pathToRoot.get(maxIdx);
+			}
+		}
 	}
 
 	@Override
 	protected void internalDetach() {
 		getFrameScope().deregisterContentHandler(this);
+		_sceneListener.detach(_model);
 
 		super.internalDetach();
 	}
@@ -173,6 +342,8 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 			")"
 		);
 		HTMLUtil.endScriptAfterRendering(out);
+
+		_gizmoControl.write(context, out);
 
 		out.endTag(DIV);
 	}

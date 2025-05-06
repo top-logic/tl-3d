@@ -8,6 +8,7 @@ package com.top_logic.threed.threejs.control;
 import com.top_logic.gui.ThemeVar;
 import com.top_logic.html.template.HTMLTemplateFragment;
 import com.top_logic.layout.basic.IconsBase;
+import com.top_logic.layout.basic.TemplateType;
 
 /**
  * Theme variables.
@@ -15,5 +16,11 @@ import com.top_logic.layout.basic.IconsBase;
 public class Icons extends IconsBase {
 
 	public static ThemeVar<HTMLTemplateFragment> THREEJS_VIEWER;
+
+	/**
+	 * Template displaying the {@link GizmoControl}.
+	 */
+	@TemplateType(GizmoControl.class)
+	public static ThemeVar<HTMLTemplateFragment> EDIT_GIZMO;
 
 }

@@ -37,6 +37,11 @@ message ConnectionPoint {
 
 /** Base class for a part in a {@link SceneGraph} */
 abstract message ScenePart {
+
+	/** The {@link ScenePart} where this {@link ScenePart} is a part of. */
+	@Container
+	ScenePart parent;
+
 }
 
 /** Base class for a node in a {@link SceneGraph} */
@@ -44,10 +49,6 @@ abstract message SceneNode extends ScenePart {
 	/** Reference to a custom object that is represented by this scene node. */
 	transient java.lang.Object userData;
 	
-	/** The {@link SceneNode} where this {@link SceneNode} is a part of. */
-	@Container
-	ScenePart parent;
-
 	/** Optional {@link ConnectionPoint} defining the point where this node can be connected. */
 	ConnectionPoint layoutPoint;
 	

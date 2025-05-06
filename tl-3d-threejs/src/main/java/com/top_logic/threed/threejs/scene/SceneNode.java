@@ -19,9 +19,6 @@ public abstract class SceneNode extends ScenePart {
 	/** @see #getUserData() */
 	public static final String USER_DATA__PROP = "userData";
 
-	/** @see #getParent() */
-	public static final String PARENT__PROP = "parent";
-
 	/** @see #getLayoutPoint() */
 	public static final String LAYOUT_POINT__PROP = "layoutPoint";
 
@@ -29,8 +26,6 @@ public abstract class SceneNode extends ScenePart {
 	public static final String SNAPPING_POINTS__PROP = "snappingPoints";
 
 	private transient java.lang.Object _userData = null;
-
-	private com.top_logic.threed.threejs.scene.ScenePart _parent = null;
 
 	private com.top_logic.threed.threejs.scene.ConnectionPoint _layoutPoint = null;
 
@@ -93,38 +88,6 @@ public abstract class SceneNode extends ScenePart {
 	 */
 	public final boolean hasUserData() {
 		return _userData != null;
-	}
-
-	/**
-	 * The {@link SceneNode} where this {@link SceneNode} is a part of.
-	 */
-	public final com.top_logic.threed.threejs.scene.ScenePart getParent() {
-		return _parent;
-	}
-
-	/**
-	 * Internal setter for updating derived field.
-	 */
-	com.top_logic.threed.threejs.scene.SceneNode setParent(com.top_logic.threed.threejs.scene.ScenePart value) {
-		internalSetParent(value);
-		return this;
-	}
-
-	/** Internal setter for {@link #getParent()} without chain call utility. */
-	protected final void internalSetParent(com.top_logic.threed.threejs.scene.ScenePart value) {
-		_listener.beforeSet(this, PARENT__PROP, value);
-		if (value != null && _parent != null) {
-			throw new IllegalStateException("Object may not be part of two different containers.");
-		}
-		_parent = value;
-		_listener.afterChanged(this, PARENT__PROP);
-	}
-
-	/**
-	 * Checks, whether {@link #getParent()} has a value.
-	 */
-	public final boolean hasParent() {
-		return _parent != null;
 	}
 
 	/**
@@ -215,7 +178,6 @@ public abstract class SceneNode extends ScenePart {
 	private static java.util.List<String> PROPERTIES = java.util.Collections.unmodifiableList(
 		java.util.Arrays.asList(
 			USER_DATA__PROP, 
-			PARENT__PROP, 
 			LAYOUT_POINT__PROP, 
 			SNAPPING_POINTS__PROP));
 
@@ -237,7 +199,6 @@ public abstract class SceneNode extends ScenePart {
 	public Object get(String field) {
 		switch (field) {
 			case USER_DATA__PROP: return getUserData();
-			case PARENT__PROP: return getParent();
 			case LAYOUT_POINT__PROP: return getLayoutPoint();
 			case SNAPPING_POINTS__PROP: return getSnappingPoints();
 			default: return super.get(field);
@@ -295,14 +256,6 @@ public abstract class SceneNode extends ScenePart {
 		switch (field) {
 			case USER_DATA__PROP: {
 				if (hasUserData()) {
-				} else {
-					out.nullValue();
-				}
-				break;
-			}
-			case PARENT__PROP: {
-				if (hasParent()) {
-					getParent().writeTo(scope, out);
 				} else {
 					out.nullValue();
 				}

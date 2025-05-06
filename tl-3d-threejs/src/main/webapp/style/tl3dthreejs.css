@@ -4,3 +4,34 @@
 	height: 100%;
 	background-color: skyblue;
 }
+
+.cGizmo {
+	position: absolute;
+	bottom: 10px;
+	right: 10px;
+	width: 200px;
+	border: 2px var(--layer-accent) solid;
+}
+
+.cGizmo div.content {
+	display: grid;
+	grid-template-columns: auto auto;
+	padding: var(--spacing-01);
+	row-gap: var(--spacing-02);
+	column-gap: var(--spacing-01);
+}
+
+.cGizmo div.title {
+	display: flex;
+	justify-content: space-between;
+	background-color: var(--layer-accent);
+	color: var(--layer-accent-text);
+	gap: var(--spacing-02);
+	padding: var(--spacing-02) var(--spacing-03);
+	box-sizing: border-box;
+}
+
+/* cButton a has "color:inherit" which eliminates color of ".cGizmo div.title".*/
+.cGizmo div.title .cButton a {
+	color: var(--layer-accent-text);
+}
