@@ -9,6 +9,7 @@ import {
   WebGLRenderer,
   Raycaster,
   Box3,
+  Quaternion,
   Vector3,
   Vector2,
   AxesHelper,
@@ -452,8 +453,11 @@ class ThreeJsControl {
   }
 
   prepareMultiGroup() {
+   let tmpPosition = new Vector3();
+   let tmpQuaternion = new Quaternion();
+   let tmpScale = new Vector3();
+  
     const box = new Box3();
-    const center = new Vector3();
 
     // remove all children from multiTransformGroup
     this.multiTransformGroup.clear();
@@ -476,6 +480,27 @@ class ThreeJsControl {
       !isDescendantOfAny(node, selectedSet)
     );
 
+    // find top-level node in selection.
+    let leadingSelection = null;
+    let tmp = selectedNodes[0];
+    while (true) {
+        if (topLevelNodes.indexOf(tmp) >= 0) {
+            leadingSelection = tmp;
+            break;
+    	}
+    	tmp = tmp.parent;
+    }
+
+    let gizmoMatrix = leadingSelection.matrixWorld.clone();
+    gizmoMatrix.decompose(tmpPosition, tmpQuaternion, tmpScale);
+    
+    this.multiTransformGroup.position.copy(tmpPosition);
+    this.multiTransformGroup.quaternion.copy(tmpQuaternion);
+    this.multiTransformGroup.scale.copy(tmpScale);
+    this.multiTransformGroup.updateMatrixWorld(true);
+    
+    this.transformControls.position.set(0,0,0); // set transformControls.position manually
+  
     for (const node of topLevelNodes) {
       // save the current parent to be able to restore the node in zUpRoot later
       node.previousParent = node.parent;
@@ -491,19 +516,10 @@ class ThreeJsControl {
         .multiply(node.matrix.clone().invert());
 
       node.applyMatrix4(localMatrix);
-  
       // expand the bounding box for the group
       box.expandByObject(node);
     }
 
-    // const firstPos = new Vector3();
-    // first.matrixWorld.clone();
-    // this.transformControls.position.copy(firstPos);
-  
-    // get visual "center" of the multiTransformGroup and position transformControls to it
-    box.getCenter(center);
-    this.transformControls.position.copy(center); // set transformControls.position manually
-    
   }  
 
   restoreMultiGroup() {
