@@ -19,38 +19,25 @@ public abstract class SceneNode extends ScenePart {
 	/** @see #getUserData() */
 	public static final String USER_DATA__PROP = "userData";
 
-	/** @see #getLayoutPoint() */
-	public static final String LAYOUT_POINT__PROP = "layoutPoint";
-
-	/** @see #getSnappingPoints() */
-	public static final String SNAPPING_POINTS__PROP = "snappingPoints";
+	/** @see #getTransform() */
+	public static final String TRANSFORM__PROP = "transform";
 
 	private transient java.lang.Object _userData = null;
 
-	private com.top_logic.threed.threejs.scene.ConnectionPoint _layoutPoint = null;
-
-	private final java.util.List<com.top_logic.threed.threejs.scene.ConnectionPoint> _snappingPoints = new de.haumacher.msgbuf.util.ReferenceList<com.top_logic.threed.threejs.scene.ConnectionPoint>() {
+	private final java.util.List<Double> _transform = new de.haumacher.msgbuf.util.ReferenceList<Double>() {
 		@Override
-		protected void beforeAdd(int index, com.top_logic.threed.threejs.scene.ConnectionPoint element) {
-			com.top_logic.threed.threejs.scene.ConnectionPoint added = element;
-			com.top_logic.threed.threejs.scene.SceneNode oldContainer = added.getOwner();
-			if (oldContainer != null && oldContainer != SceneNode.this) {
-				throw new IllegalStateException("Object may not be part of two different containers.");
-			}
-			_listener.beforeAdd(SceneNode.this, SNAPPING_POINTS__PROP, index, element);
-			added.internalSetOwner(SceneNode.this);
+		protected void beforeAdd(int index, Double element) {
+			_listener.beforeAdd(SceneNode.this, TRANSFORM__PROP, index, element);
 		}
 
 		@Override
-		protected void afterRemove(int index, com.top_logic.threed.threejs.scene.ConnectionPoint element) {
-			com.top_logic.threed.threejs.scene.ConnectionPoint removed = element;
-			removed.internalSetOwner(null);
-			_listener.afterRemove(SceneNode.this, SNAPPING_POINTS__PROP, index, element);
+		protected void afterRemove(int index, Double element) {
+			_listener.afterRemove(SceneNode.this, TRANSFORM__PROP, index, element);
 		}
 
 		@Override
 		protected void afterChanged() {
-			_listener.afterChanged(SceneNode.this, SNAPPING_POINTS__PROP);
+			_listener.afterChanged(SceneNode.this, TRANSFORM__PROP);
 		}
 	};
 
@@ -91,95 +78,50 @@ public abstract class SceneNode extends ScenePart {
 	}
 
 	/**
-	 * Optional {@link ConnectionPoint} defining the point where this node can be connected.
+	 * Transformation where this scene node lies.
 	 */
-	public final com.top_logic.threed.threejs.scene.ConnectionPoint getLayoutPoint() {
-		return _layoutPoint;
+	public final java.util.List<Double> getTransform() {
+		return _transform;
 	}
 
 	/**
-	 * @see #getLayoutPoint()
+	 * @see #getTransform()
 	 */
-	public com.top_logic.threed.threejs.scene.SceneNode setLayoutPoint(com.top_logic.threed.threejs.scene.ConnectionPoint value) {
-		internalSetLayoutPoint(value);
+	public com.top_logic.threed.threejs.scene.SceneNode setTransform(java.util.List<? extends Double> value) {
+		internalSetTransform(value);
 		return this;
 	}
 
-	/** Internal setter for {@link #getLayoutPoint()} without chain call utility. */
-	protected final void internalSetLayoutPoint(com.top_logic.threed.threejs.scene.ConnectionPoint value) {
-		com.top_logic.threed.threejs.scene.ConnectionPoint before = _layoutPoint;
-		com.top_logic.threed.threejs.scene.ConnectionPoint after = value;
-		if (after != null) {
-			com.top_logic.threed.threejs.scene.SceneNode oldContainer = after.getOwner();
-			if (oldContainer != null && oldContainer != this) {
-				throw new IllegalStateException("Object may not be part of two different containers.");
-			}
-		}
-		_listener.beforeSet(this, LAYOUT_POINT__PROP, value);
-		if (before != null) {
-			before.internalSetOwner(null);
-		}
-		_layoutPoint = value;
-		if (after != null) {
-			after.internalSetOwner(this);
-		}
-		_listener.afterChanged(this, LAYOUT_POINT__PROP);
+	/** Internal setter for {@link #getTransform()} without chain call utility. */
+	protected final void internalSetTransform(java.util.List<? extends Double> value) {
+		_transform.clear();
+		_transform.addAll(value);
 	}
 
 	/**
-	 * Checks, whether {@link #getLayoutPoint()} has a value.
+	 * Adds a value to the {@link #getTransform()} list.
 	 */
-	public final boolean hasLayoutPoint() {
-		return _layoutPoint != null;
-	}
-
-	/**
-	 * Optional {@link ConnectionPoint}s defining points where other {@link SceneNode}s can be connected with its {@link SceneNode#getLayoutPoint()}.
-	 */
-	public final java.util.List<com.top_logic.threed.threejs.scene.ConnectionPoint> getSnappingPoints() {
-		return _snappingPoints;
-	}
-
-	/**
-	 * @see #getSnappingPoints()
-	 */
-	public com.top_logic.threed.threejs.scene.SceneNode setSnappingPoints(java.util.List<? extends com.top_logic.threed.threejs.scene.ConnectionPoint> value) {
-		internalSetSnappingPoints(value);
+	public com.top_logic.threed.threejs.scene.SceneNode addTransform(double value) {
+		internalAddTransform(value);
 		return this;
 	}
 
-	/** Internal setter for {@link #getSnappingPoints()} without chain call utility. */
-	protected final void internalSetSnappingPoints(java.util.List<? extends com.top_logic.threed.threejs.scene.ConnectionPoint> value) {
-		if (value == null) throw new IllegalArgumentException("Property 'snappingPoints' cannot be null.");
-		_snappingPoints.clear();
-		_snappingPoints.addAll(value);
+	/** Implementation of {@link #addTransform(double)} without chain call utility. */
+	protected final void internalAddTransform(double value) {
+		_transform.add(value);
 	}
 
 	/**
-	 * Adds a value to the {@link #getSnappingPoints()} list.
+	 * Removes a value from the {@link #getTransform()} list.
 	 */
-	public com.top_logic.threed.threejs.scene.SceneNode addSnappingPoint(com.top_logic.threed.threejs.scene.ConnectionPoint value) {
-		internalAddSnappingPoint(value);
-		return this;
-	}
-
-	/** Implementation of {@link #addSnappingPoint(com.top_logic.threed.threejs.scene.ConnectionPoint)} without chain call utility. */
-	protected final void internalAddSnappingPoint(com.top_logic.threed.threejs.scene.ConnectionPoint value) {
-		_snappingPoints.add(value);
-	}
-
-	/**
-	 * Removes a value from the {@link #getSnappingPoints()} list.
-	 */
-	public final void removeSnappingPoint(com.top_logic.threed.threejs.scene.ConnectionPoint value) {
-		_snappingPoints.remove(value);
+	public final void removeTransform(double value) {
+		_transform.remove(value);
 	}
 
 	private static java.util.List<String> PROPERTIES = java.util.Collections.unmodifiableList(
 		java.util.Arrays.asList(
 			USER_DATA__PROP, 
-			LAYOUT_POINT__PROP, 
-			SNAPPING_POINTS__PROP));
+			TRANSFORM__PROP));
 
 	private static java.util.Set<String> TRANSIENT_PROPERTIES = java.util.Collections.unmodifiableSet(new java.util.HashSet<>(
 			java.util.Arrays.asList(
@@ -199,8 +141,7 @@ public abstract class SceneNode extends ScenePart {
 	public Object get(String field) {
 		switch (field) {
 			case USER_DATA__PROP: return getUserData();
-			case LAYOUT_POINT__PROP: return getLayoutPoint();
-			case SNAPPING_POINTS__PROP: return getSnappingPoints();
+			case TRANSFORM__PROP: return getTransform();
 			default: return super.get(field);
 		}
 	}
@@ -209,8 +150,7 @@ public abstract class SceneNode extends ScenePart {
 	public void set(String field, Object value) {
 		switch (field) {
 			case USER_DATA__PROP: internalSetUserData((java.lang.Object) value); break;
-			case LAYOUT_POINT__PROP: internalSetLayoutPoint((com.top_logic.threed.threejs.scene.ConnectionPoint) value); break;
-			case SNAPPING_POINTS__PROP: internalSetSnappingPoints(de.haumacher.msgbuf.util.Conversions.asList(com.top_logic.threed.threejs.scene.ConnectionPoint.class, value)); break;
+			case TRANSFORM__PROP: internalSetTransform(de.haumacher.msgbuf.util.Conversions.asList(Double.class, value)); break;
 			default: super.set(field, value); break;
 		}
 	}
@@ -239,14 +179,10 @@ public abstract class SceneNode extends ScenePart {
 	@Override
 	protected void writeFields(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonWriter out) throws java.io.IOException {
 		super.writeFields(scope, out);
-		if (hasLayoutPoint()) {
-			out.name(LAYOUT_POINT__PROP);
-			getLayoutPoint().writeTo(scope, out);
-		}
-		out.name(SNAPPING_POINTS__PROP);
+		out.name(TRANSFORM__PROP);
 		out.beginArray();
-		for (com.top_logic.threed.threejs.scene.ConnectionPoint x : getSnappingPoints()) {
-			x.writeTo(scope, out);
+		for (double x : getTransform()) {
+			out.value(x);
 		}
 		out.endArray();
 	}
@@ -261,18 +197,10 @@ public abstract class SceneNode extends ScenePart {
 				}
 				break;
 			}
-			case LAYOUT_POINT__PROP: {
-				if (hasLayoutPoint()) {
-					getLayoutPoint().writeTo(scope, out);
-				} else {
-					out.nullValue();
-				}
-				break;
-			}
-			case SNAPPING_POINTS__PROP: {
+			case TRANSFORM__PROP: {
 				out.beginArray();
-				for (com.top_logic.threed.threejs.scene.ConnectionPoint x : getSnappingPoints()) {
-					x.writeTo(scope, out);
+				for (double x : getTransform()) {
+					out.value(x);
 				}
 				out.endArray();
 				break;
@@ -284,15 +212,14 @@ public abstract class SceneNode extends ScenePart {
 	@Override
 	public void readField(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in, String field) throws java.io.IOException {
 		switch (field) {
-			case LAYOUT_POINT__PROP: setLayoutPoint(com.top_logic.threed.threejs.scene.ConnectionPoint.readConnectionPoint(scope, in)); break;
-			case SNAPPING_POINTS__PROP: {
-				java.util.List<com.top_logic.threed.threejs.scene.ConnectionPoint> newValue = new java.util.ArrayList<>();
+			case TRANSFORM__PROP: {
+				java.util.List<Double> newValue = new java.util.ArrayList<>();
 				in.beginArray();
 				while (in.hasNext()) {
-					newValue.add(com.top_logic.threed.threejs.scene.ConnectionPoint.readConnectionPoint(scope, in));
+					newValue.add(in.nextDouble());
 				}
 				in.endArray();
-				setSnappingPoints(newValue);
+				setTransform(newValue);
 			}
 			break;
 			default: super.readField(scope, in, field);
@@ -302,8 +229,8 @@ public abstract class SceneNode extends ScenePart {
 	@Override
 	public void writeElement(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonWriter out, String field, Object element) throws java.io.IOException {
 		switch (field) {
-			case SNAPPING_POINTS__PROP: {
-				((com.top_logic.threed.threejs.scene.ConnectionPoint) element).writeTo(scope, out);
+			case TRANSFORM__PROP: {
+				out.value(((double) element));
 				break;
 			}
 			default: super.writeElement(scope, out, field, element);
@@ -313,8 +240,8 @@ public abstract class SceneNode extends ScenePart {
 	@Override
 	public Object readElement(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in, String field) throws java.io.IOException {
 		switch (field) {
-			case SNAPPING_POINTS__PROP: {
-				return com.top_logic.threed.threejs.scene.ConnectionPoint.readConnectionPoint(scope, in);
+			case TRANSFORM__PROP: {
+				return in.nextDouble();
 			}
 			default: return super.readElement(scope, in, field);
 		}

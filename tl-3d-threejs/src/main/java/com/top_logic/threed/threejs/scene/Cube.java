@@ -99,6 +99,24 @@ public class Cube extends Asset {
 	}
 
 	@Override
+	public com.top_logic.threed.threejs.scene.Cube setLayoutPoint(com.top_logic.threed.threejs.scene.ConnectionPoint value) {
+		internalSetLayoutPoint(value);
+		return this;
+	}
+
+	@Override
+	public com.top_logic.threed.threejs.scene.Cube setSnappingPoints(java.util.List<? extends com.top_logic.threed.threejs.scene.ConnectionPoint> value) {
+		internalSetSnappingPoints(value);
+		return this;
+	}
+
+	@Override
+	public com.top_logic.threed.threejs.scene.Cube addSnappingPoint(com.top_logic.threed.threejs.scene.ConnectionPoint value) {
+		internalAddSnappingPoint(value);
+		return this;
+	}
+
+	@Override
 	public String jsonType() {
 		return CUBE__TYPE;
 	}

@@ -24,7 +24,7 @@ public class ConnectionPoint extends de.haumacher.msgbuf.graph.AbstractSharedGra
 	/** @see #getClassifiers() */
 	public static final String CLASSIFIERS__PROP = "classifiers";
 
-	private com.top_logic.threed.threejs.scene.SceneNode _owner = null;
+	private com.top_logic.threed.threejs.scene.Asset _owner = null;
 
 	private final java.util.List<Double> _transform = new de.haumacher.msgbuf.util.ReferenceList<Double>() {
 		@Override
@@ -72,20 +72,20 @@ public class ConnectionPoint extends de.haumacher.msgbuf.graph.AbstractSharedGra
 	/**
 	 * The {@link SceneNode} where this {@link ConnectionPoint} is a part of.
 	 */
-	public final com.top_logic.threed.threejs.scene.SceneNode getOwner() {
+	public final com.top_logic.threed.threejs.scene.Asset getOwner() {
 		return _owner;
 	}
 
 	/**
 	 * Internal setter for updating derived field.
 	 */
-	com.top_logic.threed.threejs.scene.ConnectionPoint setOwner(com.top_logic.threed.threejs.scene.SceneNode value) {
+	com.top_logic.threed.threejs.scene.ConnectionPoint setOwner(com.top_logic.threed.threejs.scene.Asset value) {
 		internalSetOwner(value);
 		return this;
 	}
 
 	/** Internal setter for {@link #getOwner()} without chain call utility. */
-	protected final void internalSetOwner(com.top_logic.threed.threejs.scene.SceneNode value) {
+	protected final void internalSetOwner(com.top_logic.threed.threejs.scene.Asset value) {
 		_listener.beforeSet(this, OWNER__PROP, value);
 		if (value != null && _owner != null) {
 			throw new IllegalStateException("Object may not be part of two different containers.");

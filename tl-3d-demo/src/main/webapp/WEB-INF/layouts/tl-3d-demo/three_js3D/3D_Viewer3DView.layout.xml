@@ -26,6 +26,13 @@
       tx:  $node.get(`tl.threed.demo:Node#tx`),
       userData: $node,
       url: $node.get(`tl.threed.demo:Part#asset`).get(`tl.threed.demo:Asset3D#gltfUrl`),
+      layoutPoint: {
+        lp = $node.get(`tl.threed.demo:Part#asset`).get(`tl.threed.demo:Asset3D#layoutPoint`);
+        $lp == null ? null : threejsCp(
+              tx: $lp.get(`tl.threed.demo:ConnectionPoint#tx`),
+              classifiers: $lp.get(`tl.threed.demo:ConnectionPoint#classifiers`)
+            )
+      },
       snappingPoints : $node.get(`tl.threed.demo:Part#asset`)
           .get(`tl.threed.demo:Asset3D#snappingPoints`)
           .map(cp -> 

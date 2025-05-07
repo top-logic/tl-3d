@@ -7,6 +7,13 @@ option SharedGraph;
 
 /** Base class for objects that can be rendered in a 3D context. */
 abstract message Asset {
+
+	/** Optional {@link ConnectionPoint} defining the point where this asset can be connected. */
+	ConnectionPoint layoutPoint;
+	
+	/** Optional {@link ConnectionPoint}s defining points where other {@link Asset}s can be connected with its {@link Asset#layoutPoint}. */
+	repeated ConnectionPoint snappingPoints;
+
 }
 
 /** A glTF artifact loaded from an URL. */
@@ -26,7 +33,7 @@ message ConnectionPoint {
 
 	/** The {@link SceneNode} where this {@link ConnectionPoint} is a part of. */
 	@Container
-	SceneNode owner;
+	Asset owner;
 
 	/** Transformation where the connection point in its {@link SceneNode} lies. */
 	repeated double transform;
@@ -49,11 +56,9 @@ abstract message SceneNode extends ScenePart {
 	/** Reference to a custom object that is represented by this scene node. */
 	transient java.lang.Object userData;
 	
-	/** Optional {@link ConnectionPoint} defining the point where this node can be connected. */
-	ConnectionPoint layoutPoint;
+	/** Transformation where this scene node lies. */
+	repeated double transform;
 	
-	/** Optional {@link ConnectionPoint}s defining points where other {@link SceneNode}s can be connected with its {@link SceneNode#layoutPoint}. */
-	repeated ConnectionPoint snappingPoints;
 }
 
 /** A collection of {@link SceneNode}s. */

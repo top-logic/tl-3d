@@ -57,6 +57,24 @@ public class GltfAsset extends Asset {
 	}
 
 	@Override
+	public com.top_logic.threed.threejs.scene.GltfAsset setLayoutPoint(com.top_logic.threed.threejs.scene.ConnectionPoint value) {
+		internalSetLayoutPoint(value);
+		return this;
+	}
+
+	@Override
+	public com.top_logic.threed.threejs.scene.GltfAsset setSnappingPoints(java.util.List<? extends com.top_logic.threed.threejs.scene.ConnectionPoint> value) {
+		internalSetSnappingPoints(value);
+		return this;
+	}
+
+	@Override
+	public com.top_logic.threed.threejs.scene.GltfAsset addSnappingPoint(com.top_logic.threed.threejs.scene.ConnectionPoint value) {
+		internalAddSnappingPoint(value);
+		return this;
+	}
+
+	@Override
 	public String jsonType() {
 		return GLTF_ASSET__TYPE;
 	}

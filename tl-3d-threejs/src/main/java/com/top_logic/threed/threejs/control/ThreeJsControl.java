@@ -71,7 +71,7 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 			public void afterChanged(Observable obj, String property) {
 				switch (property) {
 					case ConnectionPoint.TRANSFORM__PROP: {
-						updateGizmoControl(((ConnectionPoint) obj).getOwner());
+						updateGizmoControl((SceneNode) obj);
 					}
 				}
 			}
@@ -101,19 +101,13 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 		private void registerTxListener(SceneNode node) {
 			updateGizmoControl(node);
 			if (node != null) {
-				ConnectionPoint layoutPoint = node.getLayoutPoint();
-				if (layoutPoint != null) {
-					layoutPoint.registerListener(transformationListener);
-				}
+				node.registerListener(transformationListener);
 			}
 
 		}
 
 		private void unregisterTXListener(SceneNode node) {
-			ConnectionPoint layoutPoint = node.getLayoutPoint();
-			if (layoutPoint != null) {
-				layoutPoint.unregisterListener(transformationListener);
-			}
+			node.unregisterListener(transformationListener);
 		}
 
 		@Override
@@ -248,35 +242,26 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 			_gizmoControl.setConsumer(null);
 			_gizmoControl.setModel(null);
 		} else {
-			ConnectionPoint layoutPoint = node.getLayoutPoint();
-			if (layoutPoint == null) {
+			List<Double> transform = node.getTransform();
+			if (transform.size() == 12) {
 				_gizmoControl.setConsumer(null);
-				_gizmoControl.setModel(null);
-			} else {
-				List<Double> transform = layoutPoint.getTransform();
-				if (transform.size() == 12) {
-					_gizmoControl.setConsumer(null);
-					_gizmoControl.setModel(TransformationUtil.fromList(transform));
-					_gizmoControl.setConsumer(tx -> {
-						layoutPoint.setTransform(TransformationUtil.toList(tx));
-					});
-				}
+				_gizmoControl.setModel(TransformationUtil.fromList(transform));
+				_gizmoControl.setConsumer(tx -> {
+					node.setTransform(TransformationUtil.toList(tx));
+				});
 			}
 		}
 	}
 
 	private SceneNode findGizmoNode(List<SceneNode> selection) {
-		SceneNode[] potentialGizmoNodes = selection.stream()
-			.filter(n -> n.getLayoutPoint() != null)
-			.toArray(SceneNode[]::new);
-		int selectionCnt = potentialGizmoNodes.length;
+		int selectionCnt = selection.size();
 		switch (selectionCnt) {
 			case 0:
 				return null;
 			case 1:
-				return potentialGizmoNodes[0];
+				return selection.get(0);
 			default: {
-				SceneNode first = potentialGizmoNodes[0];
+				SceneNode first = selection.get(0);
 				List<ScenePart> pathToRoot = new ArrayList<>();
 				ScenePart p = first;
 				do {
@@ -286,7 +271,7 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 
 				int maxIdx = 0;
 				for (int i = 1; i < selectionCnt; i++) {
-					maxIdx = Math.max(maxIdx, pathToRoot.indexOf(potentialGizmoNodes[i]));
+					maxIdx = Math.max(maxIdx, pathToRoot.indexOf(selection.get(i)));
 				}
 				return (SceneNode) pathToRoot.get(maxIdx);
 			}

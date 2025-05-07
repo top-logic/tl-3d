@@ -5,6 +5,9 @@
  */
 package com.top_logic.threed.threejs.script;
 
+import java.util.Collections;
+import java.util.List;
+
 import com.top_logic.basic.config.ConfigurationException;
 import com.top_logic.basic.config.InstantiationContext;
 import com.top_logic.model.search.expr.GenericMethod;
@@ -12,6 +15,8 @@ import com.top_logic.model.search.expr.SearchExpression;
 import com.top_logic.model.search.expr.config.dom.Expr;
 import com.top_logic.model.search.expr.config.operations.AbstractSimpleMethodBuilder;
 import com.top_logic.model.search.expr.config.operations.ArgumentDescriptor;
+import com.top_logic.threed.core.math.Transformation;
+import com.top_logic.threed.threejs.scene.ConnectionPoint;
 import com.top_logic.threed.threejs.scene.GltfAsset;
 import com.top_logic.threed.threejs.scene.PartNode;
 
@@ -39,9 +44,38 @@ public class ThreejsGltf extends ThreejsSceneNode<PartNode> {
 
 	@Override
 	protected PartNode createNode(Object[] arguments) {
-		String url = (String) arguments[4];
-		return super.createNode(arguments)
-			.setAsset(GltfAsset.create().setUrl(url));
+		GltfAsset asset = GltfAsset.create();
+
+		ConnectionPoint layoutPoint = toConnectionPoint(getArguments()[3], arguments[3]);
+		asset.setLayoutPoint(layoutPoint);
+
+		List<ConnectionPoint> snappingPoints = toConnectionPointList(getArguments()[4], arguments[4]);
+		asset.setSnappingPoints(snappingPoints);
+
+		String url = (String) arguments[5];
+		asset.setUrl(url);
+
+		return super.createNode(arguments).setAsset(asset);
+	}
+
+	private List<ConnectionPoint> toConnectionPointList(SearchExpression expr, Object value) {
+		List<?> valueList = asList(value);
+		return valueList.stream().map(v -> toConnectionPointNonNull(expr, v)).toList();
+	}
+
+	private ConnectionPoint toConnectionPointNonNull(SearchExpression expr, Object value) {
+		return notNull(expr, toConnectionPoint(expr, value));
+	}
+
+	private ConnectionPoint toConnectionPoint(SearchExpression expr, Object value) {
+		if (value instanceof ConnectionPoint) {
+			return (ConnectionPoint) value;
+		}
+		Transformation tx = asTransformation(expr, value);
+		if (tx == null) {
+			return null;
+		}
+		return ThreejsCp.newConnectionPoint(tx, this, Collections.emptyList());
 	}
 
 	/**
@@ -52,8 +86,9 @@ public class ThreejsGltf extends ThreejsSceneNode<PartNode> {
 		private static final ArgumentDescriptor DESCRIPTOR = ArgumentDescriptor.builder()
 			.optional("name")
 			.optional("tx")
-			.optional("snappingPoints")
 			.optional("userData")
+			.optional("layoutPoint")
+			.optional("snappingPoints")
 			.optional("url")
 			.build();
 

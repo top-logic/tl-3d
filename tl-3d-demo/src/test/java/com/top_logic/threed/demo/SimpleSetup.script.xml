@@ -45,6 +45,83 @@
 							/>
 						</action>
 						<action class="com.top_logic.layout.scripting.runtime.action.CommandActionOp"
+							command-implementation-comment="com.top_logic.element.layout.grid.GridComponent$GridApplyCommandHandler"
+							command-label="Übernehmen"
+							command-name="gridApplyRowObject"
+							component-implementation-comment="com.top_logic.element.layout.grid.GridComponent"
+							component-name="tl-3d-demo/assets/assetsGrid.layout.xml#Grid"
+							user-id="root"
+						>
+							<arguments/>
+						</action>
+						<action class="com.top_logic.layout.scripting.runtime.action.CommandExecutionOp"
+							failure-expected="false"
+							user-id="root"
+						>
+							<model-name config:interface="com.top_logic.layout.basic.CommandModelNaming$CommandModelName">
+								<owner config:interface="com.top_logic.layout.basic.GenericCommandModelNaming$GenericCommandModelName">
+									<algorithm class="com.top_logic.layout.basic.GenericCommandModelOwner$AnnotatedCommandModelMapping"/>
+									<reference config:interface="com.top_logic.layout.form.FuzzyFormMemberNaming$Name"
+										label="Layoutpunkt"
+									>
+										<component config:interface="com.top_logic.layout.scripting.recorder.ref.ui.FuzzyComponentNaming$Name"
+											name="tl-3d-demo/assets/assetsGrid.layout.xml#Grid"
+											tab-path="Assets"
+										/>
+									</reference>
+								</owner>
+							</model-name>
+						</action>
+						<action class="com.top_logic.layout.scripting.runtime.action.LabeledButtonActionOp"
+							component-name="rootLayout#masterFrame"
+							label="Zeile hinzufügen"
+							user-id="root"
+						>
+							<business-object config:interface="com.top_logic.layout.form.FuzzyFormMemberNaming$Name"
+								label="Tabelle in Layoutpunkt"
+							>
+								<component config:interface="com.top_logic.layout.scripting.recorder.ref.ui.FuzzyComponentNaming$Name"
+									name="tl-3d-demo/assets/assetsGrid.layout.xml#Grid"
+									tab-path="Assets"
+								/>
+							</business-object>
+						</action>
+						<action class="com.top_logic.layout.scripting.action.FormRawInput$Op"
+							user-id="root"
+						>
+							<field config:interface="com.top_logic.layout.form.FuzzyFormMemberNaming$Name"
+								label="Transformation"
+							>
+								<component config:interface="com.top_logic.layout.scripting.recorder.ref.ui.FuzzyComponentNaming$Name"
+									name="tl-3d-demo/assets/assetsGrid.layout.xml#Grid"
+									tab-path="Assets"
+								/>
+							</field>
+							<value config:interface="com.top_logic.layout.scripting.recorder.ref.value.StringNaming$Name"
+								value="T(0,0,0)"
+							/>
+						</action>
+						<action class="com.top_logic.layout.scripting.action.FormRawInput$Op"
+							user-id="root"
+						>
+							<field config:interface="com.top_logic.layout.form.FuzzyFormMemberNaming$Name"
+								label="Klassifizierungen"
+							>
+								<component config:interface="com.top_logic.layout.scripting.recorder.ref.ui.FuzzyComponentNaming$Name"
+									name="tl-3d-demo/assets/assetsGrid.layout.xml#Grid"
+									tab-path="Assets"
+								/>
+							</field>
+							<value config:interface="com.top_logic.layout.scripting.recorder.ref.value.StringNaming$Name"
+								value="Tool"
+							/>
+						</action>
+						<action class="com.top_logic.layout.scripting.runtime.action.LabeledButtonActionOp"
+							component-name="rootLayout#masterFrame"
+							label="Schließen"
+							user-id="root"
+						/>
+						<action class="com.top_logic.layout.scripting.runtime.action.CommandActionOp"
 							command-implementation-comment="com.top_logic.element.layout.grid.DefaultGridSaveCommandHandler"
 							command-label="Speichern"
 							command-name="gridSave"
@@ -84,6 +161,16 @@
 							<value config:interface="com.top_logic.layout.scripting.recorder.ref.value.StringNaming$Name"
 								value="F1/KR360_R2830-4_Fortec/RB_ly000005_019_arw_2014-11-26_12_39_12.294_Default.jt"
 							/>
+						</action>
+						<action class="com.top_logic.layout.scripting.runtime.action.CommandActionOp"
+							command-implementation-comment="com.top_logic.element.layout.grid.GridComponent$GridApplyCommandHandler"
+							command-label="Übernehmen"
+							command-name="gridApplyRowObject"
+							component-implementation-comment="com.top_logic.element.layout.grid.GridComponent"
+							component-name="tl-3d-demo/assets/assetsGrid.layout.xml#Grid"
+							user-id="root"
+						>
+							<arguments/>
 						</action>
 						<action class="com.top_logic.layout.scripting.runtime.action.CommandExecutionOp"
 							failure-expected="false"
@@ -130,6 +217,112 @@
 							</field>
 							<value config:interface="com.top_logic.layout.scripting.recorder.ref.value.StringNaming$Name"
 								value="M(0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0) T(1826.0, 0.0, 2300.0)"
+							/>
+						</action>
+						<action class="com.top_logic.layout.scripting.action.FormRawInput$Op"
+							user-id="root"
+						>
+							<field config:interface="com.top_logic.layout.form.FuzzyFormMemberNaming$Name"
+								label="Klassifizierungen"
+							>
+								<component config:interface="com.top_logic.layout.scripting.recorder.ref.ui.FuzzyComponentNaming$Name"
+									name="tl-3d-demo/assets/assetsGrid.layout.xml#Grid"
+									tab-path="Assets"
+								/>
+							</field>
+							<value config:interface="com.top_logic.layout.scripting.recorder.ref.value.StringNaming$Name"
+								value="Tool"
+							/>
+						</action>
+						<action class="com.top_logic.layout.scripting.runtime.action.LabeledButtonActionOp"
+							component-name="rootLayout#masterFrame"
+							label="Schließen"
+							user-id="root"
+						/>
+						<action class="com.top_logic.layout.scripting.runtime.action.CommandExecutionOp"
+							failure-expected="false"
+							user-id="root"
+						>
+							<model-name config:interface="com.top_logic.layout.basic.CommandModelNaming$CommandModelName">
+								<owner config:interface="com.top_logic.layout.basic.GenericCommandModelNaming$GenericCommandModelName">
+									<algorithm class="com.top_logic.layout.basic.GenericCommandModelOwner$AnnotatedCommandModelMapping"/>
+									<reference config:interface="com.top_logic.layout.form.FuzzyFormMemberNaming$Name"
+										label="Layoutpunkt"
+									>
+										<component config:interface="com.top_logic.layout.scripting.recorder.ref.ui.FuzzyComponentNaming$Name"
+											name="tl-3d-demo/assets/assetsGrid.layout.xml#Grid"
+											tab-path="Assets"
+										/>
+									</reference>
+								</owner>
+							</model-name>
+						</action>
+						<action class="com.top_logic.layout.scripting.runtime.action.LabeledButtonActionOp"
+							component-name="rootLayout#masterFrame"
+							label="Zeile hinzufügen"
+							user-id="root"
+						>
+							<business-object config:interface="com.top_logic.layout.form.FuzzyFormMemberNaming$Name"
+								label="Tabelle in Layoutpunkt"
+							>
+								<component config:interface="com.top_logic.layout.scripting.recorder.ref.ui.FuzzyComponentNaming$Name"
+									name="tl-3d-demo/assets/assetsGrid.layout.xml#Grid"
+									tab-path="Assets"
+								/>
+							</business-object>
+						</action>
+						<action class="com.top_logic.layout.scripting.action.FormRawInput$Op"
+							user-id="root"
+						>
+							<field config:interface="com.top_logic.layout.scripting.recorder.ref.ui.form.DefaultFormMemberNaming$Name">
+								<form config:interface="com.top_logic.layout.scripting.recorder.ref.ui.FuzzyComponentNaming$Name"
+									name="tl-3d-demo/assets/assetsGrid.layout.xml#Grid"
+									tab-path="Assets"
+								/>
+								<path>
+									<object>
+										<business-object config:interface="com.top_logic.layout.scripting.recorder.ref.value.object.NamedModelRef">
+											<model-name config:interface="com.top_logic.element.layout.scripting.TLObjectByLabelNaming$TLObjectByLabelName"
+												class-name="tl.threed.demo:Asset3D"
+												object-label="RB_ly000005_019_arw_2014-11-26_12_39_12.294_Default"
+											/>
+										</business-object>
+									</object>
+									<labeled-member label="Layoutpunkt"/>
+									<named-member name="rows"/>
+									<named-member name="create_2"/>
+									<labeled-member label="Transformation"/>
+								</path>
+							</field>
+							<value config:interface="com.top_logic.layout.scripting.recorder.ref.value.StringNaming$Name"
+								value="T(0,0,0)"
+							/>
+						</action>
+						<action class="com.top_logic.layout.scripting.action.FormRawInput$Op"
+							user-id="root"
+						>
+							<field config:interface="com.top_logic.layout.scripting.recorder.ref.ui.form.DefaultFormMemberNaming$Name">
+								<form config:interface="com.top_logic.layout.scripting.recorder.ref.ui.FuzzyComponentNaming$Name"
+									name="tl-3d-demo/assets/assetsGrid.layout.xml#Grid"
+									tab-path="Assets"
+								/>
+								<path>
+									<object>
+										<business-object config:interface="com.top_logic.layout.scripting.recorder.ref.value.object.NamedModelRef">
+											<model-name config:interface="com.top_logic.element.layout.scripting.TLObjectByLabelNaming$TLObjectByLabelName"
+												class-name="tl.threed.demo:Asset3D"
+												object-label="RB_ly000005_019_arw_2014-11-26_12_39_12.294_Default"
+											/>
+										</business-object>
+									</object>
+									<labeled-member label="Layoutpunkt"/>
+									<named-member name="rows"/>
+									<named-member name="create_2"/>
+									<labeled-member label="Klassifizierungen"/>
+								</path>
+							</field>
+							<value config:interface="com.top_logic.layout.scripting.recorder.ref.value.StringNaming$Name"
+								value="Robot"
 							/>
 						</action>
 						<action class="com.top_logic.layout.scripting.runtime.action.LabeledButtonActionOp"
@@ -225,6 +418,21 @@
 								value="M(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0) T(0.0, 0.0, 1000.0)"
 							/>
 						</action>
+						<action class="com.top_logic.layout.scripting.action.FormRawInput$Op"
+							user-id="root"
+						>
+							<field config:interface="com.top_logic.layout.form.FuzzyFormMemberNaming$Name"
+								label="Klassifizierungen"
+							>
+								<component config:interface="com.top_logic.layout.scripting.recorder.ref.ui.FuzzyComponentNaming$Name"
+									name="tl-3d-demo/assets/assetsGrid.layout.xml#Grid"
+									tab-path="Assets"
+								/>
+							</field>
+							<value config:interface="com.top_logic.layout.scripting.recorder.ref.value.StringNaming$Name"
+								value="Robot"
+							/>
+						</action>
 						<action class="com.top_logic.layout.scripting.runtime.action.LabeledButtonActionOp"
 							component-name="rootLayout#masterFrame"
 							label="Schließen"
@@ -318,6 +526,21 @@
 								value="M(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0) T(0.0, 0.0, 500.0)"
 							/>
 						</action>
+						<action class="com.top_logic.layout.scripting.action.FormRawInput$Op"
+							user-id="root"
+						>
+							<field config:interface="com.top_logic.layout.form.FuzzyFormMemberNaming$Name"
+								label="Klassifizierungen"
+							>
+								<component config:interface="com.top_logic.layout.scripting.recorder.ref.ui.FuzzyComponentNaming$Name"
+									name="tl-3d-demo/assets/assetsGrid.layout.xml#Grid"
+									tab-path="Assets"
+								/>
+							</field>
+							<value config:interface="com.top_logic.layout.scripting.recorder.ref.value.StringNaming$Name"
+								value="Robot"
+							/>
+						</action>
 						<action class="com.top_logic.layout.scripting.runtime.action.LabeledButtonActionOp"
 							component-name="rootLayout#masterFrame"
 							label="Schließen"
@@ -364,6 +587,58 @@
 								value="E4/Robscan_MasterPC/Robscan_MasterPC.jt"
 							/>
 						</action>
+						<action class="com.top_logic.layout.scripting.runtime.action.CommandExecutionOp"
+							failure-expected="false"
+							user-id="root"
+						>
+							<model-name config:interface="com.top_logic.layout.basic.CommandModelNaming$CommandModelName">
+								<owner config:interface="com.top_logic.layout.basic.GenericCommandModelNaming$GenericCommandModelName">
+									<algorithm class="com.top_logic.layout.basic.GenericCommandModelOwner$AnnotatedCommandModelMapping"/>
+									<reference config:interface="com.top_logic.layout.form.FuzzyFormMemberNaming$Name"
+										label="Layoutpunkt"
+									>
+										<component config:interface="com.top_logic.layout.scripting.recorder.ref.ui.FuzzyComponentNaming$Name"
+											name="tl-3d-demo/assets/assetsGrid.layout.xml#Grid"
+											tab-path="Assets"
+										/>
+									</reference>
+								</owner>
+							</model-name>
+						</action>
+						<action class="com.top_logic.layout.scripting.runtime.action.LabeledButtonActionOp"
+							component-name="rootLayout#masterFrame"
+							label="Zeile hinzufügen"
+							user-id="root"
+						>
+							<business-object config:interface="com.top_logic.layout.form.FuzzyFormMemberNaming$Name"
+								label="Tabelle in Layoutpunkt"
+							>
+								<component config:interface="com.top_logic.layout.scripting.recorder.ref.ui.FuzzyComponentNaming$Name"
+									name="tl-3d-demo/assets/assetsGrid.layout.xml#Grid"
+									tab-path="Assets"
+								/>
+							</business-object>
+						</action>
+						<action class="com.top_logic.layout.scripting.action.FormRawInput$Op"
+							user-id="root"
+						>
+							<field config:interface="com.top_logic.layout.form.FuzzyFormMemberNaming$Name"
+								label="Transformation"
+							>
+								<component config:interface="com.top_logic.layout.scripting.recorder.ref.ui.FuzzyComponentNaming$Name"
+									name="tl-3d-demo/assets/assetsGrid.layout.xml#Grid"
+									tab-path="Assets"
+								/>
+							</field>
+							<value config:interface="com.top_logic.layout.scripting.recorder.ref.value.StringNaming$Name"
+								value="T(-400,-340,0)"
+							/>
+						</action>
+						<action class="com.top_logic.layout.scripting.runtime.action.LabeledButtonActionOp"
+							component-name="rootLayout#masterFrame"
+							label="Schließen"
+							user-id="root"
+						/>
 						<action class="com.top_logic.layout.scripting.runtime.action.CommandActionOp"
 							command-implementation-comment="com.top_logic.element.layout.grid.DefaultGridSaveCommandHandler"
 							command-label="Speichern"

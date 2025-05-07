@@ -589,8 +589,9 @@ class ThreeJsControl {
     if (
       !selectedObj ||
       !selectedObj.userData ||
-      !selectedObj.userData.snappingPoints ||
-      selectedObj.userData.snappingPoints.length === 0
+      !selectedObj.userData.asset ||
+      !selectedObj.userData.asset.snappingPoints ||
+      selectedObj.userData.asset.snappingPoints.length === 0
     ) {
       return;
     }
@@ -601,8 +602,9 @@ class ThreeJsControl {
       if (
         node !== selectedObj &&
         node.userData &&
-        node.userData.snappingPoints &&
-        node.userData.snappingPoints.length > 0
+        node.userData.asset &&
+        node.userData.asset.snappingPoints &&
+        node.userData.asset.snappingPoints.length > 0
       ) {
         snappableObjects.push(node);
       }
@@ -623,7 +625,7 @@ class ThreeJsControl {
     for (const otherObject of snappableObjects) {
       otherObject.updateMatrixWorld(true);
   
-      for (const otherPoint of otherObject.userData.snappingPoints) {
+      for (const otherPoint of otherObject.userData.asset.snappingPoints) {
         const position = new Vector3();
         otherPoint.node.getWorldPosition(position);
         
@@ -1155,10 +1157,10 @@ class SharedObject {
   }
   
   notifyTransform(diffMatrix) {
-    const currentTransformation = toMatrix(this.layoutPoint.transform);
+    const currentTransformation = toMatrix(this.transform);
     const newTransformation = currentTransformation.multiply(diffMatrix);
-    this.layoutPoint.transform = toTX(newTransformation);
-    return SetProperty.prototype.create(this.layoutPoint.id, 'transform', this.layoutPoint.transform);
+    this.transform = toTX(newTransformation);
+    return SetProperty.prototype.create(this.id, 'transform', this.transform);
   }
 }
 
@@ -1347,27 +1349,33 @@ class ConnectionPoint extends SharedObject {
     this.setProperty(scope, 'classifiers', json.classifiers);
   }
   
-  build(parentGroup) {
+  build(parentGroup, layoutPoint) {
     const group = new Group();
     parentGroup.add(group);
 
     transform(group, this.transform);
 
-    const material = new MeshBasicMaterial({ color: GREEN });
+    const material = new MeshBasicMaterial({ color: layoutPoint ? YELLOW : GREEN });
     material.userData.originalColor = material.color.clone();
     
-    const snappingSphere = new Mesh(
+    const sphere = new Mesh(
       new SphereGeometry(C_P_RADIUS, WIDTH_SEGMENTS, HEIGHT_SEGMENTS), 
       material
     );
     
-    // mark this as a connection point sphere
-    snappingSphere.userData.isConnectionPoint = true;
-    snappingSphere.visible = false;
+    if (layoutPoint) {
+      // mark this as a layout point sphere
+      sphere.userData.isLayoutPoint = true;
+    } else {
+      // mark this as a connection point sphere
+      sphere.userData.isConnectionPoint = true;
+    }
+    sphere.visible = false;
     
-    group.add(snappingSphere);
+    group.add(sphere);
 
     this.node = group;
+    return group;
   }
   
   setProperty(scope, property, value) {
@@ -1402,27 +1410,8 @@ class GroupNode extends SharedObject {
     const group = new Group();
     parentGroup.add(group);
 
-    if (this.layoutPoint) {
-      const material = new MeshBasicMaterial({ color: YELLOW });
-      material.userData.originalColor = material.color.clone();
-      
-      const layoutSphere = new Mesh(
-        new SphereGeometry(C_P_RADIUS, WIDTH_SEGMENTS, HEIGHT_SEGMENTS),
-        material
-      );
-      
-      // mark this as a layout point sphere
-      layoutSphere.userData.isLayoutPoint = true;
-      layoutSphere.visible = false;
-      
-      group.add(layoutSphere);
-
-      transform(group, this.layoutPoint.transform);
-    }
-
-    // transform(group, this.layoutPoint.transform);
+    transform(group, this.transform);
     this.contents.forEach((c) => c.build(group));
-    this.snappingPoints?.forEach((point) => point.build(group));
 
     // Link to scene node
     group.userData = this;
@@ -1430,14 +1419,12 @@ class GroupNode extends SharedObject {
   }
 
   loadJson(scope, json) {
-    this.setProperty(scope, 'layoutPoint', json.layoutPoint);
     this.setProperty(scope, 'contents', json.contents);
-    this.setProperty(scope, 'snappingPoints', json.snappingPoints);
+    this.setProperty(scope, 'transform', json.transform);
   }
 
   setProperty(scope, property, value) {
     switch (property) {
-  		case 'layoutPoint': this.layoutPoint = scope.loadJson(value); break;
   		case 'contents': {
   			if (this.contents) {
 				this.contents.forEach((c) => c.parent = null);
@@ -1446,8 +1433,8 @@ class GroupNode extends SharedObject {
 			this.contents.forEach((c) => c.parent = this);
   			break;
   		} 
-  		case 'snappingPoints': this.snappingPoints = scope.loadAll(value); break; 
-    }
+  		case 'transform': this.transform = value; break;
+   }
   }
 
   insertElementAt(scope, property, idx, value) {
@@ -1458,7 +1445,7 @@ class GroupNode extends SharedObject {
   			this.contents.splice(idx, 0, newContent);
   			break;
   		} 
-  		case 'snappingPoints': this.snappingPoints.splice(idx, 0, scope.loadJson(value)); break; 
+   		case 'transform': this.transform.splice(idx, 0, value); break;
     }
   }
 
@@ -1469,7 +1456,7 @@ class GroupNode extends SharedObject {
   			this.contents.splice(idx, 1);
   			break;
   		} 
-  		case 'snappingPoints': this.snappingPoints.splice(idx, 1); break; 
+   		case 'transform': this.transform.splice(idx, 1); break;
     }
   }
 }
@@ -1483,28 +1470,9 @@ class PartNode extends SharedObject {
     const group = new Group();
     parentGroup.add(group);
 
-    if (this.layoutPoint && this.layoutPoint.transform) {
-      const material = new MeshBasicMaterial({ color: YELLOW });
-      material.userData.originalColor = material.color.clone();
-      
-      const layoutSphere = new Mesh(
-        new SphereGeometry(C_P_RADIUS, WIDTH_SEGMENTS, HEIGHT_SEGMENTS),
-        material
-      );
-      
-      // mark this as a layout point sphere for easy identification
-      layoutSphere.userData.isLayoutPoint = true;
-      layoutSphere.visible = false;
-      
-      group.add(layoutSphere);
+    transform(group, this.transform);
 
-      transform(group, this.layoutPoint.transform);
-    }
-
-    // this.layoutPoint.build(group);
-    this.snappingPoints?.forEach((point) => point.build(group));
-
-    const node = this.asset.build();
+    const node = this.asset.build(group);
     group.add(node);
 
     // Link to scene node.
@@ -1513,19 +1481,70 @@ class PartNode extends SharedObject {
   }
 
   loadJson(scope, json) {
-    this.setProperty(scope, 'layoutPoint', json.layoutPoint);
     this.setProperty(scope, 'asset', json.asset);
+    this.setProperty(scope, 'transform', json.transform);
+  }
+
+  setProperty(scope, property, value) {
+    switch (property) {
+  		case 'asset': this.asset = scope.loadJson(value); break; 
+   		case 'transform': this.transform = value; break;
+    }
+  }
+
+  insertElementAt(scope, property, idx, value) {
+  	switch (property) {
+   		case 'transform': this.transform.splice(idx, 0, value); break;
+  	}
+  }
+  
+  removeElementAt(scope, property, idx) {
+  	switch (property) {
+   		case 'transform': this.transform.splice(idx, 1); break;
+  	}
+  }
+}
+
+class GltfAsset extends SharedObject {
+  constructor(id) {
+    super(id);
+  }
+
+  build(parentGroup) {
+     const group = new Group();
+    parentGroup.add(group);
+
+    this.layoutPoint?.build(group, true);
+    if (this.layoutPoint?.transform) {
+    	 group.applyMatrix4(toMatrix(this.layoutPoint.transform).invert());
+    }
+    this.snappingPoints?.forEach((point) => point.build(group, false));
+
+    const model = this.gltf.scene.clone();
+    model.traverse((obj) => {
+      if (obj.isMesh && obj.material) {
+        obj.userData.originalMaterial = obj.material;
+        obj.material = obj.material.clone();
+        obj.material.userData.originalColor = obj.material.color.clone();
+      }
+    });
+      group.add(model);
+    return group;
+  }
+
+  loadJson(scope, json) {
+    this.setProperty(scope, 'url', json.url);
+    this.setProperty(scope, 'layoutPoint', json.layoutPoint);
     this.setProperty(scope, 'snappingPoints', json.snappingPoints);
   }
 
   setProperty(scope, property, value) {
     switch (property) {
+  		case 'url': this.url = value; break;
   		case 'layoutPoint': this.layoutPoint = scope.loadJson(value); break; 
-  		case 'asset': this.asset = scope.loadJson(value); break; 
   		case 'snappingPoints': this.snappingPoints = scope.loadAll(value); break; 
     }
   }
-
   insertElementAt(scope, property, idx, value) {
     switch (property) {
   		case 'snappingPoints': this.snappingPoints.splice(idx, 0, scope.loadJson(value)); break; 
@@ -1535,34 +1554,6 @@ class PartNode extends SharedObject {
   removeElementAt(scope, property, idx) {
     switch (property) {
   		case 'snappingPoints': this.snappingPoints.splice(idx, 1); break; 
-    }
-  }
-}
-
-class GltfAsset extends SharedObject {
-  constructor(id) {
-    super(id);
-  }
-
-  build() {
-    const model = this.gltf.scene.clone();
-    model.traverse((obj) => {
-      if (obj.isMesh && obj.material) {
-        obj.userData.originalMaterial = obj.material;
-        obj.material = obj.material.clone();
-        obj.material.userData.originalColor = obj.material.color.clone();
-      }
-    });
-    return model;
-  }
-
-  loadJson(scope, json) {
-    this.setProperty(scope, 'url', json.url);
-  }
-
-  setProperty(scope, property, value) {
-    switch (property) {
-  		case 'url': this.url = value; break;
     }
   }
 }

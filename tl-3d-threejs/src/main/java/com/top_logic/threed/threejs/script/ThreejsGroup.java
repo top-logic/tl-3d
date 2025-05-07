@@ -38,7 +38,7 @@ public class ThreejsGroup extends ThreejsSceneNode<GroupNode> {
 
 	@Override
 	protected GroupNode createNode(Object[] arguments) {
-		List<SceneNode> contents = asSceneNodes(arguments[4]);
+		List<SceneNode> contents = asSceneNodes(arguments[3]);
 
 		return super.createNode(arguments)
 			.setContents(contents);
@@ -69,7 +69,6 @@ public class ThreejsGroup extends ThreejsSceneNode<GroupNode> {
 		private static final ArgumentDescriptor DESCRIPTOR = ArgumentDescriptor.builder()
 			.optional("name")
 			.optional("tx")
-			.optional("snappingPoints")
 			.optional("userData")
 			.optional("components")
 			.build();
