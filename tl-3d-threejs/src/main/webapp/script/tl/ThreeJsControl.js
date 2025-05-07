@@ -425,10 +425,6 @@ class ThreeJsControl {
   }
 
   prepareMultiGroup() {
-   let tmpPosition = new Vector3();
-   let tmpQuaternion = new Quaternion();
-   let tmpScale = new Vector3();
-  
     const box = new Box3();
 
     // remove all children from multiTransformGroup
@@ -652,22 +648,9 @@ class ThreeJsControl {
         
         // get the inverse of the parent's world matrix
         const parentWorldInverse = new Matrix4().copy(selectedObj.parent.matrixWorld).invert();
-        
-        // apply the parent's inverse world matrix to get the local matrix
-        // convert the snapping point's world matrix to be relative to the selected object's parent
-        const localMatrix = new Matrix4().copy(snappingPointWorldMatrix).premultiply(parentWorldInverse);
-        
-        // apply the local matrix directly to the object's matrix
-        selectedObj.matrix.copy(localMatrix);
-        
-        // IMPORTANT! Disable automatic matrix updates so manual matrix assignment (via .matrix.copy) is saved
-        selectedObj.matrixAutoUpdate = false;
-      } else {
-        // if there's no parent, apply the world matrix directly
-        selectedObj.matrix.copy(snappingPointWorldMatrix);
-        selectedObj.matrixAutoUpdate = false;
-      }
-      
+        snappingPointWorldMatrix.premultiply(parentWorldInverse);
+      } 
+      selectedObj.applyMatrix4(snappingPointWorldMatrix.multiply(selectedObj.matrix.clone().invert()));
       selectedObj.updateMatrixWorld(true);
     }
   
@@ -683,9 +666,9 @@ class ThreeJsControl {
   addBoxHelpers() {
 
     // show bounding box around all objects
-    // this.boundingBoxHelper = new Box3Helper(this.boundingBox, YELLOW);
-    // this.scene.add(this.boundingBoxHelper);
-    // this.render();
+    this.boundingBoxHelper = new Box3Helper(this.boundingBox, YELLOW);
+    this.scene.add(this.boundingBoxHelper);
+    this.render();
     this.removeBoxHelpers();
 
     if (this.selection.length === 0) {
