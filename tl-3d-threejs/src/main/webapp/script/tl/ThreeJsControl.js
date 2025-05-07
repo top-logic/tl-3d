@@ -34,7 +34,7 @@ import { TransformControls } from "TransformControls";
 import { GLTFLoader } from "GLTFLoader";
 import { gsap } from "gsap";
 
-const WHITE_LIGHT = "#ffffff";
+const WHITE = 0xffffff;
 const LIGHT_GREY = "#cccccc";
 const DARK_GREY = "#333333";
 const RED = 0xff0000;
@@ -47,7 +47,8 @@ const CUBE_CAMERA_FAR = 10;
 const CAMERA_MOVE_DURATION = 1.5;
 const C_P_RADIUS = 100;
 const WIDTH_SEGMENTS = 8;
-const HEIGHT_SEGMENTS = 8
+const HEIGHT_SEGMENTS = 8;
+const _90_DEGREE = Math.PI / 2;
 
 class ThreeJsControl {
   constructor(controlId, contextPath, dataUrl, isWorkplaneVisible, isInEditMode, isRotateMode) {
@@ -89,9 +90,9 @@ class ThreeJsControl {
     this.addLights();
     this.addAxesHelper(this.scene);
 
-    this.zUpRoot.rotation.x = -Math.PI / 2;
+    this.zUpRoot.rotation.x = -_90_DEGREE;
     this.scene.add(this.zUpRoot);
-    this.multiTransformGroup.rotation.x = -Math.PI / 2;
+    this.multiTransformGroup.rotation.x = -_90_DEGREE;
     this.scene.add(this.multiTransformGroup);
   }
 
@@ -131,7 +132,7 @@ class ThreeJsControl {
         this.controlsIsUpdating = true;
         this.cubeCamera.quaternion.copy(this.camera.quaternion);
         this.cubeCamera.position.copy(
-          calculateCubeCameraPosition(this.camera.position, this.controls.target)
+          CameraUtils.calculateCubeCameraPosition(this.camera.position, this.controls.target)
         );
         this.cubeControls.update();
         this.controlsIsUpdating = false;
@@ -144,26 +145,11 @@ class ThreeJsControl {
     this.cubeScene = new Scene();
     this.cubeScene.background = null;
 
-    const fov = 75;
-    const aspect = 1;
-    const near = 1;
-    const far = 20;
-
-    this.cubeCamera = new PerspectiveCamera(fov, aspect, near, far);
-    this.cubeCamera.position.set(0, 0, CUBE_CAMERA_FAR);
+    this.cubeCamera = CameraUtils.createCubeCamera();
     this.cubeTarget = new Vector3(0, 0, 0);
-    this.cubeCamera.lookAt(this.cubeTarget);
-    this.cubeScene.rotation.x = -Math.PI / 2;
+    this.cubeScene.rotation.x = -_90_DEGREE;
 
-    this.cubeScene.add(new AmbientLight(WHITE_LIGHT, 0.7));
-    const light = new DirectionalLight(WHITE_LIGHT, 0.5);
-    light.position.set(3, 5, 8);
-    light.castShadow = true;
-    this.cubeScene.add(light);
-    const light2 = new DirectionalLight(WHITE_LIGHT, 0.5);
-    light2.position.set(-3, -5, 0);
-    light2.castShadow = true;
-    this.cubeScene.add(light2);
+    SceneUtils.addCubeSceneLights(this.cubeScene);
 
     this.axesCube = this.createAxesCube();
     this.cubeScene.add(this.axesCube);
@@ -217,9 +203,9 @@ class ThreeJsControl {
     context.translate(size / 2, size / 2);
 
     switch (text) {
-      case "Right": context.rotate(-Math.PI / 2);
+      case "Right": context.rotate(-_90_DEGREE);
         break;
-      case "Left": context.rotate(Math.PI / 2);
+      case "Left": context.rotate(_90_DEGREE);
         break;
       case "Back": context.rotate(Math.PI);
         break;
@@ -259,7 +245,7 @@ class ThreeJsControl {
         this.cubeControlsIsUpdating = true;
         this.camera.quaternion.copy(this.cubeCamera.quaternion);
         this.camera.position.copy(
-          calculateMainCameraPosition(this.cubeCamera.position, this.camera.position, this.controls.target)
+          CameraUtils.calculateMainCameraPosition(this.cubeCamera.position, this.camera.position, this.controls.target)
         );
         this.controls.update();
         this.cubeControlsIsUpdating = false;
@@ -270,25 +256,11 @@ class ThreeJsControl {
   }
 
   createCamera() {
-    const container = this.container;
-    const fov = 35; // AKA Field of View
-    const aspect = container.clientWidth / container.clientHeight;
-    const near = 10; // the near clipping plane
-    const far = 100000; // the far clipping plane
-
-    this.camera = new PerspectiveCamera(fov, aspect, near, far);
-    this.camera.position.set(5000, 6000, 10000);
-    this.camera.lookAt(new Vector3());
+    this.camera = CameraUtils.createMainCamera(this.container);
   }
 
   addLights() {
-    const light1 = new DirectionalLight(WHITE_LIGHT, 8);
-    light1.position.set(0, 5000, 1000);
-    this.scene.add(light1);
-
-    const light2 = new DirectionalLight(WHITE_LIGHT, 3);
-    light2.position.set(200, -3000, -3000);
-    this.scene.add(light2);
+    SceneUtils.addStandardLights(this.scene);
   }
 
   toggleWorkplane(visible) {
@@ -301,8 +273,8 @@ class ThreeJsControl {
       this.boundingBox.getSize(boxSize);
       const gridSize = Math.max(boxSize.x, boxSize.y, boxSize.z) * 1.5;
 
-      this.workplane = createDetailedGrid(gridSize);
-      this.workplane.rotation.x = Math.PI / 2;
+      this.workplane = SceneUtils.createDetailedGrid(gridSize);
+      this.workplane.rotation.x = _90_DEGREE;
     }
 
     if (visible) {
@@ -472,35 +444,20 @@ class ThreeJsControl {
     // get actual Three.js nodes from selection
     const selectedNodes = this.selection.map(s => s.node);
 
-    // create a Set to check ancestry
-    const selectedSet = new Set(selectedNodes);
-
     // filter out nodes that are descendants of others to avoid duplicates in the transform group
     const topLevelNodes = selectedNodes.filter(node =>
-      !isDescendantOfAny(node, selectedSet)
+      !isDescendantOfAny(node, selectedNodes)
     );
 
-    // find top-level node in selection.
-    let leadingSelection = null;
-    let tmp = selectedNodes[0];
-    while (true) {
-        if (topLevelNodes.indexOf(tmp) >= 0) {
-            leadingSelection = tmp;
-            break;
-    	}
-    	tmp = tmp.parent;
-    }
-
-    let gizmoMatrix = leadingSelection.matrixWorld.clone();
-    gizmoMatrix.decompose(tmpPosition, tmpQuaternion, tmpScale);
+    const firstNode = topLevelNodes[0];
     
-    this.multiTransformGroup.position.copy(tmpPosition);
-    this.multiTransformGroup.quaternion.copy(tmpQuaternion);
-    this.multiTransformGroup.scale.copy(tmpScale);
+    const multiGroupMatrix = new Matrix4()
+      .copy(firstNode.matrixWorld)
+      .multiply(this.multiTransformGroup.matrix.clone().invert());
+
+    this.multiTransformGroup.applyMatrix4(multiGroupMatrix);
     this.multiTransformGroup.updateMatrixWorld(true);
     
-    this.transformControls.position.set(0,0,0); // set transformControls.position manually
-  
     for (const node of topLevelNodes) {
       // save the current parent to be able to restore the node in zUpRoot later
       node.previousParent = node.parent;
@@ -516,10 +473,8 @@ class ThreeJsControl {
         .multiply(node.matrix.clone().invert());
 
       node.applyMatrix4(localMatrix);
-      // expand the bounding box for the group
       box.expandByObject(node);
     }
-
   }  
 
   restoreMultiGroup() {
@@ -574,10 +529,23 @@ class ThreeJsControl {
     if (editing) {
         this.enableEditing(); 
     } else {
-        this.disableEditing(); 
+      this.disableEditing(); 
     }
+    
+    this.updateConnectionPointsVisibility();
 
     this.render(); 
+  }
+  
+  updateConnectionPointsVisibility() {
+    const updateVisibility = (object) => {
+      if (object.userData.isConnectionPoint || object.userData.isLayoutPoint) {
+        object.visible = this.isEditMode;
+      }
+    };
+    
+    this.zUpRoot.traverse(updateVisibility);
+    this.multiTransformGroup.traverse(updateVisibility);
   }
 
   enableEditing() {
@@ -707,7 +675,7 @@ class ThreeJsControl {
   addAxesHelper(scene) {
     const axesHelper = new AxesHelper(1000);
     scene.add(axesHelper);
-    axesHelper.rotation.x = -Math.PI / 2;
+    axesHelper.rotation.x = -_90_DEGREE;
   }
 
   addBoxHelpers() {
@@ -1015,21 +983,22 @@ class ThreeJsControl {
   /** Changes the selected state of the given shared node to the given value. */
   setSelected(sharedNode, value) {
     const index = this.selection.indexOf(sharedNode);
-    var command;
+    let command;
+    
     if (index >= 0) {
-      // Currently selected.
+      // Currently selected
       if (value) {
-        // Do not select again.
+        // Do not select again
         return;
       }
-      this.setColor(sharedNode.node, 0xffffff);
+      this.setColor(sharedNode.node, WHITE);
       this.selection.splice(index, 1);
       
       command = this.sceneGraph.removeSelected(sharedNode); 
     } else {
-      // Currently not selected.
+      // Currently not selected
       if (!value) {
-        // Cannot remove from selection.
+        // Cannot remove from selection
         return;
       }
       this.setColor(sharedNode.node, RED);
@@ -1038,7 +1007,7 @@ class ThreeJsControl {
       command = this.sceneGraph.addSelected(sharedNode); 
     }
     this.updateTransformControls();
-
+    
     return command;
   }
 
@@ -1046,7 +1015,7 @@ class ThreeJsControl {
   applySelection(selectedSharedNodes) {
     // remove selection from the previously selected objects
     for (const shared3JSNode of this.selection) {
-      this.setColor(shared3JSNode.node, 0xffffff);
+      this.setColor(shared3JSNode.node, WHITE);
     }
     this.selection = [];
 
@@ -1059,8 +1028,16 @@ class ThreeJsControl {
 
   setColor(node, color) {
     if (node.material) {
-      node.material.color.set(color);
-    } else {
+      const userData = node.material.userData;
+
+      if (color === WHITE && userData.originalColor) {
+        node.material.color.copy(userData.originalColor);
+      } else if (color !== WHITE) {
+        // Apply new color for non-deselection operations
+        node.material.color.set(color);
+      }
+    } else if (node.children && node.children.length > 0) {
+      // Recursively process children if this node has no material
       for (const child of node.children) {
         this.setColor(child, color);
       }
@@ -1072,12 +1049,13 @@ class ThreeJsControl {
     const changes = [];
 
     if (!toggleMode) {
-      var clearCmd = this.clearSelection();
+      const clearCmd = this.clearSelection();
       if (clearCmd != null) {
         changes.push(clearCmd);
       }
     }
 
+    // Process intersected objects
     for (let i = 0; i < intersects.length; i++) {
       const clicked = intersects[i].object;
 
@@ -1088,12 +1066,12 @@ class ThreeJsControl {
           this.value = toggleMode
             ? !this.selection.includes(sharedNode)
             : true;
-          var setCmd = this.setSelected(sharedNode, this.value);
+          const setCmd = this.setSelected(sharedNode, this.value);
 	      if (setCmd != null) {
-	        changes.push(setCmd);
-	      }
+            changes.push(setCmd);
+          }
 
-          this.addBoxHelpers();
+          // this.addBoxHelpers();
 
           this.render();
 
@@ -1112,7 +1090,7 @@ class ThreeJsControl {
 
   clearSelection() {
     for (const sharedNode of this.selection) {
-      this.setColor(sharedNode.node, 0xffffff);
+      this.setColor(sharedNode.node, WHITE);
     }
     this.selection.length = 0;
 
@@ -1375,10 +1353,18 @@ class ConnectionPoint extends SharedObject {
 
     transform(group, this.transform);
 
+    const material = new MeshBasicMaterial({ color: GREEN });
+    material.userData.originalColor = material.color.clone();
+    
     const snappingSphere = new Mesh(
       new SphereGeometry(C_P_RADIUS, WIDTH_SEGMENTS, HEIGHT_SEGMENTS), 
-      new MeshBasicMaterial({ color: GREEN })
+      material
     );
+    
+    // mark this as a connection point sphere
+    snappingSphere.userData.isConnectionPoint = true;
+    snappingSphere.visible = false;
+    
     group.add(snappingSphere);
 
     this.node = group;
@@ -1417,10 +1403,18 @@ class GroupNode extends SharedObject {
     parentGroup.add(group);
 
     if (this.layoutPoint) {
+      const material = new MeshBasicMaterial({ color: YELLOW });
+      material.userData.originalColor = material.color.clone();
+      
       const layoutSphere = new Mesh(
         new SphereGeometry(C_P_RADIUS, WIDTH_SEGMENTS, HEIGHT_SEGMENTS),
-        new MeshBasicMaterial({ color: YELLOW })
+        material
       );
+      
+      // mark this as a layout point sphere
+      layoutSphere.userData.isLayoutPoint = true;
+      layoutSphere.visible = false;
+      
       group.add(layoutSphere);
 
       transform(group, this.layoutPoint.transform);
@@ -1430,7 +1424,7 @@ class GroupNode extends SharedObject {
     this.contents.forEach((c) => c.build(group));
     this.snappingPoints?.forEach((point) => point.build(group));
 
-    // Link to scene node.
+    // Link to scene node
     group.userData = this;
     this.node = group;
   }
@@ -1490,10 +1484,18 @@ class PartNode extends SharedObject {
     parentGroup.add(group);
 
     if (this.layoutPoint && this.layoutPoint.transform) {
+      const material = new MeshBasicMaterial({ color: YELLOW });
+      material.userData.originalColor = material.color.clone();
+      
       const layoutSphere = new Mesh(
         new SphereGeometry(C_P_RADIUS, WIDTH_SEGMENTS, HEIGHT_SEGMENTS),
-        new MeshBasicMaterial({ color: YELLOW })
+        material
       );
+      
+      // mark this as a layout point sphere for easy identification
+      layoutSphere.userData.isLayoutPoint = true;
+      layoutSphere.visible = false;
+      
       group.add(layoutSphere);
 
       transform(group, this.layoutPoint.transform);
@@ -1690,20 +1692,6 @@ function getRaycaster(event, camera, canvas) {
   return raycaster;
 }
 
-function calculateCubeCameraPosition(cameraPosition, controlsTarget) {
-  const subAxesOffset = new Vector3().subVectors(cameraPosition, controlsTarget);
-  return subAxesOffset.normalize().multiplyScalar(CUBE_CAMERA_FAR);
-}
-
-function calculateMainCameraPosition(cubeCameraPosition, cameraPosition, controlsTarget) {
-  let subMainOffset = new Vector3(...cubeCameraPosition.toArray());
-  const cameraOffset = new Vector3().subVectors(cameraPosition, controlsTarget);
-
-  subMainOffset.normalize().multiplyScalar(cameraOffset.length());
-  subMainOffset = new Vector3().addVectors(subMainOffset, controlsTarget);
-  return subMainOffset;
-}
-
 function getLocalMatrix(objectMatrixWorld, parentMatrixWorld) {
   const worldMatrix = objectMatrixWorld.clone();
   const parentInverse = new Matrix4().copy(parentMatrixWorld).invert();
@@ -1717,15 +1705,6 @@ function getMatrixDiff(m1, m2) {
   diffMatrix.copy(m1.clone().invert()).multiply(m2);
 
   return diffMatrix;
-}
-
-function isDescendantOfAny(node, selectedSet) {
-  let parent = node.parent;
-  while (parent) {
-    if (selectedSet.has(parent)) return true;
-    parent = parent.parent;
-  }
-  return false;
 }
 
 function matrix(
@@ -1790,64 +1769,168 @@ function transform(group, tx) {
   }
 }
 
-function createDetailedGrid(size) {
-  const z = 0;
-  const edge = size / 2;
-  const gridGroup = new Group();
-
-  const smallCell = 200;
-  const bigCell = smallCell * 10;
-
-  function createLine(start, end, color, linewidth) {
-      const geometry = new BufferGeometry().setFromPoints([start, end]);
-      const material = new LineBasicMaterial({ color, linewidth });
-      return new Line(geometry, material);
+function isDescendantOfAny (node, selectedNodes) {
+  let parent = node.parent;
+  while (parent) {
+    if (selectedNodes.includes(parent)) return true;
+    parent = parent.parent;
   }
+  return false;
+}
 
-  const gridSmall = new Group();
-  // vertical lines
-  for (let i = 0; i <= edge; i += smallCell) {
-    gridSmall.add(createLine(new Vector3(-i, -edge, z), new Vector3(-i, edge, z), LIGHT_BLUE, 1));
-    gridSmall.add(createLine(new Vector3(i, -edge, z), new Vector3(i, edge, z), LIGHT_BLUE, 1));
-  }
-  // horizontal lines
-  for (let i = z; i <= edge; i += smallCell) {
-    gridSmall.add(createLine(new Vector3(-edge, -i, z), new Vector3(edge, -i, z), LIGHT_BLUE, 1));
-    gridSmall.add(createLine(new Vector3(-edge, i, z), new Vector3(edge, i, z), LIGHT_BLUE, 1));
-  }
+function createLine(start, end, color, linewidth) {
+  const geometry = new BufferGeometry().setFromPoints([start, end]);
+  const material = new LineBasicMaterial({ color, linewidth });
+  return new Line(geometry, material);
+}
 
-  const gridBig = new Group();
-  for (let i = bigCell; i <= edge; i += bigCell) {
+const CameraUtils = {
+  calculateCubeCameraPosition: function(cameraPosition, controlsTarget) {
+    const subAxesOffset = new Vector3().subVectors(cameraPosition, controlsTarget);
+    return subAxesOffset.normalize().multiplyScalar(CUBE_CAMERA_FAR);
+  },
+
+  calculateMainCameraPosition: function(cubeCameraPosition, cameraPosition, controlsTarget) {
+    let subMainOffset = new Vector3(...cubeCameraPosition.toArray());
+    const cameraOffset = new Vector3().subVectors(cameraPosition, controlsTarget);
+
+    subMainOffset.normalize().multiplyScalar(cameraOffset.length());
+    subMainOffset = new Vector3().addVectors(subMainOffset, controlsTarget);
+    return subMainOffset;
+  },
+  
+  createMainCamera: function(container, position = new Vector3(5000, 6000, 10000)) {
+    const fov = 35; // AKA Field of View
+    const aspect = container.clientWidth / container.clientHeight;
+    const near = 10; // the near clipping plane
+    const far = 100000; // the far clipping plane
+
+    const camera = new PerspectiveCamera(fov, aspect, near, far);
+    camera.position.copy(position);
+    camera.lookAt(new Vector3());
+    
+    return camera;
+  },
+  
+  createCubeCamera: function() {
+    const fov = 75;
+    const aspect = 1;
+    const near = 1;
+    const far = 20;
+
+    const camera = new PerspectiveCamera(fov, aspect, near, far);
+    camera.position.set(0, 0, CUBE_CAMERA_FAR);
+    camera.lookAt(new Vector3(0, 0, 0));
+    
+    return camera;
+  }
+};
+
+const SceneUtils = {
+  createLine: function(start, end, color, linewidth) {
+    const geometry = new BufferGeometry().setFromPoints([start, end]);
+    const material = new LineBasicMaterial({ color, linewidth });
+    return new Line(geometry, material);
+  },
+
+  createDetailedGrid: function(size) {
+    const z = 0;
+    const edge = size / 2;
+    const gridGroup = new Group();
+
+    const smallCell = 200;
+    const bigCell = smallCell * 10;
+
+    const gridSmall = new Group();
     // vertical lines
-    gridBig.add(createLine(new Vector3(-i, -edge, z), new Vector3(-i, edge, z), MIDDLE_BLUE, 2));
-    gridBig.add(createLine(new Vector3(i, -edge, z), new Vector3(i, edge, z), MIDDLE_BLUE, 2));
+    for (let i = 0; i <= edge; i += smallCell) {
+      gridSmall.add(createLine(new Vector3(-i, -edge, z), new Vector3(-i, edge, z), LIGHT_BLUE, 1));
+      gridSmall.add(createLine(new Vector3(i, -edge, z), new Vector3(i, edge, z), LIGHT_BLUE, 1));
+    }
     // horizontal lines
-    gridBig.add(createLine(new Vector3(-edge, -i, z), new Vector3(edge, -i, z), MIDDLE_BLUE, 2));
-    gridBig.add(createLine(new Vector3(-edge, i, z), new Vector3(edge, i, z), MIDDLE_BLUE, 2));
-}
+    for (let i = z; i <= edge; i += smallCell) {
+      gridSmall.add(createLine(new Vector3(-edge, -i, z), new Vector3(edge, -i, z), LIGHT_BLUE, 1));
+      gridSmall.add(createLine(new Vector3(-edge, i, z), new Vector3(edge, i, z), LIGHT_BLUE, 1));
+    }
 
-  const gridEdgeCenter = new Group();
-  const thickestLines = [
-    // vertical outer lines
-    [new Vector3(-edge, -edge, z), new Vector3(-edge, edge, z)],
-    [new Vector3(edge, -edge, z), new Vector3(edge, edge, z)],
-    // horizontal outer lines
-    [new Vector3(-edge, -edge, z), new Vector3(edge, -edge, z)],
-    [new Vector3(-edge, edge, z), new Vector3(edge, edge, z)],
-    // central lines
-    [new Vector3(0, -edge, z), new Vector3(0, edge, z)],
-    [new Vector3(-edge, 0, z), new Vector3(edge, 0, z)]
-  ];
-  thickestLines.forEach(([start, end]) => {
+    const gridBig = new Group();
+    for (let i = bigCell; i <= edge; i += bigCell) {
+      // vertical lines
+      gridBig.add(createLine(new Vector3(-i, -edge, z), new Vector3(-i, edge, z), MIDDLE_BLUE, 2));
+      gridBig.add(createLine(new Vector3(i, -edge, z), new Vector3(i, edge, z), MIDDLE_BLUE, 2));
+      // horizontal lines
+      gridBig.add(createLine(new Vector3(-edge, -i, z), new Vector3(edge, -i, z), MIDDLE_BLUE, 2));
+      gridBig.add(createLine(new Vector3(-edge, i, z), new Vector3(edge, i, z), MIDDLE_BLUE, 2));
+    }
+
+    const gridEdgeCenter = new Group();
+    const thickestLines = [
+      // vertical outer lines
+      [new Vector3(-edge, -edge, z), new Vector3(-edge, edge, z)],
+      [new Vector3(edge, -edge, z), new Vector3(edge, edge, z)],
+      // horizontal outer lines
+      [new Vector3(-edge, -edge, z), new Vector3(edge, -edge, z)],
+      [new Vector3(-edge, edge, z), new Vector3(edge, edge, z)],
+      // central lines
+      [new Vector3(0, -edge, z), new Vector3(0, edge, z)],
+      [new Vector3(-edge, 0, z), new Vector3(edge, 0, z)]
+    ];
+    thickestLines.forEach(([start, end]) => {
       gridEdgeCenter.add(createLine(start, end, DARK_BLUE, 3));
-  });
+    });
 
-  gridGroup.add(gridSmall);
-  gridGroup.add(gridBig);
-  gridGroup.add(gridEdgeCenter);
+    gridGroup.add(gridSmall);
+    gridGroup.add(gridBig);
+    gridGroup.add(gridEdgeCenter);
 
-  return gridGroup;
-}
+    return gridGroup;
+  },
+  
+  addStandardLights: function(scene) {
+    const light1 = new DirectionalLight(WHITE, 8);
+    light1.position.set(0, 5000, 1000);
+    scene.add(light1);
+
+    const light2 = new DirectionalLight(WHITE, 3);
+    light2.position.set(200, -3000, -3000);
+    scene.add(light2);
+    
+    return { mainLight: light1, secondaryLight: light2 };
+  },
+  
+  addCubeSceneLights: function(scene) {
+    scene.add(new AmbientLight(WHITE, 0.7));
+    
+    const light = new DirectionalLight(WHITE, 0.5);
+    light.position.set(3, 5, 8);
+    light.castShadow = true;
+    scene.add(light);
+    
+    const light2 = new DirectionalLight(WHITE, 0.5);
+    light2.position.set(-3, -5, 0);
+    light2.castShadow = true;
+    scene.add(light2);
+    
+    return { ambientLight: scene.children[0], mainLight: light, secondaryLight: light2 };
+  },
+  
+  getRaycaster: function(event, camera, canvas) {
+    const raycaster = new Raycaster();
+    const mouse = new Vector2();
+
+    const rect = canvas.getBoundingClientRect();
+    const mousePos = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+    mouse.x = (mousePos.x / canvas.clientWidth) * 2 - 1;
+    mouse.y = -(mousePos.y / canvas.clientHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+
+    return raycaster;
+  }
+};
 
 // For sever communication written in legacy JS.
 window.services.threejs = {
