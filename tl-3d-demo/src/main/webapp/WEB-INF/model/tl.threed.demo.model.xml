@@ -60,6 +60,12 @@
 					ordered="true"
 					type="ConnectionPoint"
 				/>
+				<reference name="layoutPoint"
+					composite="true"
+					kind="forwards"
+					navigate="true"
+					type="ConnectionPoint"
+				/>
 			</attributes>
 		</class>
 		<class name="AssetCollection">
