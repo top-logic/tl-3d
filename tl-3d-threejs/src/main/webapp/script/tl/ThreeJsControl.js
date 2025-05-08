@@ -9,19 +9,18 @@ import {
   WebGLRenderer,
   Raycaster,
   Box3,
-  Quaternion,
   Vector3,
   Vector2,
   AxesHelper,
   BoxHelper,
   Box3Helper,
-  BoxGeometry,
+  BoxBufferGeometry,
   BufferGeometry,
   Line,
   Mesh,
   MeshStandardMaterial,
   MeshBasicMaterial,
-  SphereGeometry,
+  SphereBufferGeometry,
   EdgesGeometry,
   LineBasicMaterial,
   LineSegments,
@@ -53,6 +52,7 @@ const _90_DEGREE = Math.PI / 2;
 class ThreeJsControl {
   constructor(controlId, contextPath, dataUrl, isWorkplaneVisible, isInEditMode, isRotateMode) {
     this.lastSelectedObject = null;
+    this.prevClosestSnappingPoint = null;
     this.controlId = controlId;
     this.contextPath = contextPath;
     this.dataUrl = dataUrl;
@@ -159,7 +159,7 @@ class ThreeJsControl {
 
   createAxesCube() {
     const cubeSize = 6;
-    const cubeGeometry = new BoxGeometry(cubeSize, cubeSize, cubeSize);
+    const cubeGeometry = new BoxBufferGeometry(cubeSize, cubeSize, cubeSize);
     const cubeMaterials = [
       new MeshStandardMaterial({ map: this.createTextTexture("Right"), side: FrontSide }),
       new MeshStandardMaterial({ map: this.createTextTexture("Left"), side: FrontSide }),    
@@ -379,7 +379,32 @@ class ThreeJsControl {
     })();
 
     this.translateControls.addEventListener("dragging-changed", updateRenderTransform);
-    this.translateControls.addEventListener("objectChange", () => this.render());
+    this.translateControls.addEventListener("objectChange", (event) => {
+      if (event.target.dragging) {
+        const selectedObject = event.target.object;
+        const { closestSnappingPoint } = this.findClosestSnappingPoint(selectedObject);
+
+        if (this.prevClosestSnappingPoint !== closestSnappingPoint) {
+          if (this.prevClosestSnappingPoint) {
+            this.restoreSnappingPointColor(this.prevClosestSnappingPoint);
+          }
+          if (closestSnappingPoint) {
+            closestSnappingPoint.pointMaterial.color.set(YELLOW);
+            let mesh = closestSnappingPoint.node.children[0];
+            if (mesh && mesh.isMesh) {
+              const highResGeometry = new SphereBufferGeometry(C_P_RADIUS*1.5, WIDTH_SEGMENTS, HEIGHT_SEGMENTS);
+              if (!mesh.userData.originalGeometry) {
+                mesh.userData.originalGeometry = mesh.geometry;
+              }
+              mesh.geometry = highResGeometry;
+            }
+          }
+          this.prevClosestSnappingPoint = closestSnappingPoint;
+        }
+      } 
+       
+       this.render();
+   });
     this.rotateControls = new TransformControls(this.camera, this.renderer.domElement);
     this.rotateControls.setMode("rotate");
     this.rotateControls.setSpace("local");
@@ -534,11 +559,31 @@ class ThreeJsControl {
   }
   
   updateConnectionPointsVisibility() {
-    const updateVisibility = (object) => {
-      if (object.userData.isConnectionPoint || object.userData.isLayoutPoint) {
-        object.visible = this.isEditMode;
-      }
-    };
+        // Get the currently selected objects
+        const selectedNodes = this.selection.map(s => s.node);
+        
+        const updateVisibility = (object) => {
+          if (object.userData.isConnectionPoint) {
+            object.visible = this.isEditMode;
+          }
+          if (object.userData.isLayoutPoint) {
+            // object.visible = false; // always hide layout points
+            // only show layout points for selected objects
+            const parentObject = findParentObject(object);
+            object.visible = this.isEditMode && selectedNodes.includes(parentObject);
+          }
+        };
+        
+        function findParentObject(layoutPoint) {
+          let current = layoutPoint;
+          while (current && current.parent) {
+            if (current.parent.userData && current.parent.userData.asset) {
+              return current.parent;
+            }
+            current = current.parent;
+          }
+          return null;
+        }
     
     this.zUpRoot.traverse(updateVisibility);
     this.multiTransformGroup.traverse(updateVisibility);
@@ -580,8 +625,7 @@ class ThreeJsControl {
     this.render(); 
   }
 
-  // "M(0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0) T(1826.0, 0.0, 2300.0)"
-  snapObject(selectedObj) {
+  findClosestSnappingPoint(selectedObj) {
     if (
       !selectedObj ||
       !selectedObj.userData ||
@@ -605,28 +649,28 @@ class ThreeJsControl {
         snappableObjects.push(node);
       }
     });
-  
+    
     if (snappableObjects.length === 0) return;
-  
+    
     selectedObj.updateMatrixWorld(true);
-  
+    
     // find the closest pair of snapping points
     let closestDistance = 1000;
     let closestSnappingPoint = null;
     let closestSnappingPointObject = null;
-
+    
     const selectedWorldPosition = new Vector3();
     selectedObj.getWorldPosition(selectedWorldPosition);
-  
+    
     for (const otherObject of snappableObjects) {
       otherObject.updateMatrixWorld(true);
-  
+      
       for (const otherPoint of otherObject.userData.asset.snappingPoints) {
         const position = new Vector3();
         otherPoint.node.getWorldPosition(position);
         
         const distance = selectedWorldPosition.distanceTo(position);
-
+        
         if (distance < closestDistance) {
           closestDistance = distance;
           closestSnappingPoint = otherPoint;
@@ -634,8 +678,32 @@ class ThreeJsControl {
         }
       }
     }
+    
+    return closestDistance < 1000 ? { closestSnappingPoint, closestSnappingPointObject } : {};
+  }
+
+  restoreSnappingPointColor(snappingPoint) {
+    if (!snappingPoint) return;
+    
+    if (snappingPoint.pointMaterial) {
+      if (snappingPoint.pointMaterial.userData.originalColor) {
+        snappingPoint.pointMaterial.color.copy(snappingPoint.pointMaterial.userData.originalColor);
+      } else {
+        snappingPoint.pointMaterial.color.set(GREEN);
+      }
+    }
+    const mesh = snappingPoint.node.children[0];
+    if (mesh && mesh.isMesh && mesh.userData.originalGeometry) {
+      mesh.geometry.dispose(); 
+      mesh.geometry = mesh.userData.originalGeometry;
+      delete mesh.userData.originalGeometry;
+    }
+  }
+
+  snapObject(selectedObj) {
+    const { closestSnappingPoint, closestSnappingPointObject } = this.findClosestSnappingPoint(selectedObj);
   
-    if (closestSnappingPoint) {
+    if (closestSnappingPoint && closestSnappingPointObject) {
       closestSnappingPointObject.updateMatrixWorld(true);
       closestSnappingPoint.node.updateMatrixWorld(true);
       selectedObj.updateMatrixWorld(true);
@@ -992,6 +1060,7 @@ class ThreeJsControl {
       command = this.sceneGraph.addSelected(sharedNode); 
     }
     this.updateTransformControls();
+    this.updateConnectionPointsVisibility();
     
     return command;
   }
@@ -1078,6 +1147,8 @@ class ThreeJsControl {
       this.setColor(sharedNode.node, WHITE);
     }
     this.selection.length = 0;
+
+    this.updateConnectionPointsVisibility();
 
     this.disableEditing();
     return this.sceneGraph.clearSelection();
@@ -1338,12 +1409,13 @@ class ConnectionPoint extends SharedObject {
 
     transform(group, this.transform);
 
-    const material = new MeshBasicMaterial({ color: layoutPoint ? YELLOW : GREEN });
-    material.userData.originalColor = material.color.clone();
+    this.pointMaterial = new MeshBasicMaterial({ color: layoutPoint ? RED : GREEN });
+    this.pointGeometry = new SphereBufferGeometry(C_P_RADIUS, WIDTH_SEGMENTS, HEIGHT_SEGMENTS);
+    this.pointMaterial.userData.originalColor = this.pointMaterial.color.clone();
     
     const sphere = new Mesh(
-      new SphereGeometry(C_P_RADIUS, WIDTH_SEGMENTS, HEIGHT_SEGMENTS), 
-      material
+      this.pointGeometry, 
+      this.pointMaterial
     );
     
     if (layoutPoint) {
