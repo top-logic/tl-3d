@@ -250,7 +250,7 @@
 				<generalization type="ScenePart"/>
 			</generalizations>
 			<attributes>
-				<reference name="root"
+				<reference name="rootNode"
 					composite="true"
 					kind="forwards"
 					mandatory="true"

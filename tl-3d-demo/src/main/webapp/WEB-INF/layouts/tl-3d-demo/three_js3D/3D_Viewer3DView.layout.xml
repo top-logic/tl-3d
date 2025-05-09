@@ -15,7 +15,7 @@
 		</name>
 		<modelBuilder class="com.top_logic.threed.threejs.component.SceneBuilderByExpression"
 			resolveParts="node -> $node.get(`tl.threed.demo:Assembly#children`)"
-			rootNode="scene -> $scene.get(`tl.threed.demo:Scene#root`)"
+			rootNode="scene -> $scene.get(`tl.threed.demo:Scene#rootNode`)"
 			supportsModel="model -> $model.instanceOf(`tl.threed.demo:Scene`)"
 			supportsObject="node -> $node.instanceOf(`tl.threed.demo:Node`)"
 			typesToObserve="tl.threed.demo:Node"

@@ -16,7 +16,7 @@
 			children="node->$node.get(`tl.element:StructuredElementContainer#children`)"
 			nodePredicate="node->$node.instanceOf(`tl.threed.demo:Node`)"
 			parents="node->$node.referers(`tl.element:StructuredElementContainer#children`)"
-			rootNode="model -> $model.get(`tl.threed.demo:Scene#root`)"
+			rootNode="model -> $model.get(`tl.threed.demo:Scene#rootNode`)"
 		/>
 		<buttons>
 			<button id="exportExcelGrid"

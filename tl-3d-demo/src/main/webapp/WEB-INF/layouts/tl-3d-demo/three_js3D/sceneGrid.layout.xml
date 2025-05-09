@@ -20,7 +20,7 @@
 			children="node->$node.get(`tl.element:StructuredElementContainer#children`)"
 			nodePredicate="node->$node.instanceOf(`tl.threed.demo:Node`)"
 			parents="node->$node.referers(`tl.element:StructuredElementContainer#children`)"
-			rootNode="scene -> $scene.get(`tl.threed.demo:Scene#root`)"
+			rootNode="scene -> $scene.get(`tl.threed.demo:Scene#rootNode`)"
 		/>
 		<buttons>
 			<button id="exportExcelGrid"
@@ -80,7 +80,7 @@
     new(`tl.threed.demo:Scene`)
     ..set(`tl.threed.demo:Scene#name`, 
         $selection.firstElement().get(`tl.threed.demo:Node#name`) || "New Project")
-    ..set(`tl.threed.demo:Scene#root`, 
+    ..set(`tl.threed.demo:Scene#rootNode`, 
         new(`tl.threed.demo:Assembly`)
         ..set(`tl.threed.demo:Assembly#children`, $selection.copy()));
 
