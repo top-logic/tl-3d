@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<action class="com.top_logic.layout.scripting.runtime.action.ActionChainOp"
+	xmlns:config="http://www.top-logic.com/ns/config/6.0"
+>
+	<actions>
+		<action class="com.top_logic.threed.demo.scripting.actions.CreateComplexSceneAction"
+			number-stations="25"
+			number-floors="3"
+		/>
+	</actions>
+</action>
