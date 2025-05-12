@@ -382,8 +382,19 @@ class ThreeJsControl {
     this.translateControls.addEventListener("objectChange", (event) => {
       if (event.target.dragging) {
         const selectedObject = event.target.object;
-        const { closestSnappingPoint } = this.findClosestSnappingPoint(selectedObject);
 
+        const isGroup = selectedObject.children.length > 0 && 
+                       (!selectedObject.userData || 
+                        !selectedObject.userData.asset || 
+                        !selectedObject.userData.asset.snappingPoints);
+
+        if (selectedObject === this.multiTransformGroup || isGroup) {
+          this.render();
+          return;
+        }
+        
+        const { closestSnappingPoint } = this.findClosestSnappingPoint(selectedObject);
+        
         if (this.prevClosestSnappingPoint !== closestSnappingPoint) {
           if (this.prevClosestSnappingPoint) {
             this.restoreSnappingPointColor(this.prevClosestSnappingPoint);
@@ -403,7 +414,7 @@ class ThreeJsControl {
         }
       } 
        
-       this.render();
+      this.render();
    });
     this.rotateControls = new TransformControls(this.camera, this.renderer.domElement);
     this.rotateControls.setMode("rotate");
@@ -633,7 +644,7 @@ class ThreeJsControl {
       !selectedObj.userData.asset.snappingPoints ||
       selectedObj.userData.asset.snappingPoints.length === 0
     ) {
-      return;
+      return { closestSnappingPoint: null, closestSnappingPointObject: null };
     }
   
     // find all other objects in the scene that have snapping points
@@ -650,7 +661,9 @@ class ThreeJsControl {
       }
     });
     
-    if (snappableObjects.length === 0) return;
+    if (snappableObjects.length === 0) {
+      return { closestSnappingPoint: null, closestSnappingPointObject: null };
+    }
     
     selectedObj.updateMatrixWorld(true);
     
@@ -679,7 +692,9 @@ class ThreeJsControl {
       }
     }
     
-    return closestDistance < 1000 ? { closestSnappingPoint, closestSnappingPointObject } : {};
+    return closestDistance < 1000 
+    ? { closestSnappingPoint, closestSnappingPointObject } 
+    : { closestSnappingPoint: null, closestSnappingPointObject: null };
   }
 
   restoreSnappingPointColor(snappingPoint) {
@@ -1849,7 +1864,7 @@ const CameraUtils = {
     const fov = 35; // AKA Field of View
     const aspect = container.clientWidth / container.clientHeight;
     const near = 10; // the near clipping plane
-    const far = 100000; // the far clipping plane
+    const far = 200000; // the far clipping plane
 
     const camera = new PerspectiveCamera(fov, aspect, near, far);
     camera.position.copy(position);
