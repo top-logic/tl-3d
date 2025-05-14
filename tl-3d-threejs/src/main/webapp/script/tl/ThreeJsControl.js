@@ -25,7 +25,9 @@ import {
   LineBasicMaterial,
   LineSegments,
   CanvasTexture,
-  FrontSide
+  FrontSide,
+  LOD,
+  LinearFilter
 } from "three";
 
 import { OrbitControls } from "OrbitControls";
@@ -48,6 +50,13 @@ const C_P_RADIUS = 100;
 const WIDTH_SEGMENTS = 8;
 const HEIGHT_SEGMENTS = 8;
 const _90_DEGREE = Math.PI / 2;
+const LOD_MEDIUM_DISTANCE = 500;
+const LOD_LOW_DISTANCE = 2000;
+const LOD_HIGH = 'high';
+const LOD_MEDIUM = 'medium';
+const LOD_LOW = 'low';
+const OPTIMIZED_PIXEL_RATIO = Math.min(window.devicePixelRatio, 1.7);
+const INTERACTIVE_PIXEL_RATIO = Math.min(window.devicePixelRatio, 1.0);
 
 class ThreeJsControl {
   constructor(controlId, contextPath, dataUrl, isWorkplaneVisible, isInEditMode, isRotateMode) {
@@ -58,6 +67,8 @@ class ThreeJsControl {
     this.dataUrl = dataUrl;
     this.scope = new Scope();
  
+    this.lastLODLevel = -1;
+    this.useLOD = true;
     this.zUpRoot = new Group();
     this.multiTransformGroup = new Group();
     this.initScene();
@@ -75,6 +86,7 @@ class ThreeJsControl {
       this.toggleEditMode(isInEditMode);
       this.toggleRotateMode(isRotateMode);
       this.zoomOut();
+      this.updateLODObjects();
     }, 100));
   }
 
@@ -98,9 +110,18 @@ class ThreeJsControl {
 
   initRenderer() {
     const container = this.container;
-    this.renderer = new WebGLRenderer();
+    this.renderer = new WebGLRenderer({
+      powerPreference: "high-performance"
+    });
+
     this.renderer.setSize(container.clientWidth, container.clientHeight);
-    this.renderer.setPixelRatio(window.devicePixelRatio);
+    
+    // Adjust pixel ratio for performance (limit to 1.7 for high-DPI screens)
+    const pixelRatio = Math.min(window.devicePixelRatio, OPTIMIZED_PIXEL_RATIO);
+    console.log("pixelRatio:", window.devicePixelRatio);
+    this.renderer.setPixelRatio(pixelRatio);
+    this.renderer.shadowMap.autoUpdate = false;
+    
     this.canvas = this.renderer.domElement;
     this.canvas.style.maxWidth = "100%";
     this.canvas.style.maxHeight = "100%";
@@ -113,9 +134,15 @@ class ThreeJsControl {
     this.container.addEventListener("wheel", (event) => this.onMouseWheel(event), {
       passive: false,
     });
+    
+    // Throttle rendering on resize for better performance
+    let resizeTimeout;
     LayoutFunctions.addCustomRenderingFunction(container.parentNode, () => {
-      this.renderer.setSize(container.clientWidth, container.clientHeight);
-      this.render();
+      if (resizeTimeout) clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        this.renderer.setSize(container.clientWidth, container.clientHeight);
+        this.render();
+      }, 100); 
     });
   }
 
@@ -271,7 +298,7 @@ class ThreeJsControl {
     if (!this.workplane) {
       const boxSize = new Vector3();
       this.boundingBox.getSize(boxSize);
-      const gridSize = Math.max(boxSize.x, boxSize.y, boxSize.z) * 1.5;
+      const gridSize = Math.max(boxSize.x, boxSize.y, boxSize.z) * 1.2;
 
       this.workplane = SceneUtils.createDetailedGrid(gridSize);
       this.workplane.rotation.x = _90_DEGREE;
@@ -379,6 +406,7 @@ class ThreeJsControl {
     })();
 
     this.translateControls.addEventListener("dragging-changed", updateRenderTransform);
+    
     this.translateControls.addEventListener("objectChange", (event) => {
       if (event.target.dragging) {
         const selectedObject = event.target.object;
@@ -387,13 +415,13 @@ class ThreeJsControl {
                        (!selectedObject.userData || 
                         !selectedObject.userData.asset || 
                         !selectedObject.userData.asset.snappingPoints);
-
+                        
         if (selectedObject === this.multiTransformGroup || isGroup) {
           this.render();
           return;
         }
         
-        const { closestSnappingPoint } = this.findClosestSnappingPoint(selectedObject);
+        const { closestSnappingPoint } = this.throttledFindClosestSnappingPoint(selectedObject);
         
         if (this.prevClosestSnappingPoint !== closestSnappingPoint) {
           if (this.prevClosestSnappingPoint) {
@@ -413,8 +441,18 @@ class ThreeJsControl {
           this.prevClosestSnappingPoint = closestSnappingPoint;
         }
       } 
-       
-      this.render();
+      
+      // throttle render calls during dragging
+      if (event.target.dragging) {
+        if (!this._throttledRender) {
+          this._throttledRender = throttle(() => {
+            this.render();
+          }, 50); 
+        }
+        this._throttledRender();
+      } else {
+        this.render();
+      }
    });
     this.rotateControls = new TransformControls(this.camera, this.renderer.domElement);
     this.rotateControls.setMode("rotate");
@@ -427,9 +465,6 @@ class ThreeJsControl {
     this.rotateControls.enabled = false;
   }
 
-  /**
-   * Syncs the content of multiTransformGroup and selected shared objects
-   */
   updateTransformControls() {
     // hides transform controls
     this.deactivateControl();
@@ -693,9 +728,14 @@ class ThreeJsControl {
     }
     
     return closestDistance < 1000 
-    ? { closestSnappingPoint, closestSnappingPointObject } 
-    : { closestSnappingPoint: null, closestSnappingPointObject: null };
+      ? { closestSnappingPoint, closestSnappingPointObject } 
+      : { closestSnappingPoint: null, closestSnappingPointObject: null };
   }
+
+      // throttled version of findClosestSnappingPoint
+      throttledFindClosestSnappingPoint = throttle((selectedObject) => {
+        return this.findClosestSnappingPoint(selectedObject);
+      }, 100); 
 
   restoreSnappingPointColor(snappingPoint) {
     if (!snappingPoint) return;
@@ -716,7 +756,7 @@ class ThreeJsControl {
   }
 
   snapObject(selectedObj) {
-    const { closestSnappingPoint, closestSnappingPointObject } = this.findClosestSnappingPoint(selectedObj);
+    const { closestSnappingPoint, closestSnappingPointObject } = this.throttledFindClosestSnappingPoint(selectedObj);
   
     if (closestSnappingPoint && closestSnappingPointObject) {
       closestSnappingPointObject.updateMatrixWorld(true);
@@ -802,12 +842,13 @@ class ThreeJsControl {
     });
   }
 
-  createResizeObserver(canvas) {
-    return new ResizeObserver(() => {
-      this.camera.aspect = canvas.clientWidth / canvas.clientHeight;
+  createResizeObserver(element) {
+    return new ResizeObserver(throttle(() => {
+      this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+      this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
       this.camera.updateProjectionMatrix();
       this.render();
-    });
+    }, 100));
   }
 
   onMouseDown() {
@@ -827,40 +868,52 @@ class ThreeJsControl {
 
   onMouseWheel(event) {
     event.preventDefault();
-
-    const target = this.controls.target;
-    const position = this.camera.position;
-
-    const offset = new Vector3();
-    offset.copy(position);
-    offset.sub(target);
-
-    const factor = event.deltaY < 0 ? 0.888888889 : 1.125;
-    offset.multiplyScalar(factor);
-    offset.add(target);
-
-    this.camera.position.copy(offset);
-
-    this.render();
-  }
-
-  onCubeHover(event) {
-    const raycaster = getRaycaster(event, this.cubeCamera, this.cubeCanvas);
-    const intersects = raycaster.intersectObject(this.axesCube.children[0], true);
-
-    const materials = this.axesCube.children[0].material;
-    materials.forEach((material, index) => {
-      material.color.copy(this.originalMaterials[index].color);
-      material.map = this.originalMaterials[index].map;
-    });
-
-    if (intersects.length > 0) {
-      const intersectedFace = intersects[0].face;
-      materials[intersectedFace.materialIndex].color.set("#66bbff");
+  
+    if (!this._throttledMouseWheel) {
+      this._throttledMouseWheel = throttle((event) => {
+        const target = this.controls.target;
+        this.renderer.setPixelRatio(INTERACTIVE_PIXEL_RATIO);
+        const position = this.camera.position;
+  
+        const offset = new Vector3();
+        offset.copy(position);
+        offset.sub(target);
+  
+        const factor = event.deltaY < 0 ? 0.888888889 : 1.125;
+        offset.multiplyScalar(factor);
+        offset.add(target);
+  
+        this.camera.position.copy(offset);
+  
+        this.render();
+        this.renderer.setPixelRatio(OPTIMIZED_PIXEL_RATIO);
+      }, 50); 
     }
-
-    this.render();
+    this._throttledMouseWheel(event);
   }
+
+onCubeHover(event) {
+  if (!this._throttledCubeHover) {
+    this._throttledCubeHover = throttle((event) => {
+      const raycaster = getRaycaster(event, this.cubeCamera, this.cubeCanvas);
+      const intersects = raycaster.intersectObject(this.axesCube.children[0], true);
+
+      const materials = this.axesCube.children[0].material;
+      materials.forEach((material, index) => {
+        material.color.copy(this.originalMaterials[index].color);
+        material.map = this.originalMaterials[index].map;
+      });
+
+      if (intersects.length > 0) {
+        const intersectedFace = intersects[0].face;
+        materials[intersectedFace.materialIndex].color.set("#66bbff");
+      }
+
+      this.render();
+    }, 100); 
+  }
+  this._throttledCubeHover(event);
+}
 
   onCubeClick(event) {
     if (Date.now() - this.clickStart > 500) {
@@ -1195,8 +1248,8 @@ class ThreeJsControl {
 
     this.render();
   }
-
-  sendSceneChanges(commands) {
+  
+    sendSceneChanges(commands) {
   	const cmds = [];
   	for (let i = 0; i < commands.length; i++) {
   		cmds.push(commands[i].extract());
@@ -1214,9 +1267,30 @@ class ThreeJsControl {
   render() {
     requestAnimationFrame(() => {
       const { renderer, cubeRenderer, scene, camera, cubeScene, cubeCamera } = this;
+
+      // update LOD objects if enabled
+      if (this.useLOD) {
+        this.updateLODObjects();
+      }
+
       renderer.render(scene, camera);
       cubeRenderer.render(cubeScene, cubeCamera);
     });
+  }
+
+  updateLODObjects() {
+    if (!this._throttledUpdateLOD) {
+      this._throttledUpdateLOD = throttle(() => {
+        if (!this.camera || !this.zUpRoot) return;
+        this.zUpRoot.traverse(node => {
+          if (node.isLOD) {
+            // LOD objects automatically update based on camera distance
+            node.update(this.camera);
+          }
+        });
+      }, 100); 
+    }
+    this._throttledUpdateLOD();
   }
 }
 
@@ -1279,21 +1353,31 @@ class Scope {
 
   async loadAssets(contextPath) {
     const gltfLoader = new GLTFLoader();
+    
+    // track loading progress
+    let totalAssets = 0;
+    let loadedAssets = 0;
 
     const loadUrl = (url) =>
       new Promise((resolve, reject) => {
         try {
+          totalAssets++;
+          
           // if gltf for the given url exists in the cache let's return it
           if (this.gltfs[url]) {
+            loadedAssets++;
+            // console.log(`Loading from cache: ${url} (${loadedAssets}/${totalAssets})`);
             resolve(this.gltfs[url]);
-
             return;
           }
 
+          // console.log(`Loading model: ${url} (${loadedAssets}/${totalAssets})`);
+          
           gltfLoader.load(url, (gltf) => {
-            // store gltf in the cache
-            this.gltfs[url] = gltf;
-            resolve(gltf);
+              loadedAssets++;
+              // store gltf in the cache
+              this.gltfs[url] = gltf;
+              resolve(gltf);
           }, null, reject);
         } catch (err) {
           const msg = "Failed to load '" + url + "': " + err;
@@ -1302,13 +1386,27 @@ class Scope {
         }
       });
 
+    // load assets in batches to prevent overwhelming the browser
     const assets = this.assets;
     const urls = assets.flatMap((asset) => contextPath + asset.url);
-    const gltfs = await Promise.all(urls.flatMap(loadUrl));
+    const batchSize = 10;
+    const batches = [];
+    
+    for (let i = 0; i < urls.length; i += batchSize) {
+      batches.push(urls.slice(i, i + batchSize));
+    }
+    
+    let loadedGltfs = [];
+    
+    for (const batch of batches) {
+      const batchGltfs = await Promise.all(batch.map(loadUrl));
+      loadedGltfs = loadedGltfs.concat(batchGltfs);
+    }
+    
     let n = 0;
-    for (const gltf of gltfs) {
+    for (const gltf of loadedGltfs) {
       assets[n++].gltf = gltf;
-    }  
+    }
   }
 }
 
@@ -1590,16 +1688,124 @@ class GltfAsset extends SharedObject {
     }
     this.snappingPoints?.forEach((point) => point.build(group, false));
 
-    const model = this.gltf.scene.clone();
+    // const model = this.gltf.scene.clone();
+    const useLOD = true;
+    // console.log('[GltfAsset] useLOD:', useLOD);
+    
+    if (useLOD) {
+      // console.log('[GltfAsset] Using LOD for this asset');
+      // create LOD object
+      const lod = new LOD();
+      group.add(lod);
+      
+      // create high detail model (original)
+      const highDetailModel = this.createDetailLevel(this.gltf.scene, LOD_HIGH);
+      lod.addLevel(highDetailModel, 0);  // visible from distance 0 to medium distance
+      
+      // create medium detail model (simplified)
+      const mediumDetailModel = this.createDetailLevel(this.gltf.scene, LOD_MEDIUM);
+      lod.addLevel(mediumDetailModel, LOD_MEDIUM_DISTANCE);  // visible from medium to low distance
+      
+      // create low detail model (very simplified)
+      const lowDetailModel = this.createDetailLevel(this.gltf.scene, LOD_LOW);
+      lod.addLevel(lowDetailModel, LOD_LOW_DISTANCE);  // visible from low distance and beyond
+      
+      return group;
+    } else {
+      // console.log('[GltfAsset] Using standard rendering');
+      // standard non-LOD rendering
+      const model = this.gltf.scene.clone();
+      model.traverse((obj) => {
+        if (obj.isMesh && obj.material) {
+          obj.userData.originalMaterial = obj.material;
+          obj.material = obj.material.clone();
+          obj.material.userData.originalColor = obj.material.color.clone();
+        }
+      });
+      group.add(model);
+      return group;
+    }
+  }
+  
+  // create a model with specific level of detail
+  createDetailLevel(originalScene, detailLevel) {
+    // console.log(`[LOD] Creating ${detailLevel} detail level`);
+    const model = originalScene.clone();
+
     model.traverse((obj) => {
       if (obj.isMesh && obj.material) {
         obj.userData.originalMaterial = obj.material;
         obj.material = obj.material.clone();
         obj.material.userData.originalColor = obj.material.color.clone();
+
+        // apply detail level specific optimizations
+        switch (detailLevel) {
+          case LOD_HIGH:
+            // high detail - keep original quality
+            break;
+            
+          case LOD_MEDIUM:
+            // medium detail - reduce material complexity
+            this.simplifyMaterial(obj.material, LOD_MEDIUM);
+            break;
+            
+          case LOD_LOW:
+            // low detail - maximum simplification
+            this.simplifyMaterial(obj.material, LOD_LOW);
+            break;
+        }
       }
     });
-      group.add(model);
-    return group;
+    //   group.add(model);
+    // return group;
+    return model;
+  }
+      
+      // simplify material based on detail level
+  simplifyMaterial(material, detailLevel) {
+    if (Array.isArray(material)) {
+      material.forEach(mat => this.applySimplerMaterial(mat, detailLevel));
+    } else {
+      const result = this.applySimplerMaterial(material, detailLevel);
+      if (result && detailLevel === LOD_LOW) {
+        return result;
+      }
+    }
+  }
+  
+  // apply simpler material properties based on detail level
+  applySimplerMaterial(material, detailLevel) {
+    // for medium detail
+    if (detailLevel === LOD_MEDIUM) {
+      // reduce texture quality
+      if (material.map) {
+        material.map.anisotropy = 1;
+        material.map.minFilter = LinearFilter;
+      }
+      
+      // simplify material properties
+      material.fog = false;
+      material.flatShading = true;
+      
+      // reduce shadow quality
+      material.shadowSide = null;
+      return material;
+    }
+    // for low detail
+    else if (detailLevel === LOD_LOW) {
+      // replace with basic material for maximum performance
+      const color = material.color ? material.color.clone() : new Color(0xcccccc);
+      
+      // create a new basic material
+      const basicMaterial = new MeshBasicMaterial({
+        color: color,
+        wireframe: false,
+        transparent: material.transparent,
+        opacity: material.opacity
+      });
+      
+      return basicMaterial;
+    }
   }
 
   loadJson(scope, json) {
@@ -1662,6 +1868,7 @@ class SetProperty extends Command {
   	}
   	target.setProperty(scope, this.property, this.value);
   }
+  
   
   extract() {
   	return [["S", {id: this.id, p: this.property}], this.value]; 
@@ -1736,6 +1943,24 @@ class RemoveElement extends ListUpdate {
   }
 }
 
+    // throttle function to limit how often a function can be called
+    const throttle = (func, limit) => {
+      let inThrottle = false;
+      let lastResult = null;
+      
+      return function(...args) {
+        if (!inThrottle) {
+          inThrottle = true;
+          lastResult = func.apply(this, args);
+          
+          setTimeout(() => {
+            inThrottle = false;
+          }, limit);
+        }
+        
+        return lastResult;
+      };
+    };
 function getRaycaster(event, camera, canvas) {
   const raycaster = new Raycaster();
   const mouse = new Vector2();
@@ -1864,7 +2089,7 @@ const CameraUtils = {
     const fov = 35; // AKA Field of View
     const aspect = container.clientWidth / container.clientHeight;
     const near = 10; // the near clipping plane
-    const far = 200000; // the far clipping plane
+    const far = 600000; // the far clipping plane
 
     const camera = new PerspectiveCamera(fov, aspect, near, far);
     camera.position.copy(position);
@@ -1899,7 +2124,7 @@ const SceneUtils = {
     const edge = size / 2;
     const gridGroup = new Group();
 
-    const smallCell = 200;
+    const smallCell = 500;
     const bigCell = smallCell * 10;
 
     const gridSmall = new Group();
