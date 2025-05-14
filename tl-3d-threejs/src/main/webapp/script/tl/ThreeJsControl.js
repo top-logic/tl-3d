@@ -842,10 +842,10 @@ class ThreeJsControl {
     });
   }
 
-  createResizeObserver(element) {
+  createResizeObserver(canvas) {
     return new ResizeObserver(throttle(() => {
-      this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
-      this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
+      this.renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+      this.camera.aspect = canvas.clientWidth / canvas.clientHeight;
       this.camera.updateProjectionMatrix();
       this.render();
     }, 100));
@@ -892,28 +892,28 @@ class ThreeJsControl {
     this._throttledMouseWheel(event);
   }
 
-onCubeHover(event) {
-  if (!this._throttledCubeHover) {
-    this._throttledCubeHover = throttle((event) => {
-      const raycaster = getRaycaster(event, this.cubeCamera, this.cubeCanvas);
-      const intersects = raycaster.intersectObject(this.axesCube.children[0], true);
+  onCubeHover(event) {
+    if (!this._throttledCubeHover) {
+      this._throttledCubeHover = throttle((event) => {
+        const raycaster = getRaycaster(event, this.cubeCamera, this.cubeCanvas);
+        const intersects = raycaster.intersectObject(this.axesCube.children[0], true);
 
-      const materials = this.axesCube.children[0].material;
-      materials.forEach((material, index) => {
-        material.color.copy(this.originalMaterials[index].color);
-        material.map = this.originalMaterials[index].map;
-      });
+        const materials = this.axesCube.children[0].material;
+        materials.forEach((material, index) => {
+          material.color.copy(this.originalMaterials[index].color);
+          material.map = this.originalMaterials[index].map;
+        });
 
-      if (intersects.length > 0) {
-        const intersectedFace = intersects[0].face;
-        materials[intersectedFace.materialIndex].color.set("#66bbff");
-      }
+        if (intersects.length > 0) {
+          const intersectedFace = intersects[0].face;
+          materials[intersectedFace.materialIndex].color.set("#66bbff");
+        }
 
-      this.render();
-    }, 100); 
+        this.render();
+      }, 100); 
+    }
+    this._throttledCubeHover(event);
   }
-  this._throttledCubeHover(event);
-}
 
   onCubeClick(event) {
     if (Date.now() - this.clickStart > 500) {
