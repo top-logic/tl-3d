@@ -18,7 +18,7 @@
 					<storage-mapping class="com.top_logic.threed.core.math.format.TransformationValueProvider"/>
 
 					<annotations>
-						<config-type value="TRANSFORMATION"/>
+						<config-type value="TRANSFORMATION_TYPE"/>
 					</annotations>
 				</datatype>
 			</types>
