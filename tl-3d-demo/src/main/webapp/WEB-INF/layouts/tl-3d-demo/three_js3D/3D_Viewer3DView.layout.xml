@@ -24,6 +24,7 @@
   $node.instanceOf(`tl.threed.demo:Part`) || $node.get(`tl.threed.demo:Node#asset`) != null: 
     threejsGltf(
       tx:  $node.get(`tl.threed.demo:Node#tx`),
+      color: $node.get(`tl.threed.demo:Node#color`),
       userData: $node,
       url: $node.get(`tl.threed.demo:Part#asset`).get(`tl.threed.demo:Asset3D#gltfUrl`),
       layoutPoint: {
@@ -45,7 +46,9 @@
   $node.instanceOf(`tl.threed.demo:Assembly`):
     threejsGroup(
       tx: $node.get(`tl.threed.demo:Node#tx`),
-      userData: $node);
+      color: $node.get(`tl.threed.demo:Node#color`),
+      userData: $node
+      );
 }]]></createNode>
 		</modelBuilder>
 		<buttons>

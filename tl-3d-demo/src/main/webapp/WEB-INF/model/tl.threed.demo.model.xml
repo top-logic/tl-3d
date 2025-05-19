@@ -201,6 +201,9 @@
 					navigate="true"
 					type="Asset3D"
 				/>
+				<property name="color"
+					type="tl.util:Color"
+				/>
 			</attributes>
 		</interface>
 		<class name="Assembly">
@@ -238,6 +241,7 @@
 					type="tl.core:Integer"
 				/>
 				<property name="color"
+					override="true"
 					type="tl.util:Color"
 				/>
 				<property name="background"
