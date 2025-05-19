@@ -1589,6 +1589,8 @@ class GroupNode extends SharedObject {
   loadJson(scope, json) {
     this.setProperty(scope, 'contents', json.contents);
     this.setProperty(scope, 'transform', json.transform);
+    this.setProperty(scope, 'hidden', json.hidden);
+    this.setProperty(scope, 'color', json.color);
   }
 
   setProperty(scope, property, value) {
@@ -1602,6 +1604,8 @@ class GroupNode extends SharedObject {
   			break;
   		} 
   		case 'transform': this.transform = value; break;
+   		case 'color': this.color = value; break;
+   		case 'hidden': this.hidden = value; break;
    }
   }
 
@@ -1651,12 +1655,16 @@ class PartNode extends SharedObject {
   loadJson(scope, json) {
     this.setProperty(scope, 'asset', json.asset);
     this.setProperty(scope, 'transform', json.transform);
+    this.setProperty(scope, 'hidden', json.hidden);
+    this.setProperty(scope, 'color', json.color);
   }
 
   setProperty(scope, property, value) {
     switch (property) {
   		case 'asset': this.asset = scope.loadJson(value); break; 
    		case 'transform': this.transform = value; break;
+   		case 'color': this.color = value; break;
+   		case 'hidden': this.hidden = value; break;
     }
   }
 

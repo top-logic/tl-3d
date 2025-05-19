@@ -46,13 +46,13 @@ public class ThreejsGltf extends ThreejsSceneNode<PartNode> {
 	protected PartNode createNode(Object[] arguments) {
 		GltfAsset asset = GltfAsset.create();
 
-		ConnectionPoint layoutPoint = toConnectionPoint(getArguments()[3], arguments[3]);
+		ConnectionPoint layoutPoint = toConnectionPoint(getArguments()[5], arguments[5]);
 		asset.setLayoutPoint(layoutPoint);
 
-		List<ConnectionPoint> snappingPoints = toConnectionPointList(getArguments()[4], arguments[4]);
+		List<ConnectionPoint> snappingPoints = toConnectionPointList(getArguments()[6], arguments[6]);
 		asset.setSnappingPoints(snappingPoints);
 
-		String url = (String) arguments[5];
+		String url = (String) arguments[7];
 		asset.setUrl(url);
 
 		return super.createNode(arguments).setAsset(asset);
@@ -87,6 +87,8 @@ public class ThreejsGltf extends ThreejsSceneNode<PartNode> {
 			.optional("name")
 			.optional("tx")
 			.optional("userData")
+			.optional("hidden")
+			.optional("color")
 			.optional("layoutPoint")
 			.optional("snappingPoints")
 			.optional("url")

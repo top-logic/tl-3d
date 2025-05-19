@@ -22,6 +22,12 @@ public abstract class SceneNode extends ScenePart {
 	/** @see #getTransform() */
 	public static final String TRANSFORM__PROP = "transform";
 
+	/** @see #isHidden() */
+	public static final String HIDDEN__PROP = "hidden";
+
+	/** @see #getColor() */
+	public static final String COLOR__PROP = "color";
+
 	private transient java.lang.Object _userData = null;
 
 	private final java.util.List<Double> _transform = new de.haumacher.msgbuf.util.ReferenceList<Double>() {
@@ -40,6 +46,10 @@ public abstract class SceneNode extends ScenePart {
 			_listener.afterChanged(SceneNode.this, TRANSFORM__PROP);
 		}
 	};
+
+	private boolean _hidden = false;
+
+	private String _color = "";
 
 	/**
 	 * Creates a {@link SceneNode} instance.
@@ -118,10 +128,56 @@ public abstract class SceneNode extends ScenePart {
 		_transform.remove(value);
 	}
 
+	/**
+	 * Whether this node must not be displayed.
+	 */
+	public final boolean isHidden() {
+		return _hidden;
+	}
+
+	/**
+	 * @see #isHidden()
+	 */
+	public com.top_logic.threed.threejs.scene.SceneNode setHidden(boolean value) {
+		internalSetHidden(value);
+		return this;
+	}
+
+	/** Internal setter for {@link #isHidden()} without chain call utility. */
+	protected final void internalSetHidden(boolean value) {
+		_listener.beforeSet(this, HIDDEN__PROP, value);
+		_hidden = value;
+		_listener.afterChanged(this, HIDDEN__PROP);
+	}
+
+	/**
+	 * Optional color in RGB format to paint this node.
+	 */
+	public final String getColor() {
+		return _color;
+	}
+
+	/**
+	 * @see #getColor()
+	 */
+	public com.top_logic.threed.threejs.scene.SceneNode setColor(String value) {
+		internalSetColor(value);
+		return this;
+	}
+
+	/** Internal setter for {@link #getColor()} without chain call utility. */
+	protected final void internalSetColor(String value) {
+		_listener.beforeSet(this, COLOR__PROP, value);
+		_color = value;
+		_listener.afterChanged(this, COLOR__PROP);
+	}
+
 	private static java.util.List<String> PROPERTIES = java.util.Collections.unmodifiableList(
 		java.util.Arrays.asList(
 			USER_DATA__PROP, 
-			TRANSFORM__PROP));
+			TRANSFORM__PROP, 
+			HIDDEN__PROP, 
+			COLOR__PROP));
 
 	private static java.util.Set<String> TRANSIENT_PROPERTIES = java.util.Collections.unmodifiableSet(new java.util.HashSet<>(
 			java.util.Arrays.asList(
@@ -142,6 +198,8 @@ public abstract class SceneNode extends ScenePart {
 		switch (field) {
 			case USER_DATA__PROP: return getUserData();
 			case TRANSFORM__PROP: return getTransform();
+			case HIDDEN__PROP: return isHidden();
+			case COLOR__PROP: return getColor();
 			default: return super.get(field);
 		}
 	}
@@ -151,6 +209,8 @@ public abstract class SceneNode extends ScenePart {
 		switch (field) {
 			case USER_DATA__PROP: internalSetUserData((java.lang.Object) value); break;
 			case TRANSFORM__PROP: internalSetTransform(de.haumacher.msgbuf.util.Conversions.asList(Double.class, value)); break;
+			case HIDDEN__PROP: internalSetHidden((boolean) value); break;
+			case COLOR__PROP: internalSetColor((String) value); break;
 			default: super.set(field, value); break;
 		}
 	}
@@ -185,6 +245,10 @@ public abstract class SceneNode extends ScenePart {
 			out.value(x);
 		}
 		out.endArray();
+		out.name(HIDDEN__PROP);
+		out.value(isHidden());
+		out.name(COLOR__PROP);
+		out.value(getColor());
 	}
 
 	@Override
@@ -205,6 +269,14 @@ public abstract class SceneNode extends ScenePart {
 				out.endArray();
 				break;
 			}
+			case HIDDEN__PROP: {
+				out.value(isHidden());
+				break;
+			}
+			case COLOR__PROP: {
+				out.value(getColor());
+				break;
+			}
 			default: super.writeFieldValue(scope, out, field);
 		}
 	}
@@ -222,6 +294,8 @@ public abstract class SceneNode extends ScenePart {
 				setTransform(newValue);
 			}
 			break;
+			case HIDDEN__PROP: setHidden(in.nextBoolean()); break;
+			case COLOR__PROP: setColor(de.haumacher.msgbuf.json.JsonUtil.nextStringOptional(in)); break;
 			default: super.readField(scope, in, field);
 		}
 	}

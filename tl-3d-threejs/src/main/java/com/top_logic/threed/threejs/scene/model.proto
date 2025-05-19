@@ -59,6 +59,12 @@ abstract message SceneNode extends ScenePart {
 	/** Transformation where this scene node lies. */
 	repeated double transform;
 	
+	/** Whether this node must not be displayed. */
+	boolean hidden;
+	
+	/** Optional color in RGB format to paint this node. */
+	string color;
+	
 }
 
 /** A collection of {@link SceneNode}s. */

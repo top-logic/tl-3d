@@ -82,6 +82,18 @@ public class PartNode extends SceneNode {
 	}
 
 	@Override
+	public com.top_logic.threed.threejs.scene.PartNode setHidden(boolean value) {
+		internalSetHidden(value);
+		return this;
+	}
+
+	@Override
+	public com.top_logic.threed.threejs.scene.PartNode setColor(String value) {
+		internalSetColor(value);
+		return this;
+	}
+
+	@Override
 	public String jsonType() {
 		return PART_NODE__TYPE;
 	}

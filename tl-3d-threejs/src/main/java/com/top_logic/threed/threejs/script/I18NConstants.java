@@ -14,9 +14,14 @@ import com.top_logic.layout.I18NConstantsBase;
 public class I18NConstants extends I18NConstantsBase {
 
 	/**
-	 * @en Expected a connection point, received {0} in expression: {1}
+	 * @en A connection point is expected. Received ''{0}'' in expression: {1}
 	 */
 	public static ResKey2 ERROR_CONNECTION_POINT_EXPECTED__ACTUAL_EXPR;
+
+	/**
+	 * @en A color is expected. Received ''{0}'' in expression: {1}
+	 */
+	public static ResKey2 ERROR_INVALID_COLOR__ACTUAL_EXPR;
 
 	static {
 		initConstants(I18NConstants.class);

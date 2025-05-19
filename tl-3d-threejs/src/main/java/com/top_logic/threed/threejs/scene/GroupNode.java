@@ -118,6 +118,18 @@ public class GroupNode extends SceneNode {
 	}
 
 	@Override
+	public com.top_logic.threed.threejs.scene.GroupNode setHidden(boolean value) {
+		internalSetHidden(value);
+		return this;
+	}
+
+	@Override
+	public com.top_logic.threed.threejs.scene.GroupNode setColor(String value) {
+		internalSetColor(value);
+		return this;
+	}
+
+	@Override
 	public String jsonType() {
 		return GROUP_NODE__TYPE;
 	}
