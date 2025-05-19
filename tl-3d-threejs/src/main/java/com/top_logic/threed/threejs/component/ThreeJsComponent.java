@@ -26,7 +26,6 @@ import com.top_logic.basic.config.ConfigurationException;
 import com.top_logic.basic.config.InstantiationContext;
 import com.top_logic.basic.config.PolymorphicConfiguration;
 import com.top_logic.basic.config.annotation.Label;
-import com.top_logic.basic.config.annotation.Name;
 import com.top_logic.basic.config.annotation.defaults.BooleanDefault;
 import com.top_logic.basic.config.annotation.defaults.ItemDefault;
 import com.top_logic.knowledge.service.Transaction;
@@ -43,9 +42,8 @@ import com.top_logic.layout.form.component.edit.EditMode;
 import com.top_logic.layout.structure.ContentLayoutControlProvider;
 import com.top_logic.layout.structure.LayoutControlProvider;
 import com.top_logic.layout.table.component.BuilderComponent;
-import com.top_logic.mig.html.DefaultMultiSelectionModel;
-import com.top_logic.mig.html.DefaultSingleSelectionModel;
 import com.top_logic.mig.html.SelectionModel;
+import com.top_logic.mig.html.SelectionModelConfig;
 import com.top_logic.mig.html.layout.CommandRegistry;
 import com.top_logic.mig.html.layout.LayoutComponent;
 import com.top_logic.model.TLClass;
@@ -75,7 +73,8 @@ public class ThreeJsComponent extends BuilderComponent
 	/**
 	 * {@link ThreeJsComponent} configuration.
 	 */
-	public interface Config extends BuilderComponent.Config, Selectable.SelectableConfig, Editor.Config {
+	public interface Config
+			extends BuilderComponent.Config, Selectable.SelectableConfig, Editor.Config, SelectionModelConfig {
 
 		/** @see com.top_logic.basic.reflect.DefaultMethodInvoker */
 		Lookup LOOKUP = MethodHandles.lookup();
@@ -90,12 +89,6 @@ public class ThreeJsComponent extends BuilderComponent
 		@Override
 		@BooleanDefault(true)
 		boolean hasToolbar();
-
-		@Name("canSelect")
-		boolean canSelect();
-
-		@Name("multiSelection")
-		boolean hasMultiSelection();
 
 		/**
 		 * The operation that takes the changes from the client and applies them to the business
@@ -145,8 +138,6 @@ public class ThreeJsComponent extends BuilderComponent
 	private final Map<SceneNode, GroupNode> _parentNodes = new HashMap<>();
 
 	private boolean _sceneValid;
-
-	private boolean _multiSelect;
 
 	private ThreeJsControl _control;
 	
@@ -262,8 +253,7 @@ public class ThreeJsComponent extends BuilderComponent
 	public ThreeJsComponent(InstantiationContext context, Config config) throws ConfigurationException {
 		super(context, config);
 
-		_multiSelect = config.hasMultiSelection();
-		_selectionModel = _multiSelect ? new DefaultMultiSelectionModel(this) : new DefaultSingleSelectionModel(this);
+		_selectionModel = config.getSelectionModelFactory().newSelectionModel(this);
 		_selectionModel.addSelectionListener(this);
 		_scene = SceneGraph.create();
 		connect(_scene, _selectionModel);
@@ -585,7 +575,7 @@ public class ThreeJsComponent extends BuilderComponent
 	@Override
 	public void notifySelectionChanged(SelectionModel model, Set<?> formerlySelectedObjects, Set<?> selectedObjects) {
 		// Selection was changed in the UI.
-		if (_multiSelect) {
+		if (_selectionModel.isMultiSelectionSupported()) {
 			Set<Object> newSelection = new HashSet<>();
 			for (Object selectedNode : selectedObjects) {
 				Object nodeModel = ((SceneNode) selectedNode).getUserData();

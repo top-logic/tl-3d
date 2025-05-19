@@ -4,7 +4,7 @@
 	xmlns:config="http://www.top-logic.com/ns/config/6.0"
 	groups="commons"
 >
-	<properties extends="com.top_logic.mig.html.layout.WithDefaultFor, com.top_logic.layout.editor.config.ButtonTemplateParameters, com.top_logic.layout.editor.config.DialogTemplateParameters, com.top_logic.tool.boundsec.InAppSecurityObjectProviderConfig">
+	<properties extends="com.top_logic.mig.html.layout.WithDefaultFor, com.top_logic.layout.editor.config.ButtonTemplateParameters, com.top_logic.layout.editor.config.DialogTemplateParameters, com.top_logic.tool.boundsec.InAppSecurityObjectProviderConfig, com.top_logic.tool.boundsec.WithSecurityMaster">
 		<annotations>
 			<display-inherited value="APPEND"/>
 		</annotations>
@@ -33,17 +33,6 @@
 		<property name="multiSelection"
 			type="boolean"
 		/>
-		<property name="securityObject"
-			instance-type="com.top_logic.tool.boundsec.SecurityObjectProvider"
-			type="com.top_logic.basic.config.PolymorphicConfiguration"
-		/>
-		<property name="securityProviderClass"
-			default="securityRoot"
-			type="String"
-		>
-			<options fun="com.top_logic.layout.form.values.edit.DefaultSecurityProviderKeys"/>
-			<hidden/>
-		</property>
 		<property name="applyScript"
 			type="com.top_logic.model.search.expr.config.dom.Expr"
 		/>
@@ -60,15 +49,15 @@
 		applyCommand="applyTransform"
 		defaultFor="${defaultFor}"
 		dialogs="${dialogs}"
+		isSecurityMaster="${isSecurityMaster}"
 		model="${model}"
 		modelBuilder="${modelBuilder}"
-		multiSelection="${multiSelection}"
 		name="3DView"
 		securityObject="${securityObject}"
-		securityProviderClass="${securityProviderClass}"
 		selection="${selection}"
 		titleKey="${name}"
 	>
+		<selectionModelFactory multiple="${multiSelection}"/>
 		<buttons>
 			${buttons}
 			<include name="templates/editComponentCommands.xml"/>
