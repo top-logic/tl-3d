@@ -44,7 +44,7 @@
 		</property>
 	</properties>
 
-	<component class="com.top_logic.threed.threejs.component.ThreeJsComponent"
+	<three-js-viewer name="3DView"
 		apply-script="${applyScript}"
 		applyCommand="applyTransform"
 		defaultFor="${defaultFor}"
@@ -52,7 +52,6 @@
 		isSecurityMaster="${isSecurityMaster}"
 		model="${model}"
 		modelBuilder="${modelBuilder}"
-		name="3DView"
 		securityObject="${securityObject}"
 		selection="${selection}"
 		titleKey="${name}"
@@ -116,5 +115,5 @@
 
 			<include name="templates/editComponentCommands.xml"/>
 		</buttons>
-	</component>
+	</three-js-viewer>
 </config:template>

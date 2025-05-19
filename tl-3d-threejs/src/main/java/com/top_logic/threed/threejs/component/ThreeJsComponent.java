@@ -26,7 +26,9 @@ import com.top_logic.basic.config.ConfigurationException;
 import com.top_logic.basic.config.InstantiationContext;
 import com.top_logic.basic.config.PolymorphicConfiguration;
 import com.top_logic.basic.config.annotation.Label;
+import com.top_logic.basic.config.annotation.TagName;
 import com.top_logic.basic.config.annotation.defaults.BooleanDefault;
+import com.top_logic.basic.config.annotation.defaults.ClassDefault;
 import com.top_logic.basic.config.annotation.defaults.ItemDefault;
 import com.top_logic.knowledge.service.Transaction;
 import com.top_logic.layout.DisplayContext;
@@ -73,6 +75,7 @@ public class ThreeJsComponent extends BuilderComponent
 	/**
 	 * {@link ThreeJsComponent} configuration.
 	 */
+	@TagName("three-js-viewer")
 	public interface Config
 			extends BuilderComponent.Config, Selectable.SelectableConfig, Editor.Config, SelectionModelConfig {
 
@@ -102,6 +105,10 @@ public class ThreeJsComponent extends BuilderComponent
 			com.top_logic.layout.form.component.Editor.Config.super.modifyIntrinsicCommands(registry);
 			BuilderComponent.Config.super.modifyIntrinsicCommands(registry);
 		}
+
+		@Override
+		@ClassDefault(ThreeJsComponent.class)
+		Class<? extends LayoutComponent> getImplementationClass();
 	}
 
 	/**
