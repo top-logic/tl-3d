@@ -7,6 +7,7 @@ package com.top_logic.threed.threejs.component;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -71,11 +72,13 @@ public abstract class AbstractSceneBuilder implements SceneBuilder {
 
 				for (GroupNode node : _processing) {
 					Object userData = node.getUserData();
+					Collection<?> parts;
 					if (userData == null) {
-						continue;
+						parts = Collections.emptyList();
+					} else {
+						parts = resolveParts(userData, _component);
+						batch.addAll(parts);
 					}
-					Collection<?> parts = resolveParts(userData, _component);
-					batch.addAll(parts);
 					_processingParts.add(parts);
 				}
 				if (batch.size() > 4) {
@@ -99,9 +102,12 @@ public abstract class AbstractSceneBuilder implements SceneBuilder {
 		public void run() {
 			int n = 0;
 			for (GroupNode group : _processing) {
+				Collection<?> parts = _processingParts.get(n++);
+				if (parts.isEmpty()) {
+					continue;
+				}
 				Collection<SceneNode> newChildren =
-					_processingParts.get(n++)
-						.stream()
+					parts.stream()
 						.map(this::toNode)
 						.filter(Objects::nonNull)
 						.toList();
