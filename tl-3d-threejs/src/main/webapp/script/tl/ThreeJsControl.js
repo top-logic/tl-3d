@@ -411,10 +411,10 @@ class ThreeJsControl {
       if (event.target.dragging) {
         const selectedObject = event.target.object;
 
+        // Check for snapping points either directly or through nodeRef
+        const selectedObjAsset = selectedObject?.userData?.asset || selectedObject?.userData?.nodeRef?.asset;
         const isGroup = selectedObject.children.length > 0 && 
-                       (!selectedObject.userData || 
-                        !selectedObject.userData.asset || 
-                        !selectedObject.userData.asset.snappingPoints);
+                       (!selectedObjAsset || !selectedObjAsset.snappingPoints);
                         
         if (selectedObject === this.multiTransformGroup || isGroup) {
           this.render();
@@ -623,7 +623,9 @@ class ThreeJsControl {
         function findParentObject(layoutPoint) {
           let current = layoutPoint;
           while (current && current.parent) {
-            if (current.parent.userData && current.parent.userData.asset) {
+            // Check for asset either directly or through nodeRef
+            const parentAsset = current.parent?.userData?.asset || current.parent?.userData?.nodeRef?.asset;
+            if (current.parent.userData && parentAsset) {
               return current.parent;
             }
             current = current.parent;
@@ -672,12 +674,14 @@ class ThreeJsControl {
   }
 
   findClosestSnappingPoint(selectedObj) {
+    // Check if selectedObj has snapping points either directly or through nodeRef
+    const selectedObjAsset = selectedObj?.userData?.asset || selectedObj?.userData?.nodeRef?.asset;
+    
     if (
       !selectedObj ||
-      !selectedObj.userData ||
-      !selectedObj.userData.asset ||
-      !selectedObj.userData.asset.snappingPoints ||
-      selectedObj.userData.asset.snappingPoints.length === 0
+      !selectedObjAsset ||
+      !selectedObjAsset.snappingPoints ||
+      selectedObjAsset.snappingPoints.length === 0
     ) {
       return { closestSnappingPoint: null, closestSnappingPointObject: null };
     }
@@ -685,12 +689,14 @@ class ThreeJsControl {
     // find all other objects in the scene that have snapping points
     const snappableObjects = [];
     this.zUpRoot.traverse((node) => {
+      // Check for snapping points either directly or through nodeRef
+      const nodeAsset = node?.userData?.asset || node?.userData?.nodeRef?.asset;
+      
       if (
         node !== selectedObj &&
-        node.userData &&
-        node.userData.asset &&
-        node.userData.asset.snappingPoints &&
-        node.userData.asset.snappingPoints.length > 0
+        nodeAsset &&
+        nodeAsset.snappingPoints &&
+        nodeAsset.snappingPoints.length > 0
       ) {
         snappableObjects.push(node);
       }
@@ -713,7 +719,10 @@ class ThreeJsControl {
     for (const otherObject of snappableObjects) {
       otherObject.updateMatrixWorld(true);
       
-      for (const otherPoint of otherObject.userData.asset.snappingPoints) {
+      // Get asset either directly or through nodeRef
+      const otherObjectAsset = otherObject?.userData?.asset || otherObject?.userData?.nodeRef?.asset;
+      
+      for (const otherPoint of otherObjectAsset.snappingPoints) {
         const position = new Vector3();
         otherPoint.node.getWorldPosition(position);
         
@@ -1149,22 +1158,35 @@ class ThreeJsControl {
   }
 
   setColor(node, color) {
-    if (node.material) {
-      const userData = node.material.userData;
-
-      if (color === WHITE && userData.originalColor) {
-        node.material.color.copy(userData.originalColor);
-      } else if (color !== WHITE) {
-        // Apply new color for non-deselection operations
+    if (color === WHITE) {
+      let rootNode = node;
+      while (rootNode?.parent) {
+        const c = rootNode.userData?.color;
+        if (typeof c === 'string' && c.trim() !== '') {
+          // console.log('Applying color from userData:', c);
+          applyColorToObject(node, c);
+          break;
+        }
+        rootNode = rootNode.parent;
+      }
+  
+      if (!rootNode?.userData?.color) {
+        console.log('No userData.color found, falling back to originalColor');
+        if (node.material?.userData?.originalColor) {
+          node.material.color.copy(node.material.userData.originalColor);
+        }
+      }
+    } else {
+      if (node.material) {
         node.material.color.set(color);
       }
-    } else if (node.children && node.children.length > 0) {
-      // Recursively process children if this node has no material
-      for (const child of node.children) {
-        this.setColor(child, color);
-      }
+    }
+  
+    for (const child of node.children) {
+      this.setColor(child, color);
     }
   }
+  
 
   /** Updates the selection from a click on the canvas. */
   updateSelection(intersects, toggleMode) {
@@ -1183,7 +1205,8 @@ class ThreeJsControl {
 
       this.candidate = clicked;
       while (this.candidate != null) {
-        const sharedNode = this.candidate.userData;
+        const data = this.candidate.userData;
+        const sharedNode = data?.nodeRef;
         if (sharedNode instanceof SharedObject) {
           this.value = toggleMode
             ? !this.selection.includes(sharedNode)
@@ -1366,12 +1389,12 @@ class Scope {
           // if gltf for the given url exists in the cache let's return it
           if (this.gltfs[url]) {
             loadedAssets++;
-            // console.log(`Loading from cache: ${url} (${loadedAssets}/${totalAssets})`);
+            console.log(`Loading from cache: ${url} (${loadedAssets}/${totalAssets})`);
             resolve(this.gltfs[url]);
             return;
           }
 
-          // console.log(`Loading model: ${url} (${loadedAssets}/${totalAssets})`);
+          console.log(`Loading model: ${url} (${loadedAssets}/${totalAssets})`);
           
           gltfLoader.load(url, (gltf) => {
               loadedAssets++;
@@ -1388,7 +1411,7 @@ class Scope {
 
     // load assets in batches to prevent overwhelming the browser
     const assets = this.assets;
-    const urls = assets.flatMap((asset) => contextPath + asset.url);
+    const urls = Array.from(new Set(assets.map((asset) => contextPath + asset.url)));
     const batchSize = 10;
     const batches = [];
     
@@ -1396,16 +1419,12 @@ class Scope {
       batches.push(urls.slice(i, i + batchSize));
     }
     
-    let loadedGltfs = [];
-    
     for (const batch of batches) {
-      const batchGltfs = await Promise.all(batch.map(loadUrl));
-      loadedGltfs = loadedGltfs.concat(batchGltfs);
+      await Promise.all(batch.map(loadUrl));
     }
     
-    let n = 0;
-    for (const gltf of loadedGltfs) {
-      assets[n++].gltf = gltf;
+    for (const asset of assets) {
+      asset.gltf = this.gltfs[contextPath + asset.url];
     }
   }
 }
@@ -1581,8 +1600,16 @@ class GroupNode extends SharedObject {
     transform(group, this.transform);
     this.contents.forEach((c) => c.build(group));
 
+    if (this.color && this.color.trim() !== '') {
+      applyColorToObject(group, this.color);
+    }
+
     // Link to scene node
-    group.userData = this;
+    group.userData = {
+      ...group.userData,
+      nodeRef: this,
+      color: this.color?.trim() || null
+    };
     this.node = group;
   }
 
@@ -1647,8 +1674,16 @@ class PartNode extends SharedObject {
     const node = this.asset.build(group);
     group.add(node);
 
+    if (this.color && this.color.trim() !== '') {
+      applyColorToObject(group, this.color);
+    }
+
     // Link to scene node.
-    group.userData = this;
+    group.userData = {
+      ...group.userData,
+      nodeRef: this,
+      color: this.color?.trim() || null
+    };
     this.node = group;
   }
 
@@ -1698,10 +1733,8 @@ class GltfAsset extends SharedObject {
 
     // const model = this.gltf.scene.clone();
     const useLOD = true;
-    // console.log('[GltfAsset] useLOD:', useLOD);
     
     if (useLOD) {
-      // console.log('[GltfAsset] Using LOD for this asset');
       // create LOD object
       const lod = new LOD();
       group.add(lod);
@@ -1951,24 +1984,42 @@ class RemoveElement extends ListUpdate {
   }
 }
 
-    // throttle function to limit how often a function can be called
-    const throttle = (func, limit) => {
-      let inThrottle = false;
-      let lastResult = null;
+function applyColorToObject(object, colorString) {
+  const color = new Color(colorString);
+  
+  object.traverse((child) => {
+    if (child.isMesh && child.material) {
+      // Handle array of materials
+      if (Array.isArray(child.material)) {
+        child.material.forEach(material => {
+          material.color.copy(color);
+        });
+      } else {
+        // Apply new color by copying values (not replacing the object)
+        child.material.color.copy(color);
+      }
+    }
+  });
+}
+
+// throttle function to limit how often a function can be called
+const throttle = (func, limit) => {
+  let inThrottle = false;
+  let lastResult = null;
+  
+  return function(...args) {
+    if (!inThrottle) {
+      inThrottle = true;
+      lastResult = func.apply(this, args);
       
-      return function(...args) {
-        if (!inThrottle) {
-          inThrottle = true;
-          lastResult = func.apply(this, args);
-          
-          setTimeout(() => {
-            inThrottle = false;
-          }, limit);
-        }
-        
-        return lastResult;
-      };
-    };
+      setTimeout(() => {
+        inThrottle = false;
+      }, limit);
+    }
+    
+    return lastResult;
+  };
+};
 function getRaycaster(event, camera, canvas) {
   const raycaster = new Raycaster();
   const mouse = new Vector2();
