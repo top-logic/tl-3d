@@ -399,14 +399,6 @@ public class ThreeJsComponent extends BuilderComponent
 		getThreeJSControl().setIsWorkplaneVisible(visible);
 	}
 
-	public boolean getIsObjectVisible() {
-		return getThreeJSControl().getIsObjectVisible();
-	}
-
-	public void setIsObjectVisible(boolean visible) {
-		getThreeJSControl().setIsObjectVisible(visible);
-	}
-
 	public boolean getIsInEditMode() {
 		return getThreeJSControl().getIsInEditMode();
 	}

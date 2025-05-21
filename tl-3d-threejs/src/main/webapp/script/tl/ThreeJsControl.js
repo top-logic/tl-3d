@@ -59,7 +59,7 @@ const OPTIMIZED_PIXEL_RATIO = Math.min(window.devicePixelRatio, 1.7);
 const INTERACTIVE_PIXEL_RATIO = Math.min(window.devicePixelRatio, 1.0);
 
 class ThreeJsControl {
-  constructor(controlId, contextPath, dataUrl, isWorkplaneVisible, isObjectVisible, isInEditMode, isRotateMode) {
+  constructor(controlId, contextPath, dataUrl, isWorkplaneVisible, isInEditMode, isRotateMode) {
     this.lastSelectedObject = null;
     this.prevClosestSnappingPoint = null;
     this.controlId = controlId;
@@ -83,7 +83,6 @@ class ThreeJsControl {
     this.loadScene().then(() => setTimeout(() => {
       this.createBoundingBox();
       this.toggleWorkplane(isWorkplaneVisible);
-      this.toggleObjectVisibility(isObjectVisible);
       this.toggleEditMode(isInEditMode);
       this.toggleRotateMode(isRotateMode);
       this.zoomOut();
@@ -315,10 +314,6 @@ class ThreeJsControl {
     this.render();
   }
 
-  toggleObjectVisibility(visible) {
-    this.sceneGraph.visible = visible;
-    this.render();
-  }
 
   initTransformControls() {
     const outer = this;
@@ -1606,6 +1601,10 @@ class GroupNode extends SharedObject {
   }
 
   build(parentGroup) {
+    if (this.hidden) {
+      return;
+    }
+
     const group = new Group();
     parentGroup.add(group);
 
@@ -1678,6 +1677,10 @@ class PartNode extends SharedObject {
   }
 
   build(parentGroup) {
+    if (this.hidden) {
+      return;
+    }
+
     const group = new Group();
     parentGroup.add(group);
 
@@ -2297,11 +2300,11 @@ const SceneUtils = {
 // For sever communication written in legacy JS.
 window.services.threejs = {
   init: async function (
-    controlId, contextPath, dataUrl, isWorkplaneVisible, isObjectVisible, 
+    controlId, contextPath, dataUrl, isWorkplaneVisible, 
     isInEditMode, isRotateMode
   ) {
     const control = new ThreeJsControl(
-      controlId, contextPath, dataUrl, isWorkplaneVisible, isObjectVisible,  
+      controlId, contextPath, dataUrl, isWorkplaneVisible,  
       isInEditMode, isRotateMode
     );
     control.attach();
@@ -2332,13 +2335,6 @@ window.services.threejs = {
     const control = ThreeJsControl.control(container);
     if (control != null) {
       control.toggleWorkplane(visible);
-    }
-  },
-
-  toggleObjectVisibility: function (container, visible) {
-    const control = ThreeJsControl.control(container);
-    if (control != null) {
-      control.toggleObjectVisibility(visible);
     }
   },
 
