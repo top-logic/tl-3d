@@ -1405,7 +1405,11 @@ class Scope {
               // store gltf in the cache
               this.gltfs[url] = gltf;
               resolve(gltf);
-          }, null, reject);
+          }, null, function (error) {
+            const msg = "Failed to load '" + url + "'.";
+          	console.error(msg);
+            resolve(null);
+           });
         } catch (err) {
           const msg = "Failed to load '" + url + "': " + err;
           console.log(msg);
