@@ -33,6 +33,17 @@
 		<property name="multiSelection"
 			type="boolean"
 		/>
+		<property name="securityObject"
+			instance-type="com.top_logic.tool.boundsec.SecurityObjectProvider"
+			type="com.top_logic.basic.config.PolymorphicConfiguration"
+		/>
+		<property name="securityProviderClass"
+			default="securityRoot"
+			type="String"
+		>
+			<options fun="com.top_logic.layout.form.values.edit.DefaultSecurityProviderKeys"/>
+			<hidden/>
+		</property>
 		<property name="applyScript"
 			type="com.top_logic.model.search.expr.config.dom.Expr"
 		/>
@@ -75,6 +86,21 @@
 				<activeResourceKey key="dynamic.ff181d05-3e29-4f2d-9e61-0226a489105e">
 					<de>Drehen</de>
 					<en>Rotate</en>
+				</activeResourceKey>
+			</button>
+			<button id="objectVisibility"
+				activeImage="css:fa-regular fa-eye"
+				class="com.top_logic.threed.threejs.component.ToggleObjectVisibleCommand"
+				group="System"
+				image="css:fa-regular fa-eye-slash"
+			>
+				<resourceKey key="dynamic.15d28470-7816-4f0a-bbfc-af385dca41ad">
+					<de>Objekt ausblenden</de>
+					<en>Hide object</en>
+				</resourceKey>
+				<activeResourceKey key="dynamic.15d28470-7816-4f0a-bbfc-af385dca41ad">
+					<de>Objekt anzeigen</de>
+					<en>Show object</en>
 				</activeResourceKey>
 			</button>
 			<button id="addWorkplane"

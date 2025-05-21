@@ -59,7 +59,7 @@ const OPTIMIZED_PIXEL_RATIO = Math.min(window.devicePixelRatio, 1.7);
 const INTERACTIVE_PIXEL_RATIO = Math.min(window.devicePixelRatio, 1.0);
 
 class ThreeJsControl {
-  constructor(controlId, contextPath, dataUrl, isWorkplaneVisible, isInEditMode, isRotateMode) {
+  constructor(controlId, contextPath, dataUrl, isWorkplaneVisible, isObjectVisible, isInEditMode, isRotateMode) {
     this.lastSelectedObject = null;
     this.prevClosestSnappingPoint = null;
     this.controlId = controlId;
@@ -83,6 +83,7 @@ class ThreeJsControl {
     this.loadScene().then(() => setTimeout(() => {
       this.createBoundingBox();
       this.toggleWorkplane(isWorkplaneVisible);
+      this.toggleObjectVisibility(isObjectVisible);
       this.toggleEditMode(isInEditMode);
       this.toggleRotateMode(isRotateMode);
       this.zoomOut();
@@ -311,6 +312,11 @@ class ThreeJsControl {
     }
 
     this.isWorkplaneVisible = visible;
+    this.render();
+  }
+
+  toggleObjectVisibility(visible) {
+    this.sceneGraph.visible = visible;
     this.render();
   }
 
@@ -2274,11 +2280,11 @@ const SceneUtils = {
 // For sever communication written in legacy JS.
 window.services.threejs = {
   init: async function (
-    controlId, contextPath, dataUrl, isWorkplaneVisible, 
+    controlId, contextPath, dataUrl, isWorkplaneVisible, isObjectVisible, 
     isInEditMode, isRotateMode
   ) {
     const control = new ThreeJsControl(
-      controlId, contextPath, dataUrl, isWorkplaneVisible, 
+      controlId, contextPath, dataUrl, isWorkplaneVisible, isObjectVisible,  
       isInEditMode, isRotateMode
     );
     control.attach();
@@ -2309,6 +2315,13 @@ window.services.threejs = {
     const control = ThreeJsControl.control(container);
     if (control != null) {
       control.toggleWorkplane(visible);
+    }
+  },
+
+  toggleObjectVisibility: function (container, visible) {
+    const control = ThreeJsControl.control(container);
+    if (control != null) {
+      control.toggleObjectVisibility(visible);
     }
   },
 
