@@ -1380,8 +1380,13 @@ class Scope {
     let totalAssets = 0;
     let loadedAssets = 0;
 
-    const loadUrl = (url) =>
+    const loadUrl = (localURL) =>
       new Promise((resolve, reject) => {
+        if (localURL == null) {
+            resolve(null);
+            return;
+        }
+        const url = contextPath + localURL;
         try {
           totalAssets++;
           
@@ -1410,7 +1415,7 @@ class Scope {
 
     // load assets in batches to prevent overwhelming the browser
     const assets = this.assets;
-    const urls = Array.from(new Set(assets.map((asset) => contextPath + asset.url)));
+    const urls = Array.from(new Set(assets.map(asset => asset.url)));
     const batchSize = 10;
     const batches = [];
     
@@ -1729,6 +1734,10 @@ class GltfAsset extends SharedObject {
     	 group.applyMatrix4(toMatrix(this.layoutPoint.transform).invert());
     }
     this.snappingPoints?.forEach((point) => point.build(group, false));
+    
+    if (this.gltf == null) {
+      return group;
+    }
 
     // const model = this.gltf.scene.clone();
     const useLOD = true;
