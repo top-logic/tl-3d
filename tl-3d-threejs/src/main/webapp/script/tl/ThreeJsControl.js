@@ -130,8 +130,8 @@ class ThreeJsControl {
     // update objects' size when the size of the canvas changes
     const resizeObserver = this.createResizeObserver(this.canvas);
     resizeObserver.observe(this.canvas);
-    this.canvas.addEventListener("mousedown", () => this.onMouseDown());
-    this.canvas.addEventListener("click", (event) => this.onClick(event));
+    this.canvas.addEventListener("mousedown", (event) => this.onMouseDown(event));
+    this.canvas.addEventListener("mouseup", (event) => this.onMouseUp(event));
     this.container.addEventListener("wheel", (event) => this.onMouseWheel(event), {
       passive: false,
     });
@@ -256,7 +256,7 @@ class ThreeJsControl {
     this.cubeCanvas.style.top = "0";
     container.append(this.cubeCanvas);
     this.cubeCanvas.addEventListener("mousemove", (event) => this.onCubeHover(event), false);
-    this.cubeCanvas.addEventListener("mousedown", () => this.onMouseDown());
+    this.cubeCanvas.addEventListener("mousedown", (event) => this.onMouseDown(event));
     this.cubeCanvas.addEventListener("click", (event) => this.onCubeClick(event), false);
   }
 
@@ -859,11 +859,15 @@ class ThreeJsControl {
     }, 100));
   }
 
-  onMouseDown() {
+  onMouseDown(event) {
     this.clickStart = Date.now();
+    this.clickButton = event.button; 
   }
 
-  onClick(event) {
+  onMouseUp(event) {
+    if (this.clickButton != 1) {
+      return; // Not click with middle mouse button.
+    }
     if (Date.now() - this.clickStart > 500) {
       return; // Not a click.
     }
