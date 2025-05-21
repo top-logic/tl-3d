@@ -410,11 +410,7 @@ class ThreeJsControl {
     this.translateControls.addEventListener("objectChange", (event) => {
       if (event.target.dragging) {
         const selectedObject = event.target.object;
-
-        // Check for snapping points either directly or through nodeRef
-        const selectedObjAsset = selectedObject?.userData?.asset || selectedObject?.userData?.nodeRef?.asset;
-        const isGroup = selectedObject.children.length > 0 && 
-                       (!selectedObjAsset || !selectedObjAsset.snappingPoints);
+        const isGroup = selectedObject.children.length > 0;
                         
         if (selectedObject === this.multiTransformGroup || isGroup) {
           this.render();
@@ -678,10 +674,7 @@ class ThreeJsControl {
     const selectedObjAsset = selectedObj?.userData?.asset || selectedObj?.userData?.nodeRef?.asset;
     
     if (
-      !selectedObj ||
-      !selectedObjAsset ||
-      !selectedObjAsset.snappingPoints ||
-      selectedObjAsset.snappingPoints.length === 0
+      !selectedObj 
     ) {
       return { closestSnappingPoint: null, closestSnappingPointObject: null };
     }
@@ -741,10 +734,10 @@ class ThreeJsControl {
       : { closestSnappingPoint: null, closestSnappingPointObject: null };
   }
 
-      // throttled version of findClosestSnappingPoint
-      throttledFindClosestSnappingPoint = throttle((selectedObject) => {
-        return this.findClosestSnappingPoint(selectedObject);
-      }, 100); 
+  // throttled version of findClosestSnappingPoint
+  throttledFindClosestSnappingPoint = throttle((selectedObject) => {
+    return this.findClosestSnappingPoint(selectedObject);
+  }, 100); 
 
   restoreSnappingPointColor(snappingPoint) {
     if (!snappingPoint) return;
@@ -2020,6 +2013,7 @@ const throttle = (func, limit) => {
     return lastResult;
   };
 };
+
 function getRaycaster(event, camera, canvas) {
   const raycaster = new Raycaster();
   const mouse = new Vector2();
