@@ -410,13 +410,11 @@ public class ThreeJsComponent extends BuilderComponent
 		return true;
 	}
 
-	public void setIsObjectVisible(boolean visible) {
+	public void toggleObjectVisibility(boolean visible) { 
 		List<SceneNode> selection = _scene.getSelection();
 		for (SceneNode node : selection) {
 			node.setHidden(!node.isHidden());
 		}
-		
-//		getThreeJSControl().setIsObjectVisible(visible);
 	}
 
 	public boolean getIsInEditMode() {

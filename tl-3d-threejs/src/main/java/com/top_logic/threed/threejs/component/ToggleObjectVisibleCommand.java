@@ -50,7 +50,6 @@ public class ToggleObjectVisibleCommand extends ToggleCommandHandler {
 
     @Override
 	protected boolean getState(LayoutComponent component) {
-        // return true;
         return ((ThreeJsComponent) component).getIsObjectVisible();
 	}
 
