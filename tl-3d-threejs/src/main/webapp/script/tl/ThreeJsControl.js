@@ -860,7 +860,7 @@ class ThreeJsControl {
   }
 
   onMouseUp(event) {
-    if (this.clickButton != 1) {
+    if (this.clickButton != 0) {
       return; // Not click with middle mouse button.
     }
     if (Date.now() - this.clickStart > 500) {
@@ -1714,7 +1714,12 @@ class PartNode extends SharedObject {
   		case 'asset': this.asset = scope.loadJson(value); break; 
    		case 'transform': this.transform = value; break;
    		case 'color': this.color = value; break;
-   		case 'hidden': this.hidden = value; break;
+   		case 'hidden': {
+        if (this.hidden) {
+          console.log(`Hiding part '${this.id}'`);
+        }
+        this.hidden = value; break;
+      } 
     }
   }
 

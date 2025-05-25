@@ -42,7 +42,7 @@ public class ToggleObjectVisibleCommand extends ToggleCommandHandler {
 	}
 
 	/**
-	 * Creates a {@link ToggleWorkplaneCommand}.
+	 * Creates a {@link ToggleObjectVisibleCommand}.
 	 */
 	public ToggleObjectVisibleCommand(InstantiationContext context, Config config) {
 		super(context, config);  
@@ -50,12 +50,12 @@ public class ToggleObjectVisibleCommand extends ToggleCommandHandler {
 
     @Override
 	protected boolean getState(LayoutComponent component) {
-        return true;
-        // return ((ThreeJsComponent) component).getIsObjectVisible();
+        // return true;
+        return ((ThreeJsComponent) component).getIsObjectVisible();
 	}
 
 	@Override
 	protected void setState(DisplayContext context, LayoutComponent component, boolean newValue) {
-        // ((ThreeJsComponent) component).setIsObjectVisible(newValue);
+        ((ThreeJsComponent) component).toggleObjectVisibility(newValue);
 	}
 }

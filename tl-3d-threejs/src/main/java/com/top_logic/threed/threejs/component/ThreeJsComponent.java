@@ -399,6 +399,26 @@ public class ThreeJsComponent extends BuilderComponent
 		getThreeJSControl().setIsWorkplaneVisible(visible);
 	}
 
+	public boolean getIsObjectVisible() {
+		List<SceneNode> selection = _scene.getSelection();
+		for (SceneNode node : selection) {
+			if (node.isHidden()) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	public void setIsObjectVisible(boolean visible) {
+		List<SceneNode> selection = _scene.getSelection();
+		for (SceneNode node : selection) {
+			node.setHidden(!node.isHidden());
+		}
+		
+//		getThreeJSControl().setIsObjectVisible(visible);
+	}
+
 	public boolean getIsInEditMode() {
 		return getThreeJSControl().getIsInEditMode();
 	}
