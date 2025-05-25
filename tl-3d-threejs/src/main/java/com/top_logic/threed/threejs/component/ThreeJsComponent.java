@@ -399,21 +399,21 @@ public class ThreeJsComponent extends BuilderComponent
 		getThreeJSControl().setIsWorkplaneVisible(visible);
 	}
 
-	public boolean getIsObjectVisible() {
+	public boolean getIsObjectHidden() {
 		List<SceneNode> selection = _scene.getSelection();
 		for (SceneNode node : selection) {
 			if (node.isHidden()) {
-				return false;
+				return true;
 			}
 		}
 
-		return true;
+		return false;
 	}
 
-	public void toggleObjectVisibility(boolean visible) { 
+	public void toggleObjectVisibility(boolean hidden) { 
 		List<SceneNode> selection = _scene.getSelection();
 		for (SceneNode node : selection) {
-			node.setHidden(!node.isHidden());
+			node.setHidden(hidden);
 		}
 	}
 

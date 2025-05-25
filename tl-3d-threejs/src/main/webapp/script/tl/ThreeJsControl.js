@@ -118,7 +118,6 @@ class ThreeJsControl {
     
     // Adjust pixel ratio for performance (limit to 1.7 for high-DPI screens)
     const pixelRatio = Math.min(window.devicePixelRatio, OPTIMIZED_PIXEL_RATIO);
-    console.log("pixelRatio:", window.devicePixelRatio);
     this.renderer.setPixelRatio(pixelRatio);
     this.renderer.shadowMap.autoUpdate = false;
     
@@ -302,12 +301,15 @@ class ThreeJsControl {
 
       this.workplane = SceneUtils.createDetailedGrid(gridSize);
       this.workplane.rotation.x = _90_DEGREE;
+      this.snapToWorkplaneEnabled = true;
     }
 
     if (visible) {
       this.scene.add(this.workplane);
+      this.snapToWorkplaneEnabled = true;
     } else {
       this.scene.remove(this.workplane);
+      this.snapToWorkplaneEnabled = false;
     }
 
     this.isWorkplaneVisible = visible;
@@ -412,6 +414,8 @@ class ThreeJsControl {
       if (event.target.dragging) {
         const selectedObject = event.target.object;
         const isGroup = selectedObject.children.length > 0;
+                        
+        this.snapObjectToWorkplane(selectedObject);
                         
         if (selectedObject === this.multiTransformGroup || isGroup) {
           this.render();
@@ -758,6 +762,45 @@ class ThreeJsControl {
     }
   }
 
+  snapObjectToWorkplane(object) {
+    if (!this.snapToWorkplaneEnabled) {
+      return false;
+    }
+    
+    object.updateMatrixWorld(true);
+    
+    const worldPosition = new Vector3();
+    object.getWorldPosition(worldPosition);
+    
+    const distanceToWorkplane = Math.abs(worldPosition.y);
+    const MAX_SNAP_DISTANCE = 1000;
+    
+    if (distanceToWorkplane <= MAX_SNAP_DISTANCE) {
+      // Create a translation matrix to move the object to y=0 in world space
+      const snapMatrix = new Matrix4();
+      snapMatrix.makeTranslation(0, -worldPosition.y, 0);
+      
+      // Apply the translation in world space
+      if (object.parent) {
+        object.parent.updateMatrixWorld(true);
+        
+        // Convert world space translation to object's local space
+        const parentWorldInverse = new Matrix4().copy(object.parent.matrixWorld).invert();
+        const localSnapMatrix = new Matrix4()
+          .copy(parentWorldInverse)
+          .multiply(snapMatrix)
+          .multiply(object.parent.matrixWorld);
+        
+        object.applyMatrix4(localSnapMatrix);
+      }
+      
+      object.updateMatrixWorld(true);
+      return true;
+    }
+    
+    return false;
+  }
+
   snapObject(selectedObj) {
     const { closestSnappingPoint, closestSnappingPointObject } = this.throttledFindClosestSnappingPoint(selectedObj);
   
@@ -778,6 +821,9 @@ class ThreeJsControl {
       } 
       selectedObj.applyMatrix4(snappingPointWorldMatrix.multiply(selectedObj.matrix.clone().invert()));
       selectedObj.updateMatrixWorld(true);
+    }
+    else if (this.snapToWorkplaneEnabled) {
+      this.snapObjectToWorkplane(selectedObj);
     }
   
     this.render();
@@ -1156,6 +1202,10 @@ class ThreeJsControl {
   }
 
   setColor(node, color) {
+    if (!node) {
+      return;
+    }
+
     if (color === WHITE) {
       let rootNode = node;
       while (rootNode?.parent) {
@@ -1715,7 +1765,7 @@ class PartNode extends SharedObject {
    		case 'transform': this.transform = value; break;
    		case 'color': this.color = value; break;
    		case 'hidden': {
-        if (this.hidden) {
+        if (value) {
           console.log(`Hiding part '${this.id}'`);
         }
         this.hidden = value; break;
