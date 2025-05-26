@@ -906,7 +906,7 @@ class ThreeJsControl {
   }
 
   onMouseUp(event) {
-    if (this.clickButton != 0) {
+    if (this.clickButton != 1) {
       return; // Not click with middle mouse button.
     }
     if (Date.now() - this.clickStart > 500) {
