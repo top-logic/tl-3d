@@ -1208,21 +1208,21 @@ class ThreeJsControl {
     }
 
     if (color === WHITE) {
-      let rootNode = node;
-      while (rootNode?.parent) {
-        const c = rootNode.userData?.color;
-        if (typeof c === 'string' && c.trim() !== '') {
-          // console.log('Applying color from userData:', c);
-          applyColorToObject(node, c);
-          break;
+        let rootNode = node;
+        while (rootNode?.parent) {
+          const c = rootNode.userData?.color;
+          if (typeof c === 'string') {
+            // console.log('Applying color from userData:', c);
+            applyColorToObject(node, c);
+            break;
+          }
+          rootNode = rootNode.parent;
         }
-        rootNode = rootNode.parent;
-      }
-  
-      if (!rootNode?.userData?.color) {
+    
+        if (!rootNode?.userData?.color) {
         console.log('No userData.color found, falling back to originalColor');
-        if (node.material?.userData?.originalColor) {
-          node.material.color.copy(node.material.userData.originalColor);
+          if (node.material?.userData?.originalColor) {
+            node.material.color.copy(node.material.userData.originalColor);
         }
       }
     } else {
@@ -1232,7 +1232,7 @@ class ThreeJsControl {
     }
   
     for (const child of node.children) {
-      this.setColor(child, color);
+        this.setColor(child, color);
     }
   }
   
@@ -1444,12 +1444,12 @@ class Scope {
           // if gltf for the given url exists in the cache let's return it
           if (this.gltfs[url]) {
             loadedAssets++;
-            console.log(`Loading from cache: ${url} (${loadedAssets}/${totalAssets})`);
+            // console.log(`Loading from cache: ${url} (${loadedAssets}/${totalAssets})`);
             resolve(this.gltfs[url]);
             return;
           }
 
-          console.log(`Loading model: ${url} (${loadedAssets}/${totalAssets})`);
+          // console.log(`Loading model: ${url} (${loadedAssets}/${totalAssets})`);
           
           gltfLoader.load(url, (gltf) => {
               loadedAssets++;
@@ -1665,7 +1665,7 @@ class GroupNode extends SharedObject {
     super(id);
   }
 
-  build(parentGroup) {
+  build(parentGroup, parentContext) {
     if (this.hidden) {
       return;
     }
@@ -1673,18 +1673,18 @@ class GroupNode extends SharedObject {
     const group = new Group();
     parentGroup.add(group);
 
-    transform(group, this.transform);
-    this.contents.forEach((c) => c.build(group));
+    const context = {
+      color: this.color || parentContext?.color
+    };
 
-    if (this.color && this.color.trim() !== '') {
-      applyColorToObject(group, this.color);
-    }
+    transform(group, this.transform);
+    this.contents.forEach((c) => c.build(group, context));
 
     // Link to scene node
     group.userData = {
       ...group.userData,
       nodeRef: this,
-      color: this.color?.trim() || null
+      color: this.color || null
     };
     this.node = group;
   }
@@ -1741,7 +1741,7 @@ class PartNode extends SharedObject {
     super(id);
   }
 
-  build(parentGroup) {
+  build(parentGroup, parentContext) {
     if (this.hidden) {
       return;
     }
@@ -1754,15 +1754,16 @@ class PartNode extends SharedObject {
     const node = this.asset.build(group);
     group.add(node);
 
-    if (this.color && this.color.trim() !== '') {
-      applyColorToObject(group, this.color);
+    const color = this.color || parentContext?.color;
+    if (color) {
+      applyColorToObject(group, color);
     }
 
     // Link to scene node.
     group.userData = {
       ...group.userData,
       nodeRef: this,
-      color: this.color?.trim() || null
+      color: this.color || null
     };
     this.node = group;
   }
