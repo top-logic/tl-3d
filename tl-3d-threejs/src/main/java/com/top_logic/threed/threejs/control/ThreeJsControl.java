@@ -23,11 +23,13 @@ import com.top_logic.layout.UpdateQueue;
 import com.top_logic.layout.basic.AbstractControl;
 import com.top_logic.layout.basic.ControlCommand;
 import com.top_logic.mig.html.HTMLUtil;
+import com.top_logic.threed.core.math.Transformation;
 import com.top_logic.threed.core.math.TransformationUtil;
 import com.top_logic.threed.threejs.scene.ConnectionPoint;
 import com.top_logic.threed.threejs.scene.SceneGraph;
 import com.top_logic.threed.threejs.scene.SceneNode;
 import com.top_logic.threed.threejs.scene.ScenePart;
+import com.top_logic.threed.threejs.scene.SceneUtils;
 import com.top_logic.tool.boundsec.HandlerResult;
 
 import de.haumacher.msgbuf.graph.DefaultScope;
@@ -245,10 +247,16 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 			List<Double> transform = node.getTransform();
 			if (transform.size() == 12) {
 				_gizmoControl.setConsumer(null);
-				_gizmoControl.setModel(TransformationUtil.fromList(transform));
-				_gizmoControl.setConsumer(tx -> {
-					node.setTransform(TransformationUtil.toList(tx));
-				});
+				ScenePart parent = node.getParent();
+				Transformation absoluteParentTX;
+				if (parent != null) {
+					absoluteParentTX = SceneUtils.getAbsoluteTransformation(parent);
+				} else {
+					absoluteParentTX = Transformation.identity();
+				}
+				_gizmoControl.setModel(absoluteParentTX.after(TransformationUtil.fromList(transform)));
+				_gizmoControl
+					.setConsumer(tx -> SceneUtils.setTransform(node, absoluteParentTX.inverse().after(tx)));
 			}
 		}
 	}

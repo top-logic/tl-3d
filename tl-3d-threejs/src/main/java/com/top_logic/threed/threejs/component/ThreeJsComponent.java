@@ -54,12 +54,12 @@ import com.top_logic.model.TLStructuredType;
 import com.top_logic.model.search.expr.config.dom.Expr;
 import com.top_logic.model.search.expr.query.QueryExecutor;
 import com.top_logic.model.util.TLModelUtil;
-import com.top_logic.threed.core.math.TransformationUtil;
 import com.top_logic.threed.threejs.control.ThreeJsControl;
 import com.top_logic.threed.threejs.scene.GroupNode;
 import com.top_logic.threed.threejs.scene.PartNode;
 import com.top_logic.threed.threejs.scene.SceneGraph;
 import com.top_logic.threed.threejs.scene.SceneNode;
+import com.top_logic.threed.threejs.scene.SceneUtils;
 import com.top_logic.tool.boundsec.AbstractCommandHandler;
 import com.top_logic.tool.boundsec.HandlerResult;
 
@@ -650,8 +650,7 @@ public class ThreeJsComponent extends BuilderComponent
 		if (!transformedNodes.isEmpty()) {
 			if (_applyScript != null) {
 				for (SceneNode node : transformedNodes) {
-					_applyScript.execute(node.getUserData(),
-						TransformationUtil.fromList(node.getTransform()), getModel());
+					_applyScript.execute(node.getUserData(), SceneUtils.getTransform(node), getModel());
 				}
 			}
 		}
