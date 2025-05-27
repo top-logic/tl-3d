@@ -1474,6 +1474,7 @@ class Scope {
         const gltf = this.gltfs[contextPath + url];
         if (gltf != null) {
           for (const asset of assetsByURL.get(url)) {
+            asset.ctrl = ctrl;
             asset.setGLTF(gltf);
           }
         }
@@ -1840,6 +1841,8 @@ class GltfAsset extends SharedObject {
 
     this.group.remove(this.placeholder);
     const currentColor = this.placeholder.material.color;
+    const isSelected = currentColor.equals(new Color(RED));
+
 
     // const model = this.gltf.scene.clone();
     const useLOD = true;
@@ -1860,6 +1863,10 @@ class GltfAsset extends SharedObject {
       // create low detail model (very simplified)
       const lowDetailModel = this.createDetailLevel(this.gltf.scene, LOD_LOW);
       lod.addLevel(lowDetailModel, LOD_LOW_DISTANCE);  // visible from low distance and beyond
+      
+      if (isSelected) {
+        this.ctrl.setColor(this.group, RED);
+      }
     } else {
       // console.log('[GltfAsset] Using standard rendering');
       // standard non-LOD rendering
