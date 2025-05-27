@@ -22,6 +22,7 @@ import {
   MeshBasicMaterial,
   SphereBufferGeometry,
   EdgesGeometry,
+  BoxGeometry,
   LineBasicMaterial,
   LineSegments,
   CanvasTexture,
@@ -1310,8 +1311,8 @@ class ThreeJsControl {
     const dataJson = await dataResponse.json();
 
     this.sceneGraph = this.scope.loadJson(dataJson);
-    await this.scope.loadAssets(this.contextPath);
     this.sceneGraph.buildGraph(this);
+    this.scope.loadAssets(this);
 
     this.camera.position.applyMatrix4(this.scene.matrix);
     this.camera.updateProjectionMatrix();
@@ -1422,7 +1423,8 @@ class Scope {
     }
   }
 
-  async loadAssets(contextPath) {
+  loadAssets(ctrl) {
+    const contextPath = ctrl.contextPath;
     const gltfLoader = new GLTFLoader();
     
     // track loading progress
@@ -1465,23 +1467,37 @@ class Scope {
           reject(msg);
         }
       });
+    const loadURLs = async (localURLs, assetsByURL) => {
+      console.log(`Loading URLS: ${localURLs}`);
+      await Promise.all(localURLs.map(loadUrl));
+      for (const url of localURLs) {
+        const gltf = this.gltfs[contextPath + url];
+        if (gltf != null) {
+          for (const asset of assetsByURL.get(url)) {
+            asset.setGLTF(gltf);
+          }
+        }
+      }
+      ctrl.render();
+    };
 
     // load assets in batches to prevent overwhelming the browser
-    const assets = this.assets;
-    const urls = Array.from(new Set(assets.map(asset => asset.url)));
+    const assetsByURL = Map.groupBy(this.assets, asset => asset.url);
     const batchSize = 10;
-    const batches = [];
-    
-    for (let i = 0; i < urls.length; i += batchSize) {
-      batches.push(urls.slice(i, i + batchSize));
+
+    var urls = new Array(batchSize);
+    var index = 0;
+    for (const key of assetsByURL.keys()) {
+      if (index == batchSize) {
+        index = 0;
+        loadURLs(urls, assetsByURL);
+        urls = new Array(batchSize);
+      }
+      urls[index] = key;
+      index++;
     }
-    
-    for (const batch of batches) {
-      await Promise.all(batch.map(loadUrl));
-    }
-    
-    for (const asset of assets) {
-      asset.gltf = this.gltfs[contextPath + asset.url];
+    if (index > 0) {
+      loadURLs(urls.slice(0, index), assetsByURL);
     }
   }
 }
@@ -1571,14 +1587,13 @@ class SceneGraph extends SharedObject {
   }
 
   reload(scope) {
-    scope.loadAssets(this.ctrl.contextPath).then(() => {
-      this.ctrl.zUpRoot.clear();
-      this.ctrl.multiTransformGroup.clear();
-      this.build(this.ctrl.zUpRoot);
-      this.ctrl.applySelection(this.selection);
-      this.ctrl.updateTransformControls();
-      this.ctrl.render();
-    });
+    this.ctrl.zUpRoot.clear();
+    this.ctrl.multiTransformGroup.clear();
+    this.build(this.ctrl.zUpRoot);
+    scope.loadAssets(this.ctrl);
+    this.ctrl.applySelection(this.selection);
+    this.ctrl.updateTransformControls();
+    this.ctrl.render();
   }
 }
 
@@ -1792,18 +1807,39 @@ class GltfAsset extends SharedObject {
   }
 
   build(parentGroup) {
-     const group = new Group();
-    parentGroup.add(group);
+    this.group = new Group();
+    parentGroup.add(this.group);
 
-    this.layoutPoint?.build(group, true);
+    this.layoutPoint?.build(this.group, true);
     if (this.layoutPoint?.transform) {
-    	 group.applyMatrix4(toMatrix(this.layoutPoint.transform).invert());
+    	 this.group.applyMatrix4(toMatrix(this.layoutPoint.transform).invert());
     }
-    this.snappingPoints?.forEach((point) => point.build(group, false));
+    this.snappingPoints?.forEach((point) => point.build(this.group, false));
     
-    if (this.gltf == null) {
-      return group;
-    }
+    if (this.url) {
+      const geometry = new BoxGeometry(500, 500, 500);
+      const material = new MeshBasicMaterial({ wireframe: false });
+      const mesh = new Mesh(geometry, material);
+      mesh.userData.originalMaterial = mesh.material;
+      mesh.material = mesh.material.clone();
+      mesh.material.userData.originalColor = mesh.material.color.clone();
+
+      this.placeholder = mesh;
+      this.group.add(this.placeholder);
+    }    
+    
+    return this.group;
+  }
+  
+  setGLTF(newGLTF) {
+  	if (!newGLTF) {
+  	  return;
+  	}
+  
+    this.gltf = newGLTF;
+
+    this.group.remove(this.placeholder);
+    const currentColor = this.placeholder.material.color;
 
     // const model = this.gltf.scene.clone();
     const useLOD = true;
@@ -1811,7 +1847,7 @@ class GltfAsset extends SharedObject {
     if (useLOD) {
       // create LOD object
       const lod = new LOD();
-      group.add(lod);
+      this.group.add(lod);
       
       // create high detail model (original)
       const highDetailModel = this.createDetailLevel(this.gltf.scene, LOD_HIGH);
@@ -1824,8 +1860,6 @@ class GltfAsset extends SharedObject {
       // create low detail model (very simplified)
       const lowDetailModel = this.createDetailLevel(this.gltf.scene, LOD_LOW);
       lod.addLevel(lowDetailModel, LOD_LOW_DISTANCE);  // visible from low distance and beyond
-      
-      return group;
     } else {
       // console.log('[GltfAsset] Using standard rendering');
       // standard non-LOD rendering
@@ -1837,8 +1871,7 @@ class GltfAsset extends SharedObject {
           obj.material.userData.originalColor = obj.material.color.clone();
         }
       });
-      group.add(model);
-      return group;
+      this.group.add(model);
     }
   }
   
