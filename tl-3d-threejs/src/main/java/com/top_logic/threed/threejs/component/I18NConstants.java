@@ -6,12 +6,11 @@
 package com.top_logic.threed.threejs.component;
 
 import com.top_logic.basic.util.ResKey;
+import com.top_logic.basic.util.ResKey1;
 import com.top_logic.layout.I18NConstantsBase;
 
 /**
  * Messages for package.
- * 
- * @author <a href="mailto:sven.foerster@top-logic.com">Sven Förster</a>
  */
 public class I18NConstants extends I18NConstantsBase {
 
@@ -20,6 +19,23 @@ public class I18NConstants extends I18NConstantsBase {
 	 *     operation.
 	 */
 	public static ResKey ERROR_OPERATION_ARGUMENT_NOT_CALLED;
+
+	/**
+	 * @en The value {0} is not a coordinate specification.
+	 * 
+	 *     <p>
+	 *     A coordinate specification is a JSON object with keys <code>label</code> and
+	 *     <code>tx</code>. The label is shown in the selector and the transformation specifies the
+	 *     coordinate system relative to world coordinates.
+	 *     </p>
+	 */
+	public static ResKey1 ERROR_IS_NOT_A_RELATIVE_COORDINATE_SYSTEM__VALUE;
+
+	/**
+	 * @en The value {0} is not an internationalizable value. Please enter a character string or a
+	 *     resource key.
+	 */
+	public static ResKey1 ERROR_NOT_A_RES_KEY__VALUE;
 
 	static {
 		initConstants(I18NConstants.class);

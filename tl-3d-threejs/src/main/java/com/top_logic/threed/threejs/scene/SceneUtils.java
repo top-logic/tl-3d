@@ -77,6 +77,21 @@ public class SceneUtils {
 		}
 
 		return tx;
+	}
 
+	/**
+	 * Sets the given {@link Transformation} as {@link SceneGraph#getCoordinateSystem()}.
+	 *
+	 * @param graph
+	 *        {@link SceneGraph} to set coordinate system to.
+	 * @param tx
+	 *        The {@link Transformation} to set. May be <code>null</code>.
+	 */
+	public static void setCoordinateSystem(SceneGraph graph, Transformation tx) {
+		if (tx == null) {
+			graph.setCoordinateSystem(Collections.emptyList());
+		} else {
+			graph.setCoordinateSystem(TransformationUtil.toList(tx));
+		}
 	}
 }

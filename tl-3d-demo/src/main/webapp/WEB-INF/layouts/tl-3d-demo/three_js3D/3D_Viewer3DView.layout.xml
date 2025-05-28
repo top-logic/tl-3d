@@ -5,7 +5,7 @@
 	template="tl-3d-threejs/threejs.template.xml"
 >
 	<arguments
-		applyScript="node -> tx -> model -> $node.set(`tl.threed.demo:Node#tx`, $tx)"
+		apply-script="node -> tx -> model -> $node.set(`tl.threed.demo:Node#tx`, $tx)"
 		model="model(tl-3d-demo/three_js3D/sceneGrid.layout.xml#Grid)"
 		multiSelection="true"
 		selection="selection(tl-3d-demo/three_js3D/sceneGrid.layout.xml#Grid)"
@@ -56,5 +56,39 @@
 				class="com.top_logic.layout.form.component.InvalidateCommand"
 			/>
 		</buttons>
+		<coordinate-systems><![CDATA[selection -> model -> {
+
+absoluteTx = node -> 
+  $node.recursion(p->$p.referers(`tl.threed.demo:Assembly#children`))
+    .reduce(
+      txIdentity(), 
+        subresult -> elt -> 
+          $elt.get(`tl.threed.demo:Node#tx`).txCompose($subresult))
+;
+
+
+partsWithCoordinates = $model.get(`tl.threed.demo:Scene#rootNode`)
+  .recursion(p -> 
+    $p.instanceOf(`tl.element:StructuredElementContainer`) ? 
+      $p.get(`tl.element:StructuredElementContainer#children`) : 
+      [])
+  .filter(p -> {
+    name = $p.get(`tl.threed.demo:Part#name`);
+    $name.length() > 23 && $name.subString(-23) == " with coordinate system"
+  });
+$partsWithCoordinates.map(p -> {
+  {
+    "label": $p.get(`tl.threed.demo:Part#name`).subString(0, -23), 
+    "tx": $absoluteTx($p)
+  }
+}).concat(
+  {
+    "label": "Statisches Koordinatensystem mit Rotation und Verschiebung",
+    "tx": txRotateX(1.5708)
+      .txCompose(txRotateZ(0.7854))
+      .txCompose(txTranslate(1000,500,600))
+  }
+);
+}]]></coordinate-systems>
 	</arguments>
 </config:template-call>

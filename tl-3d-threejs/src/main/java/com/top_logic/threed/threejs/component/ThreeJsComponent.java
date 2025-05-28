@@ -23,9 +23,11 @@ import com.top_logic.basic.CollectionUtil;
 import com.top_logic.basic.Log;
 import com.top_logic.basic.col.FilterUtil;
 import com.top_logic.basic.config.ConfigurationException;
+import com.top_logic.basic.config.ConfigurationItem;
 import com.top_logic.basic.config.InstantiationContext;
 import com.top_logic.basic.config.PolymorphicConfiguration;
 import com.top_logic.basic.config.annotation.Label;
+import com.top_logic.basic.config.annotation.Name;
 import com.top_logic.basic.config.annotation.TagName;
 import com.top_logic.basic.config.annotation.defaults.BooleanDefault;
 import com.top_logic.basic.config.annotation.defaults.ClassDefault;
@@ -51,9 +53,11 @@ import com.top_logic.mig.html.layout.LayoutComponent;
 import com.top_logic.model.TLClass;
 import com.top_logic.model.TLObject;
 import com.top_logic.model.TLStructuredType;
+import com.top_logic.model.search.expr.SearchExpression;
 import com.top_logic.model.search.expr.config.dom.Expr;
 import com.top_logic.model.search.expr.query.QueryExecutor;
 import com.top_logic.model.util.TLModelUtil;
+import com.top_logic.threed.core.math.Transformation;
 import com.top_logic.threed.threejs.control.ThreeJsControl;
 import com.top_logic.threed.threejs.scene.GroupNode;
 import com.top_logic.threed.threejs.scene.PartNode;
@@ -73,11 +77,67 @@ public class ThreeJsComponent extends BuilderComponent
 		implements ChannelListener, SelectionListener, SelectableWithSelectionModel, Editor {
 
 	/**
+	 * Configuration options of {@link ThreeJsComponent} that can be choosen "in app".
+	 * 
+	 * @author <a href="mailto:daniel.busche@top-logic.com">Daniel Busche</a>
+	 */
+	public interface InAppViewerConfig extends ConfigurationItem {
+
+		/**
+		 * Configuration name of {@link #getCoordinateSystems()}.
+		 */
+		String COORDINATE_SYSTEMS = "coordinate-systems";
+
+		/**
+		 * Configuration name of {@link #getApplyScript()}.
+		 */
+		String APPLY_SCRIPT = "apply-script";
+
+		/**
+		 * The operation that takes the changes from the client and applies them to the business
+		 * objects.
+		 */
+		@Label("Store operation")
+		Expr getApplyScript();
+
+		/**
+		 * Function resolving a set of local coordinate systems that can be selected while moving
+		 * objects in layout mode.
+		 * 
+		 * <p>
+		 * The function expects the set of selected objects as first argument and the component's
+		 * model as second argument.
+		 * </p>
+		 * 
+		 * <p>
+		 * As a result, a list of JSON objects specifying the local coordinate systems is expected.
+		 * A coordinate system specification has the two properties <code>label</code> of type
+		 * <code>String</code> and <code>tx</code> of type <code>Transformation</code>.
+		 * 
+		 * <pre>
+		 * [
+		 *   {
+		 *     "label": "My coordinate System 1",
+		 *     "tx": $affineTransformation1
+		 *   }, {
+		 *     "label": "My coordinate System 2",
+		 *     "tx": $affineTransformation2
+		 *   }
+		 * ]
+		 * </pre>
+		 * </p>
+		 */
+		@Name(COORDINATE_SYSTEMS)
+		Expr getCoordinateSystems();
+	}
+
+	/**
 	 * {@link ThreeJsComponent} configuration.
 	 */
 	@TagName("three-js-viewer")
 	public interface Config
-			extends BuilderComponent.Config, Selectable.SelectableConfig, Editor.Config, SelectionModelConfig {
+			extends BuilderComponent.Config, Selectable.SelectableConfig, Editor.Config, SelectionModelConfig,
+			InAppViewerConfig {
 
 		/** @see com.top_logic.basic.reflect.DefaultMethodInvoker */
 		Lookup LOOKUP = MethodHandles.lookup();
@@ -92,13 +152,6 @@ public class ThreeJsComponent extends BuilderComponent
 		@Override
 		@BooleanDefault(true)
 		boolean hasToolbar();
-
-		/**
-		 * The operation that takes the changes from the client and applies them to the business
-		 * objects.
-		 */
-		@Label("Store operation")
-		Expr getApplyScript();
 
 		@Override
 		default void modifyIntrinsicCommands(CommandRegistry registry) {
@@ -254,6 +307,8 @@ public class ThreeJsComponent extends BuilderComponent
 
 	private QueryExecutor _applyScript;
 
+	private QueryExecutor _coordinateSystemsFunction;
+
 	/**
 	 * Creates a {@link ThreeJsComponent}.
 	 */
@@ -263,6 +318,7 @@ public class ThreeJsComponent extends BuilderComponent
 		_selectionModel = config.getSelectionModelFactory().newSelectionModel(this);
 		_selectionModel.addSelectionListener(this);
 		_scene = SceneGraph.create();
+		SceneUtils.setCoordinateSystem(_scene, Transformation.identity());
 		connect(_scene, _selectionModel);
 		_scene.registerListener(new Listener() {
 
@@ -287,6 +343,7 @@ public class ThreeJsComponent extends BuilderComponent
 		_typesToObserve = computeTypesToObserve();
 
 		_applyScript = QueryExecutor.compileOptional(config.getApplyScript());
+		_coordinateSystemsFunction = QueryExecutor.compileOptional(config.getCoordinateSystems());
 	}
 
 	private void connect(SceneGraph scene, SelectionModel selectionModel) {
@@ -503,7 +560,6 @@ public class ThreeJsComponent extends BuilderComponent
 	
 	@Override
 	protected Map<String, ChannelSPI> channels() {
-		// TODO Auto-generated method stub
 		return CHANNELS;
 	}
 
@@ -578,6 +634,13 @@ public class ThreeJsComponent extends BuilderComponent
 
 	private void internalSetSelection(Object newValue) {
 		_selectionModel.setSelection(addNodesForBusinessObjects(newValue, new HashSet<>()));
+		Collection<?> newSelection;
+		if (newValue instanceof Collection) {
+			newSelection = (Collection<?>) newValue;
+		} else {
+			newSelection = CollectionUtil.singletonOrEmptyList(newValue);
+		}
+		_control.setCoordinateSystems(getGlobalCoordinateSystems(newSelection));
 	}
 
 	private <T extends Collection<? super SceneNode>> T addNodesForBusinessObjects(Object newValue, T out) {
@@ -631,6 +694,17 @@ public class ThreeJsComponent extends BuilderComponent
 		}
 	}
 	
+	private List<CoordinateSystemProvider> getGlobalCoordinateSystems(Collection<?> selectedObjects) {
+		if (_coordinateSystemsFunction == null) {
+			return Collections.emptyList();
+		}
+		return SearchExpression.asCollection(_coordinateSystemsFunction.execute(selectedObjects, getModel()))
+			.stream()
+			.map(CoordinateSystem::asCoordinateSystem)
+			.<CoordinateSystemProvider> map(x -> () -> x)
+			.toList();
+	}
+
 	HandlerResult applyTransformation() {
 		HandlerResult result = applyTransformation(_transformedNodes);
 		if (result.isSuccess()) {

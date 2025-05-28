@@ -21,6 +21,26 @@
 	column-gap: var(--spacing-01);
 }
 
+.cGizmo .whole-line {
+	grid-column: 1/-1;
+}
+
+.cGizmo .coordinateSystems .ddwttContainer {
+	width: calc(200px - var(--spacing-02));
+}
+
+.cGizmo .coordinateSystems .ddwttContainer .ddwttDropBtn {
+	width: 100%;
+}
+
+.cGizmo .coordinateSystems .ddwttContainer .ddwttDropBtn .ddwttChevron {
+	margin-left: auto;
+}
+
+.cGizmo .coordinateSystems {
+	justify-self: stretch;
+}
+
 .cGizmo div.title {
 	display: flex;
 	justify-content: space-between;

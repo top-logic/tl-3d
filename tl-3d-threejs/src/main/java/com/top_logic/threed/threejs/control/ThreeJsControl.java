@@ -25,6 +25,8 @@ import com.top_logic.layout.basic.ControlCommand;
 import com.top_logic.mig.html.HTMLUtil;
 import com.top_logic.threed.core.math.Transformation;
 import com.top_logic.threed.core.math.TransformationUtil;
+import com.top_logic.threed.threejs.component.CoordinateSystem;
+import com.top_logic.threed.threejs.component.CoordinateSystemProvider;
 import com.top_logic.threed.threejs.scene.ConnectionPoint;
 import com.top_logic.threed.threejs.scene.SceneGraph;
 import com.top_logic.threed.threejs.scene.SceneNode;
@@ -396,6 +398,24 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 			throw new UncheckedIOException(ex);
 		}
 		_scope.dropChanges();
+	}
+
+	/**
+	 * Sets the given coordinate systems as possible {@link CoordinateSystem}s.
+	 */
+	public void setCoordinateSystems(List<CoordinateSystemProvider> globalCoordinateSystems) {
+		_gizmoControl.setCoordinateSystems(globalCoordinateSystems, this::handleCoordinateSystemChanged);
+
+	}
+
+	private void handleCoordinateSystemChanged(CoordinateSystem system) {
+		Transformation tx;
+		if (system == null) {
+			tx = Transformation.identity();
+		} else {
+			tx = system.getTx();
+		}
+		SceneUtils.setCoordinateSystem(_model, tx);
 	}
 
 }

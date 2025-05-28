@@ -9,22 +9,34 @@ import java.io.IOException;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.text.Format;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
 
+import com.top_logic.basic.CollectionUtil;
 import com.top_logic.basic.util.ResKey;
 import com.top_logic.basic.util.Utils;
 import com.top_logic.basic.xml.TagWriter;
+import com.top_logic.layout.AbstractResourceProvider;
 import com.top_logic.layout.DisplayContext;
+import com.top_logic.layout.ResourceProvider;
 import com.top_logic.layout.basic.AbstractCommandModel;
 import com.top_logic.layout.basic.AbstractControl;
 import com.top_logic.layout.basic.TemplateVariable;
 import com.top_logic.layout.form.FormField;
+import com.top_logic.layout.form.FormMember;
 import com.top_logic.layout.form.ValueListener;
 import com.top_logic.layout.form.control.ButtonControl;
+import com.top_logic.layout.form.control.DropDownControl;
 import com.top_logic.layout.form.control.TextInputControl;
 import com.top_logic.layout.form.model.FormContext;
 import com.top_logic.layout.form.model.FormFactory;
+import com.top_logic.layout.form.model.SelectField;
+import com.top_logic.layout.form.model.SelectFieldUtils;
 import com.top_logic.threed.core.math.Transformation;
+import com.top_logic.threed.threejs.component.CoordinateSystem;
+import com.top_logic.threed.threejs.component.CoordinateSystemProvider;
 import com.top_logic.tool.boundsec.HandlerResult;
 import com.top_logic.util.Resources;
 import com.top_logic.util.TLContext;
@@ -35,6 +47,8 @@ import com.top_logic.util.TLContext;
  * @author <a href="mailto:daniel.busche@top-logic.com">Daniel Busche</a>
  */
 public class GizmoControl extends AbstractControl {
+
+	private static final String COORDINATE_SYSTEMS = "coordinateSystems";
 
 	private static final String TRANSLATE_X = "translate-x";
 
@@ -54,6 +68,8 @@ public class GizmoControl extends AbstractControl {
 
 	private Transformation _tx = Transformation.identity();
 
+	private Transformation _coordinateSystem;
+
 	private Format _translateFormat;
 
 	private Format _rotateFormat;
@@ -62,7 +78,24 @@ public class GizmoControl extends AbstractControl {
 
 	private boolean _editable = false;
 
+	private Consumer<CoordinateSystem> _selectionCallback = cs -> {
+		//
+	};
 
+	private ResourceProvider _coordinateSystemLabels = new AbstractResourceProvider() {
+		Resources _resources = resources();
+
+		@Override
+		public String getLabel(Object object) {
+			return _resources.getString(((CoordinateSystem) object).getLabel());
+		}
+
+		@Override
+		public String getTooltip(Object anObject) {
+			return getLabel(anObject);
+		}
+
+	};
 	/**
 	 * Creates a {@link GizmoControl}.
 	 */
@@ -76,6 +109,35 @@ public class GizmoControl extends AbstractControl {
 	@Override
 	protected String getTypeCssClass() {
 		return "cGizmo";
+	}
+
+	/**
+	 * Sets the coordinate systems to the select.
+	 */
+	public GizmoControl setCoordinateSystems(List<CoordinateSystemProvider> coordinateSystems,
+			Consumer<CoordinateSystem> selectionCallback) {
+		_selectionCallback = Objects.requireNonNull(selectionCallback);
+		List<CoordinateSystem> systems = Objects.requireNonNull(coordinateSystems)
+			.stream()
+			.map(CoordinateSystemProvider::getCoordinateSystem)
+			.toList();
+		SelectField field = (SelectField) field(COORDINATE_SYSTEMS);
+		String currentSelection;
+		CoordinateSystem value = (CoordinateSystem) field.getSingleSelection();
+		if (value != null) {
+			currentSelection = _coordinateSystemLabels.getLabel(value);
+		} else {
+			currentSelection = null;
+		}
+		SelectFieldUtils.setOptions(field, systems);
+		if (currentSelection != null && field.getSingleSelection() == null) {
+			systems.stream()
+				.filter(system -> currentSelection.equals(_coordinateSystemLabels.getLabel(system)))
+				.findFirst()
+				.ifPresent(newSelection -> field.setAsSingleSelection(newSelection));
+		}
+
+		return this;
 	}
 
 	/**
@@ -147,7 +209,43 @@ public class GizmoControl extends AbstractControl {
 		ctx.addMember(newRotateField(ROTATE_X, I18NConstants.ROTATE_X_LABEL));
 		ctx.addMember(newRotateField(ROTATE_Y, I18NConstants.ROTATE_Y_LABEL));
 		ctx.addMember(newRotateField(ROTATE_Z, I18NConstants.ROTATE_Z_LABEL));
+		ctx.addMember(newCoordinateSystemsField());
 		return ctx;
+	}
+
+	private FormMember newCoordinateSystemsField() {
+		SelectField coordinatesField = FormFactory.newSelectField(COORDINATE_SYSTEMS, Collections.emptyList());
+		coordinatesField.setLabel(resources().getString(I18NConstants.COORDINATE_SYSTEMS_LABEL));
+		coordinatesField.setEmptyLabel(resources().getString(I18NConstants.WORD_COORDINATES));
+
+		coordinatesField.setOptionLabelProvider(_coordinateSystemLabels);
+		coordinatesField.addValueListener(new ValueListener() {
+
+			@Override
+			public void valueChanged(FormField field, Object oldValue, Object newValue) {
+				CoordinateSystem selectedCoordinates = (CoordinateSystem) CollectionUtil.getSingleValueFrom(newValue);
+				_selectionCallback.accept(selectedCoordinates);
+				handleCoordinateSystemChanged(selectedCoordinates);
+			}
+
+		});
+		// Coordinate system should be always selectable.
+		coordinatesField.setInheritDeactivation(false);
+		return coordinatesField;
+	}
+
+	void handleCoordinateSystemChanged(CoordinateSystem coordinates) {
+		Transformation tx;
+		if (coordinates == null) {
+			tx = null;
+		} else {
+			tx = coordinates.getTx();
+		}
+		_coordinateSystem = tx;
+		Transformation model = getModel();
+		if (model != null) {
+			initFieldsAfterCoordinateSystemChanged(model);
+		}
 	}
 
 	void updateDisabled() {
@@ -170,13 +268,23 @@ public class GizmoControl extends AbstractControl {
 			field(ROTATE_Y).initializeField(null);
 			field(ROTATE_Z).initializeField(null);
 		} else {
-			field(TRANSLATE_X).initializeField(tx.x());
-			field(TRANSLATE_Y).initializeField(tx.y());
-			field(TRANSLATE_Z).initializeField(tx.z());
-			field(ROTATE_X).initializeField(toDegrees(tx.getRotationX()));
-			field(ROTATE_Y).initializeField(toDegrees(tx.getRotationY()));
-			field(ROTATE_Z).initializeField(toDegrees(tx.getRotationZ()));
+			initFieldsAfterCoordinateSystemChanged(tx);
 		}
+	}
+
+	private void initFieldsAfterCoordinateSystemChanged(Transformation model) {
+		Transformation finalTransform;
+		if (_coordinateSystem == null) {
+			finalTransform = model;
+		} else {
+			finalTransform = _coordinateSystem.inverse().after(model);
+		}
+		field(TRANSLATE_X).initializeField(finalTransform.x());
+		field(TRANSLATE_Y).initializeField(finalTransform.y());
+		field(TRANSLATE_Z).initializeField(finalTransform.z());
+		field(ROTATE_X).initializeField(toDegrees(finalTransform.getRotationX()));
+		field(ROTATE_Y).initializeField(toDegrees(finalTransform.getRotationY()));
+		field(ROTATE_Z).initializeField(toDegrees(finalTransform.getRotationZ()));
 	}
 
 	private void internalSetModel(Transformation tx) {
@@ -257,11 +365,17 @@ public class GizmoControl extends AbstractControl {
 		if (!rotateZ.hasValue() || rotateZ.getValue() == null) {
 			return;
 		}
-		Transformation newTX = Transformation
+		Transformation txFromFields = Transformation
 			.translate(translateValue(TRANSLATE_X), translateValue(TRANSLATE_Y), translateValue(TRANSLATE_Z))
 			.after(Transformation.rotateZ(rotateValue(ROTATE_Z)))
 			.after(Transformation.rotateY(rotateValue(ROTATE_Y)))
 			.after(Transformation.rotateX(rotateValue(ROTATE_X)));
+		Transformation newTX = txFromFields;
+		if (_coordinateSystem == null) {
+			newTX = txFromFields;
+		} else {
+			newTX = _coordinateSystem.after(txFromFields);
+		}
 		if (Utils.equals(newTX, getModel())) {
 			return;
 		}
@@ -275,14 +389,18 @@ public class GizmoControl extends AbstractControl {
 		Format format = (Format) _translateFormat.clone();
 		FormField field = FormFactory.newNumberField(name, format, null, false);
 		field.addValueListener(this::handleTranslateValueChanged);
-		field.setLabel(Resources.getInstance().getString(label));
+		field.setLabel(resources().getString(label));
 		return field;
+	}
+
+	static Resources resources() {
+		return Resources.getInstance();
 	}
 
 	private FormField newRotateField(String name, ResKey label) {
 		FormField field = FormFactory.newNumberField(name, (Format) _rotateFormat.clone(), null, false);
 		field.addValueListener(this::handleRotateValueChanged);
-		field.setLabel(Resources.getInstance().getString(label));
+		field.setLabel(resources().getString(label));
 		return field;
 	}
 
@@ -397,6 +515,22 @@ public class GizmoControl extends AbstractControl {
 		return field(ROTATE_Z).getLabel();
 	}
 
+	/**
+	 * Writes the field for selecting coordinate system.
+	 */
+	@TemplateVariable("coordinateSystems")
+	public void writeCoordinateSystems(DisplayContext context, TagWriter out) throws IOException {
+		new DropDownControl(field(COORDINATE_SYSTEMS)).write(context, out);
+	}
+
+	/**
+	 * Label of the field for selecting coordinate system.
+	 */
+	@TemplateVariable("coordinateSystemsLabel")
+	public String getCoordinateSystemsLabel() {
+		return field(COORDINATE_SYSTEMS).getLabel();
+	}
+
 	private void writeTranslation(DisplayContext context, TagWriter out, String name) throws IOException {
 		new TextInputControl(field(name)).write(context, out);
 	}
@@ -449,8 +583,8 @@ public class GizmoControl extends AbstractControl {
 				: com.top_logic.layout.structure.Icons.WINDOW_MINIMIZE);
 			ResKey tooltipKey = minimized ? com.top_logic.layout.structure.I18NConstants.EXPAND_IMAGE_TEXT
 				: com.top_logic.layout.structure.I18NConstants.COLLAPSE_IMAGE_TEXT;
-			setTooltip(Resources.getInstance().getString(tooltipKey));
-			setLabel(Resources.getInstance().getString(tooltipKey));
+			setTooltip(resources().getString(tooltipKey));
+			setLabel(resources().getString(tooltipKey));
 		}
 
 		@Override

@@ -4,7 +4,7 @@
 	xmlns:config="http://www.top-logic.com/ns/config/6.0"
 	groups="commons"
 >
-	<properties extends="com.top_logic.mig.html.layout.WithDefaultFor, com.top_logic.layout.editor.config.ButtonTemplateParameters, com.top_logic.layout.editor.config.DialogTemplateParameters, com.top_logic.tool.boundsec.InAppSecurityObjectProviderConfig, com.top_logic.tool.boundsec.WithSecurityMaster">
+	<properties extends="com.top_logic.mig.html.layout.WithDefaultFor, com.top_logic.layout.editor.config.ButtonTemplateParameters, com.top_logic.layout.editor.config.DialogTemplateParameters, com.top_logic.tool.boundsec.InAppSecurityObjectProviderConfig, com.top_logic.tool.boundsec.WithSecurityMaster, com.top_logic.threed.threejs.component.ThreeJsComponent$InAppViewerConfig">
 		<annotations>
 			<display-inherited value="APPEND"/>
 		</annotations>
@@ -44,9 +44,6 @@
 			<options fun="com.top_logic.layout.form.values.edit.DefaultSecurityProviderKeys"/>
 			<hidden/>
 		</property>
-		<property name="applyScript"
-			type="com.top_logic.model.search.expr.config.dom.Expr"
-		/>
 		<property name="buttons"
 			element-type="com.top_logic.tool.boundsec.CommandHandler$ConfigBase"
 			type="List"
@@ -56,8 +53,9 @@
 	</properties>
 
 	<three-js-viewer name="3DView"
-		apply-script="${applyScript}"
+		apply-script="${apply-script}"
 		applyCommand="applyTransform"
+		coordinate-systems="${coordinate-systems}"
 		defaultFor="${defaultFor}"
 		dialogs="${dialogs}"
 		isSecurityMaster="${isSecurityMaster}"

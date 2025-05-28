@@ -36,6 +36,14 @@ public class I18NConstants extends I18NConstantsBase {
 	/** @en Z (°) */
 	public static ResKey ROTATE_Z_LABEL;
 
+	/** @en Coordinate system */
+	public static ResKey COORDINATE_SYSTEMS_LABEL;
+
+	/**
+	 * @en World coordinates
+	 */
+	public static ResKey WORD_COORDINATES;
+
 	/**
 	 * Prefix for the {@link FormContext} used by the {@link GizmoControl}.
 	 */
