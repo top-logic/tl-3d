@@ -21,6 +21,9 @@ public class SceneGraph extends ScenePart {
 	/** @see #getSelection() */
 	public static final String SELECTION__PROP = "selection";
 
+	/** @see #getCoordinateSystem() */
+	public static final String COORDINATE_SYSTEM__PROP = "coordinateSystem";
+
 	private com.top_logic.threed.threejs.scene.SceneNode _root = null;
 
 	private final java.util.List<com.top_logic.threed.threejs.scene.SceneNode> _selection = new de.haumacher.msgbuf.util.ReferenceList<com.top_logic.threed.threejs.scene.SceneNode>() {
@@ -37,6 +40,23 @@ public class SceneGraph extends ScenePart {
 		@Override
 		protected void afterChanged() {
 			_listener.afterChanged(SceneGraph.this, SELECTION__PROP);
+		}
+	};
+
+	private final java.util.List<Double> _coordinateSystem = new de.haumacher.msgbuf.util.ReferenceList<Double>() {
+		@Override
+		protected void beforeAdd(int index, Double element) {
+			_listener.beforeAdd(SceneGraph.this, COORDINATE_SYSTEM__PROP, index, element);
+		}
+
+		@Override
+		protected void afterRemove(int index, Double element) {
+			_listener.afterRemove(SceneGraph.this, COORDINATE_SYSTEM__PROP, index, element);
+		}
+
+		@Override
+		protected void afterChanged() {
+			_listener.afterChanged(SceneGraph.this, COORDINATE_SYSTEM__PROP);
 		}
 	};
 
@@ -139,6 +159,47 @@ public class SceneGraph extends ScenePart {
 		_selection.remove(value);
 	}
 
+	/**
+	 * Transformation defining the coordinate system of the scene.
+	 */
+	public final java.util.List<Double> getCoordinateSystem() {
+		return _coordinateSystem;
+	}
+
+	/**
+	 * @see #getCoordinateSystem()
+	 */
+	public com.top_logic.threed.threejs.scene.SceneGraph setCoordinateSystem(java.util.List<? extends Double> value) {
+		internalSetCoordinateSystem(value);
+		return this;
+	}
+
+	/** Internal setter for {@link #getCoordinateSystem()} without chain call utility. */
+	protected final void internalSetCoordinateSystem(java.util.List<? extends Double> value) {
+		_coordinateSystem.clear();
+		_coordinateSystem.addAll(value);
+	}
+
+	/**
+	 * Adds a value to the {@link #getCoordinateSystem()} list.
+	 */
+	public com.top_logic.threed.threejs.scene.SceneGraph addCoordinateSystem(double value) {
+		internalAddCoordinateSystem(value);
+		return this;
+	}
+
+	/** Implementation of {@link #addCoordinateSystem(double)} without chain call utility. */
+	protected final void internalAddCoordinateSystem(double value) {
+		_coordinateSystem.add(value);
+	}
+
+	/**
+	 * Removes a value from the {@link #getCoordinateSystem()} list.
+	 */
+	public final void removeCoordinateSystem(double value) {
+		_coordinateSystem.remove(value);
+	}
+
 	@Override
 	public String jsonType() {
 		return SCENE_GRAPH__TYPE;
@@ -147,7 +208,8 @@ public class SceneGraph extends ScenePart {
 	private static java.util.List<String> PROPERTIES = java.util.Collections.unmodifiableList(
 		java.util.Arrays.asList(
 			ROOT__PROP, 
-			SELECTION__PROP));
+			SELECTION__PROP, 
+			COORDINATE_SYSTEM__PROP));
 
 	private static java.util.Set<String> TRANSIENT_PROPERTIES = java.util.Collections.unmodifiableSet(new java.util.HashSet<>(
 			java.util.Arrays.asList(
@@ -168,6 +230,7 @@ public class SceneGraph extends ScenePart {
 		switch (field) {
 			case ROOT__PROP: return getRoot();
 			case SELECTION__PROP: return getSelection();
+			case COORDINATE_SYSTEM__PROP: return getCoordinateSystem();
 			default: return super.get(field);
 		}
 	}
@@ -177,6 +240,7 @@ public class SceneGraph extends ScenePart {
 		switch (field) {
 			case ROOT__PROP: internalSetRoot((com.top_logic.threed.threejs.scene.SceneNode) value); break;
 			case SELECTION__PROP: internalSetSelection(de.haumacher.msgbuf.util.Conversions.asList(com.top_logic.threed.threejs.scene.SceneNode.class, value)); break;
+			case COORDINATE_SYSTEM__PROP: internalSetCoordinateSystem(de.haumacher.msgbuf.util.Conversions.asList(Double.class, value)); break;
 			default: super.set(field, value); break;
 		}
 	}
@@ -209,6 +273,12 @@ public class SceneGraph extends ScenePart {
 			x.writeTo(scope, out);
 		}
 		out.endArray();
+		out.name(COORDINATE_SYSTEM__PROP);
+		out.beginArray();
+		for (double x : getCoordinateSystem()) {
+			out.value(x);
+		}
+		out.endArray();
 	}
 
 	@Override
@@ -226,6 +296,14 @@ public class SceneGraph extends ScenePart {
 				out.beginArray();
 				for (com.top_logic.threed.threejs.scene.SceneNode x : getSelection()) {
 					x.writeTo(scope, out);
+				}
+				out.endArray();
+				break;
+			}
+			case COORDINATE_SYSTEM__PROP: {
+				out.beginArray();
+				for (double x : getCoordinateSystem()) {
+					out.value(x);
 				}
 				out.endArray();
 				break;
@@ -248,6 +326,16 @@ public class SceneGraph extends ScenePart {
 				setSelection(newValue);
 			}
 			break;
+			case COORDINATE_SYSTEM__PROP: {
+				java.util.List<Double> newValue = new java.util.ArrayList<>();
+				in.beginArray();
+				while (in.hasNext()) {
+					newValue.add(in.nextDouble());
+				}
+				in.endArray();
+				setCoordinateSystem(newValue);
+			}
+			break;
 			default: super.readField(scope, in, field);
 		}
 	}
@@ -259,6 +347,10 @@ public class SceneGraph extends ScenePart {
 				((com.top_logic.threed.threejs.scene.SceneNode) element).writeTo(scope, out);
 				break;
 			}
+			case COORDINATE_SYSTEM__PROP: {
+				out.value(((double) element));
+				break;
+			}
 			default: super.writeElement(scope, out, field, element);
 		}
 	}
@@ -268,6 +360,9 @@ public class SceneGraph extends ScenePart {
 		switch (field) {
 			case SELECTION__PROP: {
 				return com.top_logic.threed.threejs.scene.SceneNode.readSceneNode(scope, in);
+			}
+			case COORDINATE_SYSTEM__PROP: {
+				return in.nextDouble();
 			}
 			default: return super.readElement(scope, in, field);
 		}

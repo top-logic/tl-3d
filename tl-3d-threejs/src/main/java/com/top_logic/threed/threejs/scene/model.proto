@@ -87,4 +87,8 @@ message SceneGraph extends ScenePart {
 	/** The currently selected {@link SceneNode}s. */
 	@Ref
 	repeated SceneNode selection;
+	
+	/** Transformation defining the coordinate system of the scene. */
+	repeated double coordinateSystem;
+	
 }

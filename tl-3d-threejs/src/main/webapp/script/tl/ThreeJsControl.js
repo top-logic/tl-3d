@@ -1522,6 +1522,7 @@ class SceneGraph extends SharedObject {
   loadJson(scope, json) {
     this.setProperty(scope, 'root', json.root);
     this.setProperty(scope, 'selection', json.selection);
+    this.setProperty(scope, 'coordinateSystem', json.coordinateSystem);
   }
   
   removeSelected(node) {
@@ -1566,6 +1567,10 @@ class SceneGraph extends SharedObject {
   		case 'selection': 
   			this.selection = scope.loadAll(value);
   			break; 
+  		case 'coordinateSystem': 
+			console.log(`Changing coordinate system: ${value}`)
+  			this.coordinateSystem = value;
+  			break; 
   	}
   }
   
@@ -1575,6 +1580,9 @@ class SceneGraph extends SharedObject {
         const sharedObject = scope.loadJson(value);
   			this.selection.splice(idx, 0, sharedObject); 
   			break; 
+  		case 'coordinateSystem': 
+  			this.coordinateSystem.splice(idx, 0, value); 
+  			break; 
   	}
   }
   
@@ -1582,6 +1590,9 @@ class SceneGraph extends SharedObject {
   	switch (property) {
   		case 'selection': 
   			this.selection.splice(idx, 1);
+  			break; 
+  		case 'coordinateSystem': 
+  			this.coordinateSystem.splice(idx, 1);
   			break; 
   	}
   }
