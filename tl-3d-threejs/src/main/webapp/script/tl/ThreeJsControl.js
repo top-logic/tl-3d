@@ -67,7 +67,7 @@ class ThreeJsControl {
     this.contextPath = contextPath;
     this.dataUrl = dataUrl;
     this.scope = new Scope();
- 
+    
     this.lastLODLevel = -1;
     this.useLOD = true;
     this.zUpRoot = new Group();
@@ -135,15 +135,16 @@ class ThreeJsControl {
       passive: false,
     });
     
-    // Throttle rendering on resize for better performance
-    let resizeTimeout;
-    LayoutFunctions.addCustomRenderingFunction(container.parentNode, () => {
-      if (resizeTimeout) clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(() => {
-        this.renderer.setSize(container.clientWidth, container.clientHeight);
-        this.render();
-      }, 100); 
+    // Create a MutationObserver to detect DOM changes that might affect layout
+    const mutationObserver = new MutationObserver(() => {
+      this.updateRendererSize();
     });
+    
+    // Observe the container and its parent for attribute changes
+    mutationObserver.observe(container, { attributes: true, attributeFilter: ['style', 'class'] });
+    if (container.parentNode) {
+      mutationObserver.observe(container.parentNode, { attributes: true, attributeFilter: ['style', 'class'] });
+    }
   }
 
   initControls() {
@@ -316,7 +317,6 @@ class ThreeJsControl {
     this.isWorkplaneVisible = visible;
     this.render();
   }
-
 
   initTransformControls() {
     const outer = this;
@@ -892,13 +892,17 @@ class ThreeJsControl {
     });
   }
 
-  createResizeObserver(canvas) {
+  createResizeObserver() {
     return new ResizeObserver(throttle(() => {
-      this.renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-      this.camera.aspect = canvas.clientWidth / canvas.clientHeight;
-      this.camera.updateProjectionMatrix();
-      this.render();
+      this.updateRendererSize();
     }, 100));
+  }
+
+  updateRendererSize() {
+    this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+    this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
+    this.camera.updateProjectionMatrix();
+    this.render();
   }
 
   onMouseDown(event) {
@@ -1346,7 +1350,7 @@ class ThreeJsControl {
       }
 
       renderer.render(scene, camera);
-      cubeRenderer.render(cubeScene, cubeCamera);
+        cubeRenderer.render(cubeScene, cubeCamera);
     });
   }
 
