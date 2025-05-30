@@ -137,13 +137,13 @@ class ThreeJsControl {
     
     // Create a MutationObserver to detect DOM changes that might affect layout
     const mutationObserver = new MutationObserver(() => {
-      this.updateRendererSize();
+        this.updateRendererSize();
     });
     
     // Observe the container and its parent for attribute changes
-    mutationObserver.observe(container, { attributes: true, attributeFilter: ['style', 'class'] });
-    if (container.parentNode) {
-      mutationObserver.observe(container.parentNode, { attributes: true, attributeFilter: ['style', 'class'] });
+      mutationObserver.observe(container, { attributes: true, attributeFilter: ['style', 'class'] });
+      if (container.parentNode) {
+        mutationObserver.observe(container.parentNode, { attributes: true, attributeFilter: ['style', 'class'] });
     }
   }
 
@@ -894,11 +894,13 @@ class ThreeJsControl {
 
   createResizeObserver() {
     return new ResizeObserver(throttle(() => {
-      this.updateRendererSize();
+        this.updateRendererSize();
     }, 100));
   }
 
   updateRendererSize() {
+    if (!this.container) return;
+    
     this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
     this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
     this.camera.updateProjectionMatrix();
@@ -1299,7 +1301,11 @@ class ThreeJsControl {
   }
 
   get container() {
-    return document.getElementById(this.controlId);
+    const container = document.getElementById(this.controlId);
+    if (!container) {
+      return null;
+    }
+    return container;
   }
 
   static control(container) {
