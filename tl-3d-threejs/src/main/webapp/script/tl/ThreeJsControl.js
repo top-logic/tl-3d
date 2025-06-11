@@ -84,6 +84,7 @@ class ThreeJsControl {
     this.loadScene().then(() => setTimeout(() => {
       this.createBoundingBox();
       this.toggleWorkplane(isWorkplaneVisible);
+      this.updateWorkplanePosition();
       this.toggleEditMode(isInEditMode);
       this.toggleRotateMode(isRotateMode);
       this.zoomOut();
@@ -302,13 +303,16 @@ class ThreeJsControl {
       const gridSize = Math.max(boxSize.x, boxSize.y, boxSize.z) * 1.2;
 
       this.workplane = SceneUtils.createDetailedGrid(gridSize);
-      this.workplane.rotation.x = _90_DEGREE;
       this.snapToWorkplaneEnabled = true;
     }
 
     if (visible) {
-      this.scene.add(this.workplane);
+      if (this.workplane.parent) {
+        this.workplane.parent.remove(this.workplane);
+      }
+      this.zUpRoot.add(this.workplane);
       this.snapToWorkplaneEnabled = true;
+      this.updateWorkplanePosition();
     } else {
       this.scene.remove(this.workplane);
       this.snapToWorkplaneEnabled = false;
@@ -316,6 +320,18 @@ class ThreeJsControl {
 
     this.isWorkplaneVisible = visible;
     this.render();
+  }
+
+  updateWorkplanePosition() {
+      if (!this.workplane || !this.isWorkplaneVisible) {
+        return;
+      }
+      if (this.sceneGraph && this.sceneGraph.coordinateSystem) {
+        const matrixValues = toMatrix(this.sceneGraph.coordinateSystem);
+        this.workplane.applyMatrix4(matrixValues.multiply(this.workplane.matrix.clone().invert()));
+      }
+      this.workplane.updateMatrixWorld(true);
+      this.render();
   }
 
   initTransformControls() {
@@ -1478,7 +1494,7 @@ class Scope {
         }
       });
     const loadURLs = async (localURLs, assetsByURL) => {
-      console.log(`Loading URLS: ${localURLs}`);
+      // console.log(`Loading URLS: ${localURLs}`);
       await Promise.all(localURLs.map(loadUrl));
       for (const url of localURLs) {
         const gltf = this.gltfs[contextPath + url];
@@ -1578,7 +1594,7 @@ class SceneGraph extends SharedObject {
   			this.selection = scope.loadAll(value);
   			break; 
   		case 'coordinateSystem': 
-			console.log(`Changing coordinate system: ${value}`)
+			// console.log(`Changing coordinate system: ${value}`)
   			this.coordinateSystem = value;
   			break; 
   	}
@@ -1614,6 +1630,7 @@ class SceneGraph extends SharedObject {
     scope.loadAssets(this.ctrl);
     this.ctrl.applySelection(this.selection);
     this.ctrl.updateTransformControls();
+    this.ctrl.toggleWorkplane(this.ctrl.isWorkplaneVisible);
     this.ctrl.render();
   }
 }
