@@ -314,7 +314,9 @@ class ThreeJsControl {
       this.snapToWorkplaneEnabled = true;
       this.updateWorkplanePosition();
     } else {
-      this.scene.remove(this.workplane);
+      if (this.workplane.parent) {
+        this.workplane.parent.remove(this.workplane);
+      }
       this.snapToWorkplaneEnabled = false;
     }
 
