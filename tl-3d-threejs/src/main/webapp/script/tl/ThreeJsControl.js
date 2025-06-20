@@ -1180,10 +1180,10 @@ class ThreeJsControl {
     });
 
     gsap.to(this.controls.target, {
-      x: 0, y: 0, z: 0,
-      // x: center.x,
-      // y: center.y,
-      // z: center.z,
+      // x: 0, y: 0, z: 0,
+      x: center.x,
+      y: center.y,
+      z: center.z,
       duration: CAMERA_MOVE_DURATION,
       ease: "power3.inOut",
       onUpdate: () => {
