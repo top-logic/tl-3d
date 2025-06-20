@@ -58,6 +58,7 @@ const LOD_MEDIUM = 'medium';
 const LOD_LOW = 'low';
 const OPTIMIZED_PIXEL_RATIO = Math.min(window.devicePixelRatio, 1.7);
 const INTERACTIVE_PIXEL_RATIO = Math.min(window.devicePixelRatio, 1.0);
+const GRID_SMALL_CELL = 500;
 
 class ThreeJsControl {
   constructor(controlId, contextPath, dataUrl, isWorkplaneVisible, isInEditMode, isRotateMode) {
@@ -368,6 +369,13 @@ class ThreeJsControl {
             }
 
             return;
+          }
+
+          // Apply grid snapping to each object in multi-select if both workplane and edit mode are enabled
+          if (outer.isWorkplaneVisible && outer.isEditMode && outer.snapToWorkplaneEnabled) {
+            outer.multiTransformGroup.children.forEach(node => {
+              outer.snapObjectToWorkplane(node);
+            });
           }
 
           // re-map multiTransformGroup children to array of commands
@@ -792,12 +800,26 @@ class ThreeJsControl {
     object.getWorldPosition(worldPosition);
     
     const distanceToWorkplane = Math.abs(worldPosition.y);
-    const MAX_SNAP_DISTANCE = 1000;
+    const MAX_SNAP_DISTANCE = 200;
     
     if (distanceToWorkplane <= MAX_SNAP_DISTANCE) {
-      // Create a translation matrix to move the object to y=0 in world space
-      const snapMatrix = new Matrix4();
-      snapMatrix.makeTranslation(0, -worldPosition.y, 0);
+      let snapMatrix = new Matrix4();
+      const isOnWorkplane = Math.abs(worldPosition.y);
+      
+      if (this.isWorkplaneVisible && this.isEditMode && isOnWorkplane) {
+        // Object is already on workplane, apply grid snapping
+        const snappedPosition = this.calculateGridSnappedPosition(worldPosition);
+        
+        // Create translation to snap to grid and workplane
+        snapMatrix.makeTranslation(
+          snappedPosition.x - worldPosition.x,
+          snappedPosition.y - worldPosition.y,
+          snappedPosition.z - worldPosition.z
+        );
+      } else {
+        //  Object is not on workplane yet, just snap to workplane at current X,Z
+        snapMatrix.makeTranslation(0, -worldPosition.y, 0);
+      }
       
       // Apply the translation in world space
       if (object.parent) {
@@ -818,6 +840,29 @@ class ThreeJsControl {
     }
     
     return false;
+  }
+
+  calculateGridSnappedPosition(worldPosition) {
+    const GRID_SIZE = GRID_SMALL_CELL;
+    const SNAP_THRESHOLD = 200; // Snap when within 200 units of a grid line
+    
+    // Calculate nearest grid positions
+    const nearestGridX = Math.round(worldPosition.x / GRID_SIZE) * GRID_SIZE;
+    const nearestGridZ = Math.round(worldPosition.z / GRID_SIZE) * GRID_SIZE;
+    
+    // Check if position is close enough to grid lines to snap
+    const distanceToGridX = Math.abs(worldPosition.x - nearestGridX);
+    const distanceToGridZ = Math.abs(worldPosition.z - nearestGridZ);
+    
+    // Only snap if within threshold distance
+    const snappedX = distanceToGridX <= SNAP_THRESHOLD ? nearestGridX : worldPosition.x;
+    const snappedZ = distanceToGridZ <= SNAP_THRESHOLD ? nearestGridZ : worldPosition.z;
+    
+    return {
+      x: snappedX,
+      y: 0, // Always snap to workplane
+      z: snappedZ
+    };
   }
 
   snapObject(selectedObj) {
@@ -2335,7 +2380,7 @@ const SceneUtils = {
     const edge = size / 2;
     const gridGroup = new Group();
 
-    const smallCell = 500;
+    const smallCell = GRID_SMALL_CELL;
     const bigCell = smallCell * 10;
 
     const gridSmall = new Group();
