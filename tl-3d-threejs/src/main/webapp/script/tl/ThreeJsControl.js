@@ -74,6 +74,7 @@ class ThreeJsControl {
     this.useLOD = true;
     this.zUpRoot = new Group();
     this.multiTransformGroup = new Group();
+    this.areObjectsTransparent = false;
     this.initScene();
     this.initAxesCubeScene();
     this.initRenderer();
@@ -1248,10 +1249,20 @@ class ThreeJsControl {
       }
       this.setColor(sharedNode.node, RED);
       this.selection.push(sharedNode);
-      this.makeObjectsTransparent();
       
       command = this.sceneGraph.addSelected(sharedNode); 
     }
+    
+    // Update transparency if it's currently enabled
+    if (this.areObjectsTransparent) {
+      // If no objects are selected after this change, turn off transparency
+      if (this.selection.length === 0) {
+        this.toggleObjectsTransparent(false);
+      } else {
+        this.toggleObjectsTransparent(true);
+      }
+    }
+    
     this.updateTransformControls();
     this.updateConnectionPointsVisibility();
     
@@ -1471,27 +1482,34 @@ class ThreeJsControl {
     });
   }
 
-  makeObjectsTransparent() {
+  toggleObjectsTransparent(transparent) {
+    // If transparent parameter is provided, use it; otherwise toggle current state
+    const shouldBeTransparent = transparent !== undefined ? transparent : !this.areObjectsTransparent;
+    
+    // Always clear transparency first
     this.clearObjectsTransparency();
 
-    const selectedIds = new Set()
-    this.selection.forEach(sharedNode => {
-      if (sharedNode.node) {
-        sharedNode.node.traverse(child => {
-          selectedIds.add(child.id);
-        });
-      }
-    });
+    if (shouldBeTransparent && this.selection.length > 0) {
+      const selectedIds = new Set()
+      this.selection.forEach(sharedNode => {
+        if (sharedNode.node) {
+          sharedNode.node.traverse(child => {
+            selectedIds.add(child.id);
+          });
+        }
+      });
 
-    this.scene.traverse((object) => {
-      if (object.material && !selectedIds.has(object.id)) {
-        this.getMaterials(object).forEach((material) => {
-          // Make non-selected objects 30% transparent
-          this.setObjectTransparency(material, 0.3); 
-        });
-      }
-    });
+      this.scene.traverse((object) => {
+        if (object.material && !selectedIds.has(object.id)) {
+          this.getMaterials(object).forEach((material) => {
+            // Make non-selected objects 30% transparent
+            this.setObjectTransparency(material, 0.3); 
+          });
+        }
+      });
+    }
   
+    this.areObjectsTransparent = shouldBeTransparent;
     this.render();
   }
 
@@ -2548,11 +2566,11 @@ const SceneUtils = {
 // For sever communication written in legacy JS.
 window.services.threejs = {
   init: async function (
-    controlId, contextPath, dataUrl, isWorkplaneVisible, 
+    controlId, contextPath, dataUrl, isWorkplaneVisible, areObjectsTransparent,
     isInEditMode, isRotateMode
   ) {
     const control = new ThreeJsControl(
-      controlId, contextPath, dataUrl, isWorkplaneVisible,  
+      controlId, contextPath, dataUrl, isWorkplaneVisible, areObjectsTransparent, 
       isInEditMode, isRotateMode
     );
     control.attach();
@@ -2583,6 +2601,13 @@ window.services.threejs = {
     const control = ThreeJsControl.control(container);
     if (control != null) {
       control.toggleWorkplane(visible);
+    }
+  },
+
+  toggleObjectsTransparent: function (container, transparent) {
+    const control = ThreeJsControl.control(container);
+    if (control != null) {
+      control.toggleObjectsTransparent(transparent);
     }
   },
 

@@ -61,6 +61,8 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 
 	private boolean _isWorkplaneVisible;
 
+	private boolean _areObjectsTransparent;
+
 	private boolean _isInEditMode;
 
 	private boolean _isRotateMode;
@@ -210,6 +212,16 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 		addUpdate(new JSFunctionCall(getID(), THREEJS_JS_NS, "toggleWorkplane", visible));
 	}
 
+	public boolean getAreObjectsTransparent() {
+		return _areObjectsTransparent;
+	}
+
+	public void setAreObjectsTransparent(boolean transparent) {
+		_areObjectsTransparent = transparent;
+		
+		addUpdate(new JSFunctionCall(getID(), THREEJS_JS_NS, "toggleObjectsTransparent", transparent));
+	}
+
 	public boolean getIsInEditMode() {
 		return _isInEditMode;
 	}
@@ -332,6 +344,7 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 			context.getContextPath() + "', '" + 
 			dataUrl + "', " +
 			_isWorkplaneVisible + ", " + 
+			_areObjectsTransparent + ", " + 
 			_isInEditMode + ", " +
 			_isRotateMode +
 			")"

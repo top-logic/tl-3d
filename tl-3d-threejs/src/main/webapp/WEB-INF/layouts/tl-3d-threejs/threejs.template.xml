@@ -86,6 +86,21 @@
 					<en>Rotate</en>
 				</activeResourceKey>
 			</button>
+				<button id="toggleObjectsTransparent"
+				activeImage="css:bi bi-transparency"
+				class="com.top_logic.threed.threejs.component.ToggleObjectsTransparentCommand"
+				group="System"
+				image="css:bi bi-transparency"
+			>
+				<resourceKey key="dynamic.4171b17b-36fc-4798-bae6-244affa2b7df">
+					<en>Make objects transparent</en>
+					<de>Objekte transparent machen</de>
+				</resourceKey>
+				<activeResourceKey key="dynamic.87240c27-825a-4115-b657-59b82d0129ce">
+					<en>Make objects opaque</en>
+					<de>Objekte undurchsichtig machen</de>
+				</activeResourceKey>
+			</button>
 			<button id="objectVisibility"
 				activeImage="css:fa-regular fa-eye"
 				class="com.top_logic.threed.threejs.component.ToggleObjectVisibleCommand"

@@ -456,6 +456,14 @@ public class ThreeJsComponent extends BuilderComponent
 		getThreeJSControl().setIsWorkplaneVisible(visible);
 	}
 
+		public boolean getAreObjectsTransparent() {
+		return getThreeJSControl().getAreObjectsTransparent();
+	}
+
+	public void setAreObjectsTransparent(boolean transparent) {
+		getThreeJSControl().setAreObjectsTransparent(transparent);
+	}
+
 	public boolean getIsObjectHidden() {
 		List<SceneNode> selection = _scene.getSelection();
 		for (SceneNode node : selection) {
