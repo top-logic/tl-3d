@@ -1,34 +1,35 @@
 import {
-  Color,
-  PerspectiveCamera,
-  Matrix4,
-  Group,
-  Scene,
-  DirectionalLight,
   AmbientLight,
-  WebGLRenderer,
-  Raycaster,
-  Box3,
-  Vector3,
-  Vector2,
   AxesHelper,
-  BoxHelper,
+  Box3,
   Box3Helper,
   BoxBufferGeometry,
-  BufferGeometry,
-  Line,
-  Mesh,
-  MeshStandardMaterial,
-  MeshBasicMaterial,
-  SphereBufferGeometry,
-  EdgesGeometry,
   BoxGeometry,
+  BoxHelper,
+  BufferGeometry,
+  CanvasTexture,
+  Color,
+  DirectionalLight,
+  EdgesGeometry,
+  FrontSide,
+  Group,
+  Line,
+  LinearFilter,
   LineBasicMaterial,
   LineSegments,
-  CanvasTexture,
-  FrontSide,
   LOD,
-  LinearFilter
+  Matrix4,
+  Mesh,
+  MeshBasicMaterial,
+  MeshStandardMaterial,
+  PerspectiveCamera,
+  Raycaster,
+  RGBAFormat,
+  Scene,
+  SphereBufferGeometry,
+  Vector2,
+  Vector3,
+  WebGLRenderer,
 } from "three";
 
 import { OrbitControls } from "OrbitControls";
@@ -1247,6 +1248,7 @@ class ThreeJsControl {
       }
       this.setColor(sharedNode.node, RED);
       this.selection.push(sharedNode);
+      this.makeObjectsTransparent();
       
       command = this.sceneGraph.addSelected(sharedNode); 
     }
@@ -1356,6 +1358,7 @@ class ThreeJsControl {
       this.setColor(sharedNode.node, WHITE);
     }
     this.selection.length = 0;
+    this.clearObjectsTransparency();
 
     this.updateConnectionPointsVisibility();
 
@@ -1409,20 +1412,6 @@ class ThreeJsControl {
     services.ajax.execute("dispatchControlCommand", message);
   }
 
-  render() {
-    requestAnimationFrame(() => {
-      const { renderer, cubeRenderer, scene, camera, cubeScene, cubeCamera } = this;
-
-      // update LOD objects if enabled
-      if (this.useLOD) {
-        this.updateLODObjects();
-      }
-
-      renderer.render(scene, camera);
-        cubeRenderer.render(cubeScene, cubeCamera);
-    });
-  }
-
   updateLODObjects() {
     if (!this._throttledUpdateLOD) {
       this._throttledUpdateLOD = throttle(() => {
@@ -1436,6 +1425,88 @@ class ThreeJsControl {
       }, 100); 
     }
     this._throttledUpdateLOD();
+  }
+
+  getMaterials(object) {
+    return Array.isArray(object.material) ? object.material : [object.material];
+  }
+
+  setObjectTransparency(material, opacity) {
+    // Store original properties on first use
+    if (!material.userData.originalProperties) {
+      material.userData.originalProperties = {
+        transparent: material.transparent,
+        opacity: material.opacity,
+        depthWrite: material.depthWrite,
+        format: material.format
+      };
+    }
+    
+    if (opacity === null) {
+      // Restore original properties
+      const orig = material.userData.originalProperties;
+      material.transparent = orig.transparent;
+      material.opacity = orig.opacity;
+      material.depthWrite = orig.depthWrite;
+      material.format = orig.format;
+    } else {
+      // Apply transparency
+      material.transparent = true;
+      material.opacity = opacity;
+      material.depthWrite = false;
+      material.format = RGBAFormat;
+    }
+    material.needsUpdate = true;
+  }
+
+  clearObjectsTransparency() {
+    this.scene.traverse((object) => {
+      if (object.material) {
+        this.getMaterials(object).forEach((material) => {
+          if (material.transparent && material.opacity < 1.0) {
+            this.setObjectTransparency(material, null);
+          }
+        });
+      }
+    });
+  }
+
+  makeObjectsTransparent() {
+    this.clearObjectsTransparency();
+
+    const selectedIds = new Set()
+    this.selection.forEach(sharedNode => {
+      if (sharedNode.node) {
+        sharedNode.node.traverse(child => {
+          selectedIds.add(child.id);
+        });
+      }
+    });
+
+    this.scene.traverse((object) => {
+      if (object.material && !selectedIds.has(object.id)) {
+        this.getMaterials(object).forEach((material) => {
+          // Make non-selected objects 30% transparent
+          this.setObjectTransparency(material, 0.3); 
+        });
+      }
+    });
+  
+    this.render();
+  }
+
+  render() {
+    requestAnimationFrame(() => {
+      const { renderer, cubeRenderer, scene, camera, cubeScene, cubeCamera } = this;
+
+      // update LOD objects if enabled
+      if (this.useLOD) {
+        this.updateLODObjects();
+      }
+
+      renderer.render(scene, camera);
+        cubeRenderer.render(cubeScene, cubeCamera);
+    });
   }
 }
 
@@ -1959,7 +2030,7 @@ class GltfAsset extends SharedObject {
       });
       this.group.add(model);
     }
-    
+
     const currentColor = this.placeholder.material.color;
     ctrl.setColor(this.group, currentColor);
   }
