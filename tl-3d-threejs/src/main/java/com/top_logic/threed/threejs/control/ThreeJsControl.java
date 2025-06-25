@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 
 import com.top_logic.base.services.simpleajax.JSFunctionCall;
+import com.top_logic.basic.col.MapBuilder;
+import com.top_logic.basic.json.JSON;
 import com.top_logic.basic.util.ResKey;
 import com.top_logic.basic.xml.TagWriter;
 import com.top_logic.layout.ContentHandler;
@@ -338,17 +340,21 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 		String dataUrl =
 			getFrameScope().getURL(context, this).appendParameter("t", Long.toString(System.nanoTime())).getURL();
 
+		Map<String, Object> initialState = new MapBuilder<String, Object>()
+			.put("controlId", getID())
+			.put("contextPath", context.getContextPath())
+			.put("dataUrl", dataUrl)
+			.put("isWorkplaneVisible", _isWorkplaneVisible)
+			.put("isInEditMode", _isInEditMode)
+			.put("isRotateMode", _isRotateMode)
+			.put("areObjectsTransparent", _areObjectsTransparent)
+			.toMap();
+
+		String initialStateJson = JSON.toString(initialState);
+
 		HTMLUtil.beginScriptAfterRendering(out);
 		out.append(THREEJS_JS_NS);
-		out.append(".init('" + getID() + "', '" + 
-			context.getContextPath() + "', '" + 
-			dataUrl + "', " +
-			_isWorkplaneVisible + ", " + 
-			_areObjectsTransparent + ", " + 
-			_isInEditMode + ", " +
-			_isRotateMode +
-			")"
-		);
+		out.append(".init(" + initialStateJson + ")");
 		HTMLUtil.endScriptAfterRendering(out);
 
 		_gizmoControl.write(context, out);

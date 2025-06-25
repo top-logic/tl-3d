@@ -61,20 +61,37 @@ const OPTIMIZED_PIXEL_RATIO = Math.min(window.devicePixelRatio, 1.7);
 const INTERACTIVE_PIXEL_RATIO = Math.min(window.devicePixelRatio, 1.0);
 const GRID_SMALL_CELL = 500;
 
+/**
+ * Initial state configuration for ThreeJsControl.
+ * @typedef {Object} ThreeJsControlState
+ * @property {string} controlId - The ID of the control element.
+ * @property {string} contextPath - The context path for loading resources.
+ * @property {string} dataUrl - The URL to fetch the scene data.
+ * @property {boolean} isWorkplaneVisible - Visibility state of the workplane.
+ * @property {boolean} isInEditMode - State of the edit mode.
+ * @property {boolean} isRotateMode - State of the rotate mode.
+ * @property {boolean} areObjectsTransparent - State of selection mode: opaque/transparent.
+ */
+
 class ThreeJsControl {
-  constructor(controlId, contextPath, dataUrl, isWorkplaneVisible, isInEditMode, isRotateMode) {
+  /**
+   * Constructs a new instance of the ThreeJsControl class.
+   * @param {ThreeJsControlState} initialState - Initial state configuration.
+   */
+  constructor(initialState) {
     this.lastSelectedObject = null;
     this.prevClosestSnappingPoint = null;
-    this.controlId = controlId;
-    this.contextPath = contextPath;
-    this.dataUrl = dataUrl;
+    this.controlId = initialState.controlId;
+    this.contextPath = initialState.contextPath;
+    this.dataUrl = initialState.dataUrl;
     this.scope = new Scope();
     
     this.lastLODLevel = -1;
     this.useLOD = true;
     this.zUpRoot = new Group();
     this.multiTransformGroup = new Group();
-    this.areObjectsTransparent = false;
+    this.areObjectsTransparent = initialState.areObjectsTransparent;
+    
     this.initScene();
     this.initAxesCubeScene();
     this.initRenderer();
@@ -86,10 +103,10 @@ class ThreeJsControl {
     this.isEditMode = false;
     this.loadScene().then(() => setTimeout(() => {
       this.createBoundingBox();
-      this.toggleWorkplane(isWorkplaneVisible);
+      this.toggleWorkplane(initialState.isWorkplaneVisible);
       this.updateWorkplanePosition();
-      this.toggleEditMode(isInEditMode);
-      this.toggleRotateMode(isRotateMode);
+      this.toggleEditMode(initialState.isInEditMode);
+      this.toggleRotateMode(initialState.isRotateMode);
       this.zoomOut();
       this.updateLODObjects();
     }, 100));
@@ -978,7 +995,7 @@ class ThreeJsControl {
   }
 
   onMouseUp(event) {
-    if (this.clickButton != 1) {
+    if (this.clickButton != 0) {
       return; // Not click with middle mouse button.
     }
     if (Date.now() - this.clickStart > 500) {
@@ -1253,16 +1270,7 @@ class ThreeJsControl {
       command = this.sceneGraph.addSelected(sharedNode); 
     }
     
-    // Update transparency if it's currently enabled
-    if (this.areObjectsTransparent) {
-      // If no objects are selected after this change, turn off transparency
-      if (this.selection.length === 0) {
-        this.toggleObjectsTransparent(false);
-      } else {
-        this.toggleObjectsTransparent(true);
-      }
-    }
-    
+    this.updateObjectsTransparency();
     this.updateTransformControls();
     this.updateConnectionPointsVisibility();
     
@@ -1282,6 +1290,8 @@ class ThreeJsControl {
       this.setColor(shared3JSNode.node, RED);
       this.selection.push(shared3JSNode);
     }
+
+    this.updateObjectsTransparency();
   }
 
   setColor(node, color) {
@@ -1399,7 +1409,7 @@ class ThreeJsControl {
 
     this.sceneGraph = this.scope.loadJson(dataJson);
     this.sceneGraph.buildGraph(this);
-    this.scope.loadAssets(this);
+    this.scope.loadAssets(this).then(() => this.updateObjectsTransparency());
 
     this.camera.position.applyMatrix4(this.scene.matrix);
     this.camera.updateProjectionMatrix();
@@ -1482,14 +1492,16 @@ class ThreeJsControl {
     });
   }
 
-  toggleObjectsTransparent(transparent) {
-    // If transparent parameter is provided, use it; otherwise toggle current state
-    const shouldBeTransparent = transparent !== undefined ? transparent : !this.areObjectsTransparent;
-    
-    // Always clear transparency first
+  toggleObjectsTransparent(shouldBeTransparent) {    
+    this.areObjectsTransparent = shouldBeTransparent;
+    this.updateObjectsTransparency();
+  }
+
+  updateObjectsTransparency() {
+     // Always clear transparency first
     this.clearObjectsTransparency();
 
-    if (shouldBeTransparent && this.selection.length > 0) {
+    if (this.areObjectsTransparent && this.selection.length > 0) {
       const selectedIds = new Set()
       this.selection.forEach(sharedNode => {
         if (sharedNode.node) {
@@ -1508,8 +1520,7 @@ class ThreeJsControl {
         }
       });
     }
-  
-    this.areObjectsTransparent = shouldBeTransparent;
+
     this.render();
   }
 
@@ -1585,7 +1596,7 @@ class Scope {
     }
   }
 
-  loadAssets(ctrl) {
+  async loadAssets(ctrl) {
     const contextPath = ctrl.contextPath;
     const gltfLoader = new GLTFLoader();
     
@@ -1652,14 +1663,14 @@ class Scope {
     for (const key of assetsByURL.keys()) {
       if (index == batchSize) {
         index = 0;
-        loadURLs(urls, assetsByURL);
+        await loadURLs(urls, assetsByURL);
         urls = new Array(batchSize);
       }
       urls[index] = key;
       index++;
     }
     if (index > 0) {
-      loadURLs(urls.slice(0, index), assetsByURL);
+      await loadURLs(urls.slice(0, index), assetsByURL);
     }
   }
 }
@@ -1763,11 +1774,14 @@ class SceneGraph extends SharedObject {
     this.ctrl.zUpRoot.clear();
     this.ctrl.multiTransformGroup.clear();
     this.build(this.ctrl.zUpRoot);
-    scope.loadAssets(this.ctrl);
-    this.ctrl.applySelection(this.selection);
-    this.ctrl.updateTransformControls();
+
+    scope.loadAssets(this.ctrl).then(() => {
+      this.ctrl.applySelection(this.selection);
+      this.ctrl.updateTransformControls();
+      this.ctrl.render();
+    });
+    
     this.ctrl.toggleWorkplane(this.ctrl.isWorkplaneVisible);
-    this.ctrl.render();
   }
 }
 
@@ -2565,14 +2579,8 @@ const SceneUtils = {
 
 // For sever communication written in legacy JS.
 window.services.threejs = {
-  init: async function (
-    controlId, contextPath, dataUrl, isWorkplaneVisible, areObjectsTransparent,
-    isInEditMode, isRotateMode
-  ) {
-    const control = new ThreeJsControl(
-      controlId, contextPath, dataUrl, isWorkplaneVisible, areObjectsTransparent, 
-      isInEditMode, isRotateMode
-    );
+  init: function (initialState) {
+    const control = new ThreeJsControl(initialState);
     control.attach();
   },
 
