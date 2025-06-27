@@ -60,6 +60,8 @@ const LOD_LOW = 'low';
 const OPTIMIZED_PIXEL_RATIO = Math.min(window.devicePixelRatio, 1.7);
 const INTERACTIVE_PIXEL_RATIO = Math.min(window.devicePixelRatio, 1.0);
 const GRID_SMALL_CELL = 500;
+const SNAP_THRESHOLD = 50;
+const GRID_SNAP_THRESHOLD = 200;
 
 /**
  * Initial state configuration for ThreeJsControl.
@@ -91,6 +93,7 @@ class ThreeJsControl {
     this.zUpRoot = new Group();
     this.multiTransformGroup = new Group();
     this.areObjectsTransparent = initialState.areObjectsTransparent;
+    this.useScreenSpaceSnapping = true;
     
     this.initScene();
     this.initAxesCubeScene();
@@ -463,7 +466,7 @@ class ThreeJsControl {
                         
         this.snapObjectToWorkplane(selectedObject);
                         
-        if (selectedObject === this.multiTransformGroup || isGroup) {
+        if (selectedObject === this.multiTransformGroup) {
           this.render();
           return;
         }
@@ -484,6 +487,7 @@ class ThreeJsControl {
               }
               mesh.geometry = highResGeometry;
             }
+            this.render(); 
           }
           this.prevClosestSnappingPoint = closestSnappingPoint;
         }
@@ -720,6 +724,19 @@ class ThreeJsControl {
     this.render(); 
   }
 
+getScreenSpaceDistance(pos1, pos2) {
+  const screen1 = pos1.clone().project(this.camera);
+  const screen2 = pos2.clone().project(this.camera);
+  const canvas = this.renderer.domElement;
+  
+  const x1 = (screen1.x + 1) * canvas.width / 2;
+  const y1 = (-screen1.y + 1) * canvas.height / 2;
+  const x2 = (screen2.x + 1) * canvas.width / 2;
+  const y2 = (-screen2.y + 1) * canvas.height / 2;
+  
+  return Math.hypot(x2 - x1, y2 - y1);
+}
+
   findClosestSnappingPoint(selectedObj) {
     // Check if selectedObj has snapping points either directly or through nodeRef
     const selectedObjAsset = selectedObj?.userData?.asset || selectedObj?.userData?.nodeRef?.asset;
@@ -753,7 +770,7 @@ class ThreeJsControl {
     selectedObj.updateMatrixWorld(true);
     
     // find the closest pair of snapping points
-    let closestDistance = 1000;
+    let closestDistance = SNAP_THRESHOLD;
     let closestSnappingPoint = null;
     let closestSnappingPointObject = null;
     
@@ -770,7 +787,9 @@ class ThreeJsControl {
         const position = new Vector3();
         otherPoint.node.getWorldPosition(position);
         
-        const distance = selectedWorldPosition.distanceTo(position);
+        const distance = this.useScreenSpaceSnapping 
+          ? this.getScreenSpaceDistance(selectedWorldPosition, position)
+          : selectedWorldPosition.distanceTo(position);
         
         if (distance < closestDistance) {
           closestDistance = distance;
@@ -780,7 +799,8 @@ class ThreeJsControl {
       }
     }
     
-    return closestDistance < 1000 
+    const threshold = SNAP_THRESHOLD;
+    return closestDistance < threshold 
       ? { closestSnappingPoint, closestSnappingPointObject } 
       : { closestSnappingPoint: null, closestSnappingPointObject: null };
   }
@@ -788,7 +808,7 @@ class ThreeJsControl {
   // throttled version of findClosestSnappingPoint
   throttledFindClosestSnappingPoint = throttle((selectedObject) => {
     return this.findClosestSnappingPoint(selectedObject);
-  }, 100); 
+  }, 100);
 
   restoreSnappingPointColor(snappingPoint) {
     if (!snappingPoint) return;
@@ -862,20 +882,18 @@ class ThreeJsControl {
   }
 
   calculateGridSnappedPosition(worldPosition) {
-    const GRID_SIZE = GRID_SMALL_CELL;
-    const SNAP_THRESHOLD = 200; // Snap when within 200 units of a grid line
-    
+
     // Calculate nearest grid positions
-    const nearestGridX = Math.round(worldPosition.x / GRID_SIZE) * GRID_SIZE;
-    const nearestGridZ = Math.round(worldPosition.z / GRID_SIZE) * GRID_SIZE;
+    const nearestGridX = Math.round(worldPosition.x / GRID_SMALL_CELL) * GRID_SMALL_CELL;
+    const nearestGridZ = Math.round(worldPosition.z / GRID_SMALL_CELL) * GRID_SMALL_CELL;
     
     // Check if position is close enough to grid lines to snap
     const distanceToGridX = Math.abs(worldPosition.x - nearestGridX);
     const distanceToGridZ = Math.abs(worldPosition.z - nearestGridZ);
     
     // Only snap if within threshold distance
-    const snappedX = distanceToGridX <= SNAP_THRESHOLD ? nearestGridX : worldPosition.x;
-    const snappedZ = distanceToGridZ <= SNAP_THRESHOLD ? nearestGridZ : worldPosition.z;
+    const snappedX = distanceToGridX <= GRID_SNAP_THRESHOLD ? nearestGridX : worldPosition.x;
+    const snappedZ = distanceToGridZ <= GRID_SNAP_THRESHOLD ? nearestGridZ : worldPosition.z;
     
     return {
       x: snappedX,
@@ -995,7 +1013,7 @@ class ThreeJsControl {
   }
 
   onMouseUp(event) {
-    if (this.clickButton != 0) {
+    if (this.clickButton != 1) {
       return; // Not click with middle mouse button.
     }
     if (Date.now() - this.clickStart > 500) {
@@ -1312,7 +1330,6 @@ class ThreeJsControl {
         }
     
         if (!rootNode?.userData?.color) {
-        console.log('No userData.color found, falling back to originalColor');
           if (node.material?.userData?.originalColor) {
             node.material.color.copy(node.material.userData.originalColor);
         }
@@ -2015,7 +2032,7 @@ class GltfAsset extends SharedObject {
 
       this.placeholder = mesh;
       this.group.add(this.placeholder);
-    }    
+    }
     
     return this.group;
   }
@@ -2026,6 +2043,11 @@ class GltfAsset extends SharedObject {
   	}
   
     this.gltf = newGLTF;
+
+    // Ensure group is initialized before trying to use it
+    if (!this.group) {
+      return;
+    }
 
     this.group.remove(this.placeholder);
 
