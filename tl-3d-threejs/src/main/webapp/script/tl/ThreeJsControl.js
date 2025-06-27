@@ -1514,6 +1514,19 @@ getScreenSpaceDistance(pos1, pos2) {
     this.updateObjectsTransparency();
   }
 
+  isWorkplaneChild(object) {
+    if (!this.workplane) return false;
+    
+    let parent = object.parent;
+    while (parent) {
+      if (parent === this.workplane) {
+        return true;
+      }
+      parent = parent.parent;
+    }
+    return false;
+  }
+
   updateObjectsTransparency() {
      // Always clear transparency first
     this.clearObjectsTransparency();
@@ -1529,7 +1542,7 @@ getScreenSpaceDistance(pos1, pos2) {
       });
 
       this.scene.traverse((object) => {
-        if (object.material && !selectedIds.has(object.id)) {
+        if (object.material && !selectedIds.has(object.id) && object !== this.workplane && !this.isWorkplaneChild(object)) {
           this.getMaterials(object).forEach((material) => {
             // Make non-selected objects 30% transparent
             this.setObjectTransparency(material, 0.3); 
