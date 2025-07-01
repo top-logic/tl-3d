@@ -24,6 +24,12 @@ public class SceneGraph extends ScenePart {
 	/** @see #getCoordinateSystem() */
 	public static final String COORDINATE_SYSTEM__PROP = "coordinateSystem";
 
+	/** @see #getRotateStepSize() */
+	public static final String ROTATE_STEP_SIZE__PROP = "rotateStepSize";
+
+	/** @see #getTranslateStepSize() */
+	public static final String TRANSLATE_STEP_SIZE__PROP = "translateStepSize";
+
 	private com.top_logic.threed.threejs.scene.SceneNode _root = null;
 
 	private final java.util.List<com.top_logic.threed.threejs.scene.SceneNode> _selection = new de.haumacher.msgbuf.util.ReferenceList<com.top_logic.threed.threejs.scene.SceneNode>() {
@@ -59,6 +65,10 @@ public class SceneGraph extends ScenePart {
 			_listener.afterChanged(SceneGraph.this, COORDINATE_SYSTEM__PROP);
 		}
 	};
+
+	private int _rotateStepSize = 0;
+
+	private int _translateStepSize = 0;
 
 	/**
 	 * Creates a {@link SceneGraph} instance.
@@ -200,6 +210,50 @@ public class SceneGraph extends ScenePart {
 		_coordinateSystem.remove(value);
 	}
 
+	/**
+	 * Step size to use when an element is rotated.
+	 */
+	public final int getRotateStepSize() {
+		return _rotateStepSize;
+	}
+
+	/**
+	 * @see #getRotateStepSize()
+	 */
+	public com.top_logic.threed.threejs.scene.SceneGraph setRotateStepSize(int value) {
+		internalSetRotateStepSize(value);
+		return this;
+	}
+
+	/** Internal setter for {@link #getRotateStepSize()} without chain call utility. */
+	protected final void internalSetRotateStepSize(int value) {
+		_listener.beforeSet(this, ROTATE_STEP_SIZE__PROP, value);
+		_rotateStepSize = value;
+		_listener.afterChanged(this, ROTATE_STEP_SIZE__PROP);
+	}
+
+	/**
+	 * Step size to use when an element is translated.
+	 */
+	public final int getTranslateStepSize() {
+		return _translateStepSize;
+	}
+
+	/**
+	 * @see #getTranslateStepSize()
+	 */
+	public com.top_logic.threed.threejs.scene.SceneGraph setTranslateStepSize(int value) {
+		internalSetTranslateStepSize(value);
+		return this;
+	}
+
+	/** Internal setter for {@link #getTranslateStepSize()} without chain call utility. */
+	protected final void internalSetTranslateStepSize(int value) {
+		_listener.beforeSet(this, TRANSLATE_STEP_SIZE__PROP, value);
+		_translateStepSize = value;
+		_listener.afterChanged(this, TRANSLATE_STEP_SIZE__PROP);
+	}
+
 	@Override
 	public String jsonType() {
 		return SCENE_GRAPH__TYPE;
@@ -209,7 +263,9 @@ public class SceneGraph extends ScenePart {
 		java.util.Arrays.asList(
 			ROOT__PROP, 
 			SELECTION__PROP, 
-			COORDINATE_SYSTEM__PROP));
+			COORDINATE_SYSTEM__PROP, 
+			ROTATE_STEP_SIZE__PROP, 
+			TRANSLATE_STEP_SIZE__PROP));
 
 	private static java.util.Set<String> TRANSIENT_PROPERTIES = java.util.Collections.unmodifiableSet(new java.util.HashSet<>(
 			java.util.Arrays.asList(
@@ -231,6 +287,8 @@ public class SceneGraph extends ScenePart {
 			case ROOT__PROP: return getRoot();
 			case SELECTION__PROP: return getSelection();
 			case COORDINATE_SYSTEM__PROP: return getCoordinateSystem();
+			case ROTATE_STEP_SIZE__PROP: return getRotateStepSize();
+			case TRANSLATE_STEP_SIZE__PROP: return getTranslateStepSize();
 			default: return super.get(field);
 		}
 	}
@@ -241,6 +299,8 @@ public class SceneGraph extends ScenePart {
 			case ROOT__PROP: internalSetRoot((com.top_logic.threed.threejs.scene.SceneNode) value); break;
 			case SELECTION__PROP: internalSetSelection(de.haumacher.msgbuf.util.Conversions.asList(com.top_logic.threed.threejs.scene.SceneNode.class, value)); break;
 			case COORDINATE_SYSTEM__PROP: internalSetCoordinateSystem(de.haumacher.msgbuf.util.Conversions.asList(Double.class, value)); break;
+			case ROTATE_STEP_SIZE__PROP: internalSetRotateStepSize((int) value); break;
+			case TRANSLATE_STEP_SIZE__PROP: internalSetTranslateStepSize((int) value); break;
 			default: super.set(field, value); break;
 		}
 	}
@@ -279,6 +339,10 @@ public class SceneGraph extends ScenePart {
 			out.value(x);
 		}
 		out.endArray();
+		out.name(ROTATE_STEP_SIZE__PROP);
+		out.value(getRotateStepSize());
+		out.name(TRANSLATE_STEP_SIZE__PROP);
+		out.value(getTranslateStepSize());
 	}
 
 	@Override
@@ -306,6 +370,14 @@ public class SceneGraph extends ScenePart {
 					out.value(x);
 				}
 				out.endArray();
+				break;
+			}
+			case ROTATE_STEP_SIZE__PROP: {
+				out.value(getRotateStepSize());
+				break;
+			}
+			case TRANSLATE_STEP_SIZE__PROP: {
+				out.value(getTranslateStepSize());
 				break;
 			}
 			default: super.writeFieldValue(scope, out, field);
@@ -336,6 +408,8 @@ public class SceneGraph extends ScenePart {
 				setCoordinateSystem(newValue);
 			}
 			break;
+			case ROTATE_STEP_SIZE__PROP: setRotateStepSize(in.nextInt()); break;
+			case TRANSLATE_STEP_SIZE__PROP: setTranslateStepSize(in.nextInt()); break;
 			default: super.readField(scope, in, field);
 		}
 	}

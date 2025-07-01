@@ -91,4 +91,10 @@ message SceneGraph extends ScenePart {
 	/** Transformation defining the coordinate system of the scene. */
 	repeated double coordinateSystem;
 	
+	/** Step size to use when an element is rotated. */
+	int rotateStepSize;
+
+	/** Step size to use when an element is translated. */
+	int translateStepSize;
+	
 }

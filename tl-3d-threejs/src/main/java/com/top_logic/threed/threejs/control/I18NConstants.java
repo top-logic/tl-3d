@@ -36,6 +36,12 @@ public class I18NConstants extends I18NConstantsBase {
 	/** @en Z (°) */
 	public static ResKey ROTATE_Z_LABEL;
 
+	/** @en Step size */
+	public static ResKey TRANSLATE_STEP_SIZE_LABEL;
+
+	/** @en Step size (°) */
+	public static ResKey ROTATE_STEP_SIZE_LABEL;
+
 	/** @en Coordinate system */
 	public static ResKey COORDINATE_SYSTEMS_LABEL;
 
