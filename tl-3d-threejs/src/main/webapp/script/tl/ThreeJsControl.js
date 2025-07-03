@@ -73,8 +73,6 @@ const GRID_SNAP_THRESHOLD = 200;
  * @property {boolean} isInEditMode - State of the edit mode.
  * @property {boolean} isRotateMode - State of the rotate mode.
  * @property {boolean} areObjectsTransparent - State of selection mode: opaque/transparent.
- * @property {number} translateStepSize - Step size for translation movements.
- * @property {number} rotateStepSize - Step size for rotation movements.
  */
 
 class ThreeJsControl {
@@ -96,9 +94,6 @@ class ThreeJsControl {
     this.multiTransformGroup = new Group();
     this.areObjectsTransparent = initialState.areObjectsTransparent;
     this.useScreenSpaceSnapping = true;
-    this.translateStepSize = initialState.translateStepSize || 1.0;
-    this.rotateStepSize = initialState.rotateStepSize || 1.0;
-    
     this.initScene();
     this.initAxesCubeScene();
     this.initRenderer();
@@ -743,29 +738,6 @@ class ThreeJsControl {
     this.render(); 
   }
 
-  translate(axis, direction, stepSize) {
-    if (stepSize !== undefined) {
-      this.translateStepSize = stepSize;
-    }
-    this.selection?.forEach(obj => {
-      obj.position[axis] += this.translateStepSize * direction;
-      obj.updateMatrixWorld(true);
-    });
-    this.render();
-  }
-
-  rotate(axis, direction, stepSize) {
-    if (stepSize !== undefined) {
-      this.rotateStepSize = stepSize;
-    }
-    const rotateAmount = this.rotateStepSize * Math.PI / 180 * direction;
-    this.selection?.forEach(obj => {
-      obj.rotation[axis] += rotateAmount;
-      obj.updateMatrixWorld(true);
-    });
-    this.render();
-  }
-
 getScreenSpaceDistance(pos1, pos2) {
   const screen1 = pos1.clone().project(this.camera);
   const screen2 = pos2.clone().project(this.camera);
@@ -871,23 +843,25 @@ getScreenSpaceDistance(pos1, pos2) {
   }
 
   snapToStepSize(obj) {
+    const translateStepSize = this.sceneGraph.translateStepSize;
+    const rotateStepSize = this.sceneGraph.rotateStepSize;
     const startPos = obj.userData.dragStartPosition;
     const startRot = obj.userData.dragStartRotation;
     
-    if (startPos && this.translateStepSize > 0) {
-      const stepsX = Math.round((obj.position.x - startPos.x) / this.translateStepSize);
-      const stepsY = Math.round((obj.position.y - startPos.y) / this.translateStepSize);
-      const stepsZ = Math.round((obj.position.z - startPos.z) / this.translateStepSize);
+    if (startPos && translateStepSize > 0) {
+      const stepsX = Math.round((obj.position.x - startPos.x) / translateStepSize);
+      const stepsY = Math.round((obj.position.y - startPos.y) / translateStepSize);
+      const stepsZ = Math.round((obj.position.z - startPos.z) / translateStepSize);
       
       obj.position.set(
-        startPos.x + (stepsX * this.translateStepSize),
-        startPos.y + (stepsY * this.translateStepSize),
-        startPos.z + (stepsZ * this.translateStepSize)
+        startPos.x + (stepsX * translateStepSize),
+        startPos.y + (stepsY * translateStepSize),
+        startPos.z + (stepsZ * translateStepSize)
       );
     }
     
-    if (startRot && this.rotateStepSize > 0) {
-      const stepRad = this.rotateStepSize * Math.PI / 180;
+    if (startRot && rotateStepSize > 0) {
+      const stepRad = rotateStepSize * Math.PI / 180;
       const stepsX = Math.round((obj.rotation.x - startRot.x) / stepRad);
       const stepsY = Math.round((obj.rotation.y - startRot.y) / stepRad);
       const stepsZ = Math.round((obj.rotation.z - startRot.z) / stepRad);
@@ -1507,7 +1481,7 @@ getScreenSpaceDistance(pos1, pos2) {
     this.render();
   }
   
-    sendSceneChanges(commands) {
+  sendSceneChanges(commands) {
   	const cmds = [];
   	for (let i = 0; i < commands.length; i++) {
   		cmds.push(commands[i].extract());
@@ -1845,15 +1819,12 @@ class SceneGraph extends SharedObject {
   			this.selection = scope.loadAll(value);
   			break; 
   		case 'coordinateSystem': 
-			// console.log(`Changing coordinate system: ${value}`)
   			this.coordinateSystem = value;
   			break; 
   		case 'translateStepSize': 
-			// console.log(`Changing translate step size: ${value}`)
   			this.translateStepSize = value;
   			break; 
   		case 'rotateStepSize': 
-			// console.log(`Changing rotate step size: ${value}`)
   			this.rotateStepSize = value;
   			break; 
   	}

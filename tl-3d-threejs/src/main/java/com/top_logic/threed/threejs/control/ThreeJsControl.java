@@ -167,10 +167,7 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 
 	private SceneListener _sceneListener = new SceneListener();
 
-	private GizmoControl _gizmoControl = new GizmoControl()
-		.setStepSizes(0, 0,
-			newTranslateSize -> getModel().setTranslateStepSize(newTranslateSize),
-			newRotateSize -> getModel().setRotateStepSize(newRotateSize));
+	private GizmoControl _gizmoControl = new GizmoControl();
 
 	/**
 	 * Creates a {@link ThreeJsControl}.
@@ -254,6 +251,17 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 
 		_sceneListener.attach(_model);
 		updateGizmoControl(findGizmoNode(_model.getSelection()));
+
+		// Initialize step sizes from model with proper callbacks
+		_gizmoControl.setStepSizes(_model.getTranslateStepSize(), _model.getRotateStepSize(),
+			newTranslateSize -> {
+				getModel().setTranslateStepSize(newTranslateSize);
+				addUpdate(new JSFunctionCall(getID(), THREEJS_JS_NS, "setProperty", "translateStepSize", newTranslateSize));
+			},
+			newRotateSize -> {
+				getModel().setRotateStepSize(newRotateSize);
+				addUpdate(new JSFunctionCall(getID(), THREEJS_JS_NS, "setProperty", "rotateStepSize", newRotateSize));
+			});
 
 		getFrameScope().registerContentHandler(getID(), this);
 	}
@@ -351,8 +359,6 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 			.put("isInEditMode", _isInEditMode)
 			.put("isRotateMode", _isRotateMode)
 			.put("areObjectsTransparent", _areObjectsTransparent)
-			.put("translateStepSize", _gizmoControl.getTranslateStepSize())
-			.put("rotateStepSize", _gizmoControl.getRotateStepSize())
 			.toMap();
 
 		String initialStateJson = JSON.toString(initialState);
