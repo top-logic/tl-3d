@@ -1798,6 +1798,8 @@ class SceneGraph extends SharedObject {
     this.setProperty(scope, 'root', json.root);
     this.setProperty(scope, 'selection', json.selection);
     this.setProperty(scope, 'coordinateSystem', json.coordinateSystem);
+    this.setProperty(scope, 'translateStepSize', json.translateStepSize);
+    this.setProperty(scope, 'rotateStepSize', json.rotateStepSize);
   }
   
   removeSelected(node) {
@@ -1845,6 +1847,14 @@ class SceneGraph extends SharedObject {
   		case 'coordinateSystem': 
 			// console.log(`Changing coordinate system: ${value}`)
   			this.coordinateSystem = value;
+  			break; 
+  		case 'translateStepSize': 
+			// console.log(`Changing translate step size: ${value}`)
+  			this.translateStepSize = value;
+  			break; 
+  		case 'rotateStepSize': 
+			// console.log(`Changing rotate step size: ${value}`)
+  			this.rotateStepSize = value;
   			break; 
   	}
   }

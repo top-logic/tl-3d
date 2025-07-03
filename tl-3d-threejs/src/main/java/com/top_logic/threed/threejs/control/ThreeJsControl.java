@@ -167,7 +167,10 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 
 	private SceneListener _sceneListener = new SceneListener();
 
-	private GizmoControl _gizmoControl = new GizmoControl();
+	private GizmoControl _gizmoControl = new GizmoControl()
+		.setStepSizes(0, 0,
+			newTranslateSize -> getModel().setTranslateStepSize(newTranslateSize),
+			newRotateSize -> getModel().setRotateStepSize(newRotateSize));
 
 	/**
 	 * Creates a {@link ThreeJsControl}.
@@ -179,8 +182,8 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 	}
 
 	@Override
-	public Object getModel() {
-		return null;
+	public SceneGraph getModel() {
+		return _model;
 	}
 
 	@Override
