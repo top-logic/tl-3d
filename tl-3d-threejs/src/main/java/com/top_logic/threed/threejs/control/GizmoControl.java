@@ -62,6 +62,10 @@ public class GizmoControl extends AbstractControl {
 
 	private static final String ROTATE_Z = "rotate-z";
 
+	private static final String TRANSLATE_STEP_SIZE = "translate-step-size";
+
+	private static final String ROTATE_STEP_SIZE = "rotate-step-size";
+
 	private FormContext _formContext;
 
 	private Consumer<Transformation> _consumer = null;
@@ -206,9 +210,11 @@ public class GizmoControl extends AbstractControl {
 		ctx.addMember(newTranslateField(TRANSLATE_X, I18NConstants.TRANSLATE_X_LABEL));
 		ctx.addMember(newTranslateField(TRANSLATE_Y, I18NConstants.TRANSLATE_Y_LABEL));
 		ctx.addMember(newTranslateField(TRANSLATE_Z, I18NConstants.TRANSLATE_Z_LABEL));
+		ctx.addMember(newStepSizeField(TRANSLATE_STEP_SIZE, I18NConstants.TRANSLATE_STEP_SIZE_LABEL));
 		ctx.addMember(newRotateField(ROTATE_X, I18NConstants.ROTATE_X_LABEL));
 		ctx.addMember(newRotateField(ROTATE_Y, I18NConstants.ROTATE_Y_LABEL));
 		ctx.addMember(newRotateField(ROTATE_Z, I18NConstants.ROTATE_Z_LABEL));
+		ctx.addMember(newStepSizeField(ROTATE_STEP_SIZE, I18NConstants.ROTATE_STEP_SIZE_LABEL));
 		ctx.addMember(newCoordinateSystemsField());
 		return ctx;
 	}
@@ -404,6 +410,15 @@ public class GizmoControl extends AbstractControl {
 		return field;
 	}
 
+	private FormField newStepSizeField(String name, ResKey label) {
+		Format format = new DecimalFormat("#", DecimalFormatSymbols.getInstance(TLContext.getLocale()));
+		FormField field = FormFactory.newNumberField(name, format, 1, false);
+		field.setLabel(resources().getString(label));
+		field.initializeField(1);
+		
+		return field;
+	}
+
 	@Override
 	public Transformation getModel() {
 		return _tx;
@@ -531,6 +546,22 @@ public class GizmoControl extends AbstractControl {
 		return field(COORDINATE_SYSTEMS).getLabel();
 	}
 
+	/**
+	 * Writes the field displaying the step size.
+	 */
+	@TemplateVariable("translateStepSize")
+	public void writeTranslateStepSize(DisplayContext context, TagWriter out) throws IOException {
+		new TextInputControl(field(TRANSLATE_STEP_SIZE)).write(context, out);
+	}
+
+	/**
+	 * Writes the field displaying the step size.
+	 */
+	@TemplateVariable("rotateStepSize")
+	public void writeRotateStepSize(DisplayContext context, TagWriter out) throws IOException {
+		new TextInputControl(field(ROTATE_STEP_SIZE)).write(context, out);
+	}
+
 	private void writeTranslation(DisplayContext context, TagWriter out, String name) throws IOException {
 		new TextInputControl(field(name)).write(context, out);
 	}
@@ -541,6 +572,22 @@ public class GizmoControl extends AbstractControl {
 
 	private FormField field(String name) {
 		return _formContext.getField(name);
+	}
+
+	public int getTranslateStepSize() {
+		FormField field = field(TRANSLATE_STEP_SIZE);
+		if (field.hasValue() && field.getValue() != null) {
+			return ((Number) field.getValue()).intValue();
+		}
+		return 1;
+	}
+
+	public int getRotateStepSize() {
+		FormField field = field(ROTATE_STEP_SIZE);
+		if (field.hasValue() && field.getValue() != null) {
+			return ((Number) field.getValue()).intValue();
+		}
+		return 1; 
 	}
 
 	/**

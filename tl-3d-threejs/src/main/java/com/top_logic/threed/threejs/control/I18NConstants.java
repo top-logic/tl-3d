@@ -39,6 +39,12 @@ public class I18NConstants extends I18NConstantsBase {
 	/** @en Coordinate system */
 	public static ResKey COORDINATE_SYSTEMS_LABEL;
 
+	/** @en Step size */
+	public static ResKey TRANSLATE_STEP_SIZE_LABEL;
+
+	/** @en Step size */
+	public static ResKey ROTATE_STEP_SIZE_LABEL;
+
 	/**
 	 * @en World coordinates
 	 */

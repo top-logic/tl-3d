@@ -73,6 +73,8 @@ const GRID_SNAP_THRESHOLD = 200;
  * @property {boolean} isInEditMode - State of the edit mode.
  * @property {boolean} isRotateMode - State of the rotate mode.
  * @property {boolean} areObjectsTransparent - State of selection mode: opaque/transparent.
+ * @property {number} translateStepSize - Step size for translation movements.
+ * @property {number} rotateStepSize - Step size for rotation movements.
  */
 
 class ThreeJsControl {
@@ -94,6 +96,8 @@ class ThreeJsControl {
     this.multiTransformGroup = new Group();
     this.areObjectsTransparent = initialState.areObjectsTransparent;
     this.useScreenSpaceSnapping = true;
+    this.translateStepSize = initialState.translateStepSize || 1.0;
+    this.rotateStepSize = initialState.rotateStepSize || 1.0;
     
     this.initScene();
     this.initAxesCubeScene();
@@ -388,11 +392,19 @@ class ThreeJsControl {
 
             for (const node of outer.multiTransformGroup.children) {
               lastWorldMatrixes[node.id] = node.matrixWorld.clone();
+              // Store starting position and rotation for incremental snapping
+              node.userData.dragStartPosition = node.position.clone();
+              node.userData.dragStartRotation = node.rotation.clone();
             }
 
             return;
           }
 
+          // Apply step snapping to each object in multi-select
+          outer.multiTransformGroup.children.forEach(node => {
+            outer.snapToStepSize(node);
+          });
+          
           // Apply grid snapping to each object in multi-select if both workplane and edit mode are enabled
           if (outer.isWorkplaneVisible && outer.isEditMode && outer.snapToWorkplaneEnabled) {
             outer.multiTransformGroup.children.forEach(node => {
@@ -437,6 +449,9 @@ class ThreeJsControl {
           if (event.value) {
             lastMatrix.copy(currentMatrix);
             lastObject = object;
+            // Store starting position and rotation for incremental snapping
+            object.userData.dragStartPosition = object.position.clone();
+            object.userData.dragStartRotation = object.rotation.clone();
             return;
           }
 
@@ -463,6 +478,10 @@ class ThreeJsControl {
       if (event.target.dragging) {
         const selectedObject = event.target.object;
         const isGroup = selectedObject.children.length > 0;
+        // Apply step snapping to single objects
+        if (selectedObject !== this.multiTransformGroup) {
+          this.snapToStepSize(selectedObject);
+        }
                         
         this.snapObjectToWorkplane(selectedObject);
                         
@@ -724,6 +743,29 @@ class ThreeJsControl {
     this.render(); 
   }
 
+  translate(axis, direction, stepSize) {
+    if (stepSize !== undefined) {
+      this.translateStepSize = stepSize;
+    }
+    this.selection?.forEach(obj => {
+      obj.position[axis] += this.translateStepSize * direction;
+      obj.updateMatrixWorld(true);
+    });
+    this.render();
+  }
+
+  rotate(axis, direction, stepSize) {
+    if (stepSize !== undefined) {
+      this.rotateStepSize = stepSize;
+    }
+    const rotateAmount = this.rotateStepSize * Math.PI / 180 * direction;
+    this.selection?.forEach(obj => {
+      obj.rotation[axis] += rotateAmount;
+      obj.updateMatrixWorld(true);
+    });
+    this.render();
+  }
+
 getScreenSpaceDistance(pos1, pos2) {
   const screen1 = pos1.clone().project(this.camera);
   const screen2 = pos2.clone().project(this.camera);
@@ -825,6 +867,36 @@ getScreenSpaceDistance(pos1, pos2) {
       mesh.geometry.dispose(); 
       mesh.geometry = mesh.userData.originalGeometry;
       delete mesh.userData.originalGeometry;
+    }
+  }
+
+  snapToStepSize(obj) {
+    const startPos = obj.userData.dragStartPosition;
+    const startRot = obj.userData.dragStartRotation;
+    
+    if (startPos && this.translateStepSize > 0) {
+      const stepsX = Math.round((obj.position.x - startPos.x) / this.translateStepSize);
+      const stepsY = Math.round((obj.position.y - startPos.y) / this.translateStepSize);
+      const stepsZ = Math.round((obj.position.z - startPos.z) / this.translateStepSize);
+      
+      obj.position.set(
+        startPos.x + (stepsX * this.translateStepSize),
+        startPos.y + (stepsY * this.translateStepSize),
+        startPos.z + (stepsZ * this.translateStepSize)
+      );
+    }
+    
+    if (startRot && this.rotateStepSize > 0) {
+      const stepRad = this.rotateStepSize * Math.PI / 180;
+      const stepsX = Math.round((obj.rotation.x - startRot.x) / stepRad);
+      const stepsY = Math.round((obj.rotation.y - startRot.y) / stepRad);
+      const stepsZ = Math.round((obj.rotation.z - startRot.z) / stepRad);
+      
+      obj.rotation.set(
+        startRot.x + (stepsX * stepRad),
+        startRot.y + (stepsY * stepRad),
+        startRot.z + (stepsZ * stepRad)
+      );
     }
   }
 
@@ -1013,7 +1085,7 @@ getScreenSpaceDistance(pos1, pos2) {
   }
 
   onMouseUp(event) {
-    if (this.clickButton != 1) {
+    if (this.clickButton != 0) {
       return; // Not click with middle mouse button.
     }
     if (Date.now() - this.clickStart > 500) {
@@ -2666,5 +2738,13 @@ window.services.threejs = {
     if (control != null) {
       control.toggleRotateMode(value);
     }
+  },
+
+  translate: function (container, axis, direction, stepSize) {
+    ThreeJsControl.control(container)?.translate(axis, direction, stepSize);
+  },
+
+  rotate: function (container, axis, direction, stepSize) {
+    ThreeJsControl.control(container)?.rotate(axis, direction, stepSize);
   }
 };

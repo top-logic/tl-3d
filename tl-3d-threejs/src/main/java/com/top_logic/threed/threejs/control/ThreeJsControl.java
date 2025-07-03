@@ -348,6 +348,8 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 			.put("isInEditMode", _isInEditMode)
 			.put("isRotateMode", _isRotateMode)
 			.put("areObjectsTransparent", _areObjectsTransparent)
+			.put("translateStepSize", _gizmoControl.getTranslateStepSize())
+			.put("rotateStepSize", _gizmoControl.getRotateStepSize())
 			.toMap();
 
 		String initialStateJson = JSON.toString(initialState);
