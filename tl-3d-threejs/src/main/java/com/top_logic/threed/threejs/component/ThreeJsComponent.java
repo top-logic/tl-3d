@@ -567,7 +567,7 @@ public class ThreeJsComponent extends BuilderComponent
 	}
 	
 	@Override
-	protected Map<String, ChannelSPI> channels() {
+	protected Map<String, ChannelSPI> programmaticChannels() {
 		return CHANNELS;
 	}
 
