@@ -32,11 +32,13 @@ import com.top_logic.basic.config.annotation.TagName;
 import com.top_logic.basic.config.annotation.defaults.BooleanDefault;
 import com.top_logic.basic.config.annotation.defaults.ClassDefault;
 import com.top_logic.basic.config.annotation.defaults.ItemDefault;
+import com.top_logic.event.infoservice.InfoService;
 import com.top_logic.knowledge.service.Transaction;
 import com.top_logic.layout.DisplayContext;
 import com.top_logic.layout.channel.ChannelSPI;
 import com.top_logic.layout.channel.ComponentChannel;
 import com.top_logic.layout.channel.ComponentChannel.ChannelListener;
+import com.top_logic.layout.channel.DefaultChannelSPI;
 import com.top_logic.layout.component.Selectable;
 import com.top_logic.layout.component.SelectableWithSelectionModel;
 import com.top_logic.layout.component.model.SelectionListener;
@@ -74,7 +76,7 @@ import de.haumacher.msgbuf.observer.Observable;
  * 3D-Viewer using the <code>Three.js</code> library.
  */
 public class ThreeJsComponent extends BuilderComponent
-		implements ChannelListener, SelectionListener, SelectableWithSelectionModel, Editor {
+		implements SelectionListener, SelectableWithSelectionModel, Editor {
 
 	/**
 	 * Configuration options of {@link ThreeJsComponent} that can be choosen "in app".
@@ -184,10 +186,15 @@ public class ThreeJsComponent extends BuilderComponent
 	}
 
 	/**
+	 * Channel definition storing paths of hidden elements.
+	 */
+	public static final ChannelSPI HIDDEN_ELEMENTS = new DefaultChannelSPI("hiddenElements", Collections.emptySet());
+
+	/**
 	 * @see #channels()
 	 */
 	protected static final Map<String, ChannelSPI> CHANNELS =
-		channels(Selectable.MODEL_AND_SELECTION_CHANNEL, EditMode.EDIT_MODE_SPI);
+		channels(Selectable.MODEL_AND_SELECTION_CHANNEL, EditMode.EDIT_MODE_SPI, HIDDEN_ELEMENTS);
 
 	private final SceneGraph _scene;
 
@@ -563,7 +570,8 @@ public class ThreeJsComponent extends BuilderComponent
 
 		linkSelectionChannel(log);
 
-		selectionChannel().addListener(this);
+		selectionChannel().addListener(this::handleNewSelectionChannelValue);
+		getChannel(HIDDEN_ELEMENTS.getName()).addListener(this::handleNewHiddenElementsChannelValue);
 	}
 	
 	@Override
@@ -634,8 +642,17 @@ public class ThreeJsComponent extends BuilderComponent
 
 	}
 
-	@Override
-	public void handleNewValue(ComponentChannel sender, Object oldValue, Object newValue) {
+	/**
+	 * Implementation of {@link ChannelListener} for the {@link #selectionChannel()}.
+	 *
+	 * @param sender
+	 *        See {@link ChannelListener#handleNewValue(ComponentChannel, Object, Object)}.
+	 * @param oldValue
+	 *        See {@link ChannelListener#handleNewValue(ComponentChannel, Object, Object)}.
+	 * @param newValue
+	 *        See {@link ChannelListener#handleNewValue(ComponentChannel, Object, Object)}.
+	 */
+	private void handleNewSelectionChannelValue(ComponentChannel sender, Object oldValue, Object newValue) {
 		// Component received a new selection.
 		internalSetSelection(newValue);
 	}
@@ -702,6 +719,51 @@ public class ThreeJsComponent extends BuilderComponent
 		}
 	}
 	
+	/**
+	 * Implementation of {@link ChannelListener} for the {@link #selectionChannel()}.
+	 *
+	 * @param sender
+	 *        See {@link ChannelListener#handleNewValue(ComponentChannel, Object, Object)}.
+	 * @param oldValue
+	 *        See {@link ChannelListener#handleNewValue(ComponentChannel, Object, Object)}.
+	 * @param newValue
+	 *        See {@link ChannelListener#handleNewValue(ComponentChannel, Object, Object)}.
+	 */
+	private void handleNewHiddenElementsChannelValue(ComponentChannel sender, Object oldValue, Object newValue) {
+		Set<?> oldChannelSetValue = CollectionUtil.asSet(oldValue);
+		Set<?> newChannelSetValue = CollectionUtil.asSet(newValue);
+		for (Object formerHidden : oldChannelSetValue) {
+			if (!newChannelSetValue.contains(formerHidden)) {
+				setHiddenForNodeOfPath(formerHidden, false);
+			}
+		}
+		for (Object formerVisible : newChannelSetValue) {
+			if (!oldChannelSetValue.contains(formerVisible)) {
+				setHiddenForNodeOfPath(formerVisible, true);
+			}
+		}
+	}
+
+	private void setHiddenForNodeOfPath(Object boPath, boolean newHidden) {
+		SceneNode node;
+		if (boPath instanceof Collection<?>) {
+			Collection<?> path = (Collection<?>) boPath;
+			if (path.isEmpty()) {
+				node = null;
+			} else {
+				Object lastBO = CollectionUtil.getLast(path);
+				node = _nodeByModel.get(lastBO);
+			}
+		} else {
+			node = null;
+		}
+		if (node != null) {
+			node.setHidden(newHidden);
+		} else {
+			InfoService.showError(I18NConstants.ERROR_NOT_VALID_HIDDEN_CHANNEL_VALUE__VALUE.fill(boPath));
+		}
+	}
+
 	private List<CoordinateSystemProvider> getGlobalCoordinateSystems(Collection<?> selectedObjects) {
 		if (_coordinateSystemsFunction == null) {
 			return Collections.emptyList();

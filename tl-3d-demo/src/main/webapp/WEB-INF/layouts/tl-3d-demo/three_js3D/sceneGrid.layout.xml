@@ -2,11 +2,10 @@
 
 <config:template-call
 	xmlns:config="http://www.top-logic.com/ns/config/6.0"
-	final="true"
 	template="com.top_logic.element/treegrid.template.xml"
 >
 	<arguments
-		defaultColumns="name,tx,asset"
+		defaultColumns="ID_fbb3957d_fdb2_4e6e_b40c_bc93d6777c06,name,tx,asset"
 		defaultSelection="false"
 		expandSelected="false"
 		model="selection(tl-3d-demo/three_js3D/projektSelector.layout.xml#Selector)"
@@ -22,10 +21,24 @@
 			parents="node->$node.referers(`tl.element:StructuredElementContainer#children`)"
 			rootNode="scene -> $scene.get(`tl.threed.demo:Scene#rootNode`)"
 		/>
+		<configurationProviders>
+			<tree-select-column
+				channel="hiddenElements(tl-3d-demo/three_js3D/3D_Viewer3DView.layout.xml#3DView)"
+				columnId="ID_fbb3957d_fdb2_4e6e_b40c_bc93d6777c06"
+				store-unselected-elements="true"
+			>
+				<columnLabel key="dynamic.988b6ba6-77d7-4262-8a92-83010cb3ba0a">
+					<en>Visibility</en>
+					<de>Sichtbarkeit</de>
+				</columnLabel>
+			</tree-select-column>
+		</configurationProviders>
 		<buttons>
 			<button id="exportExcelGrid"
 				class="com.top_logic.layout.table.export.StreamingExcelExportHandler"
-			/>
+			>
+				<downloadNameProvider class="com.top_logic.layout.table.export.ComponentDownloadName"/>
+			</button>
 			<button id="createNewRow"
 				class="com.top_logic.model.search.providers.GridCreateHandlerByExpression"
 				createContext="model -> $model"
@@ -89,7 +102,9 @@
 			<button id="ID_38e16012_e1b7_44e3_8776_eccfd8bbf060"
 				class="com.top_logic.layout.component.GenericDeleteCommandHandler"
 				target="selection(self())"
-			/>
+			>
+				<confirmation class="com.top_logic.tool.boundsec.confirm.DefaultDeleteConfirmation"/>
+			</button>
 		</buttons>
 	</arguments>
 </config:template-call>

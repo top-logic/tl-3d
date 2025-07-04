@@ -37,6 +37,14 @@ public class I18NConstants extends I18NConstantsBase {
 	 */
 	public static ResKey1 ERROR_NOT_A_RES_KEY__VALUE;
 
+	/**
+	 * @en The value {0} is not a valid value for the "hiddenElements" channel of a 3D viewer. It is
+	 *     expected that the values are paths of the business objects with the root as first element
+	 *     and the hidden element as last element. It was not possible to find a node for the last
+	 *     element in the specified value.
+	 */
+	public static ResKey1 ERROR_NOT_VALID_HIDDEN_CHANNEL_VALUE__VALUE;
+
 	static {
 		initConstants(I18NConstants.class);
 	}
