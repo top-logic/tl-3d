@@ -471,24 +471,6 @@ public class ThreeJsComponent extends BuilderComponent
 		getThreeJSControl().setAreObjectsTransparent(transparent);
 	}
 
-	public boolean getIsObjectHidden() {
-		List<SceneNode> selection = _scene.getSelection();
-		for (SceneNode node : selection) {
-			if (node.isHidden()) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	public void toggleObjectVisibility(boolean hidden) { 
-		List<SceneNode> selection = _scene.getSelection();
-		for (SceneNode node : selection) {
-			node.setHidden(hidden);
-		}
-	}
-
 	public boolean getIsInEditMode() {
 		return getThreeJSControl().getIsInEditMode();
 	}

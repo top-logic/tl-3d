@@ -101,21 +101,6 @@
 					<de>Objekte undurchsichtig machen</de>
 				</activeResourceKey>
 			</button>
-			<button id="objectVisibility"
-				activeImage="css:fa-regular fa-eye"
-				class="com.top_logic.threed.threejs.component.ToggleObjectVisibleCommand"
-				group="System"
-				image="css:fa-regular fa-eye-slash"
-			>
-				<resourceKey key="dynamic.15d28470-7816-4f0a-bbfc-af385dca41ad">
-					<de>Objekt ausblenden</de>
-					<en>Hide object</en>
-				</resourceKey>
-				<activeResourceKey key="dynamic.15d28470-7816-4f0a-bbfc-af385dca41ad">
-					<de>Objekt anzeigen</de>
-					<en>Show object</en>
-				</activeResourceKey>
-			</button>
 			<button id="addWorkplane"
 				activeImage="css:bi bi-grid-3x3 tl-danger"
 				class="com.top_logic.threed.threejs.component.ToggleWorkplaneCommand"
