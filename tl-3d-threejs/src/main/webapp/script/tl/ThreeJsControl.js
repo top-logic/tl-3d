@@ -763,6 +763,8 @@ getScreenSpaceDistance(pos1, pos2) {
   
     // find all other objects in the scene that have snapping points
     const snappableObjects = [];
+    // const snappableObjectsPoints = [];
+
     this.zUpRoot.traverse((node) => {
       // Check for snapping points either directly or through nodeRef
       const nodeAsset = node?.userData?.asset || node?.userData?.nodeRef?.asset;
@@ -774,6 +776,7 @@ getScreenSpaceDistance(pos1, pos2) {
         nodeAsset.snappingPoints.length > 0
       ) {
         snappableObjects.push(node);
+        // snappableObjectsPoints.push(node.matrixWorld.clone());
       }
     });
     
@@ -805,7 +808,12 @@ getScreenSpaceDistance(pos1, pos2) {
           ? this.getScreenSpaceDistance(selectedWorldPosition, position)
           : selectedWorldPosition.distanceTo(position);
         
-        if (distance < closestDistance) {
+        if (distance < closestDistance) {   
+          
+          if (this.isConnectionPointOccupied(otherPoint, selectedObj)) {
+            continue;
+          }
+
           closestDistance = distance;
           closestSnappingPoint = otherPoint;
           closestSnappingPointObject = otherObject;
@@ -946,6 +954,56 @@ getScreenSpaceDistance(pos1, pos2) {
       y: 0, // Always snap to workplane
       z: snappedZ
     };
+  }
+
+  isConnectionPointOccupied(connectionPoint, excludeObject = null) {
+    // Get world position of connection point
+    const position = new Vector3();
+    connectionPoint.node.getWorldPosition(position);
+    const checkRadius = 50;
+    
+    // Find all objects near this connection point
+    const nearbyObjects = [];
+    let totalObjectsChecked = 0;
+    let objectsWithAssets = 0;
+    
+    this.zUpRoot.traverse((node) => {
+      totalObjectsChecked++;
+      
+      // Skip the object being moved
+      if (node === excludeObject) {
+        return;
+      }
+      
+      // Check if has asset
+      if (node.userData?.asset) {
+        objectsWithAssets++;
+      } else if (node.userData?.nodeRef?.asset) {
+        objectsWithAssets++;
+      }
+      
+      // Skip spheres and other non-snappable objects
+      if (node.userData?.isSphere || 
+          node.userData?.isGrid || 
+          node.userData?.isHelper ||
+          (!node.userData?.asset && !node.userData?.nodeRef?.asset)) {
+        return;
+      }
+      
+      // Check if this object is close to the connection point
+      const nodePosition = new Vector3();
+      node.getWorldPosition(nodePosition);
+      
+      // Use 3D distance for proximity check
+      const distance = position.distanceTo(nodePosition);
+      
+      if (distance < checkRadius) {
+        nearbyObjects.push(node);
+      }
+    });
+    
+    const isOccupied = nearbyObjects.length > 0;
+    return isOccupied;
   }
 
   snapObject(selectedObj) {
