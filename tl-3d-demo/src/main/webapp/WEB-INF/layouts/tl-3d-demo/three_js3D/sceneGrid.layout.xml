@@ -25,7 +25,7 @@
 			<tree-select-column
 				channel="hiddenElements(tl-3d-demo/three_js3D/3D_Viewer3DView.layout.xml#3DView)"
 				columnId="ID_fbb3957d_fdb2_4e6e_b40c_bc93d6777c06"
-				store-unselected-elements="true"
+				invert-selection="true"
 			>
 				<columnLabel key="dynamic.988b6ba6-77d7-4262-8a92-83010cb3ba0a">
 					<en>Visibility</en>
