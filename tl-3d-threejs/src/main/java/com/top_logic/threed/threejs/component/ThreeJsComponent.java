@@ -98,6 +98,12 @@ public class ThreeJsComponent extends BuilderComponent
 		/**
 		 * The operation that takes the changes from the client and applies them to the business
 		 * objects.
+		 * 
+		 * <p>
+		 * The script is called for each transformed object. It is called with tree arguments. The
+		 * first argument is the business object of the transformed node, the second argument is the
+		 * new transformation matrix and the third argument is the model of the component.
+		 * </p>
 		 */
 		@Label("Store operation")
 		Expr getApplyScript();
