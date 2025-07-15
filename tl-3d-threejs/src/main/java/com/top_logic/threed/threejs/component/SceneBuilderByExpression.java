@@ -333,13 +333,7 @@ public class SceneBuilderByExpression extends AbstractSceneBuilder
 
 	@Override
 	public SceneNode createNode(Object businessModel, LayoutComponent component) {
-		SceneNode node = (SceneNode) _createNode.execute(businessModel, component.getModel());
-
-		if (node != null) {
-			node.setUserData(businessModel);
-		}
-
-		return node;
+		return (SceneNode) _createNode.execute(businessModel, component.getModel());
 	}
 
 	@Override
