@@ -218,12 +218,26 @@ public class ThreeJsComponent extends BuilderComponent
 		public void registerRecursive(SceneNode node) {
 			super.registerRecursive(node);
 			node.registerListener(_transformListener);
+			node.registerListener(_userDataListener);
 		}
 
 		@Override
 		public void unregisterRecursive(SceneNode node) {
+			node.unregisterListener(_userDataListener);
 			node.unregisterListener(_transformListener);
 			super.unregisterRecursive(node);
+		}
+
+	};
+
+	private final Listener _userDataListener = new Listener() {
+
+		@Override
+		public void beforeSet(Observable obj, String property, Object value) {
+			switch (property) {
+				case SceneNode.USER_DATA__PROP:
+					obj.set(SceneNode.SELECTABLE__PROP, value != null);
+			}
 		}
 
 	};
@@ -274,6 +288,7 @@ public class ThreeJsComponent extends BuilderComponent
 						"Multiple nodes for the same user data '" + userData + "': " + clash + " vs. " + self);
 				}
 			}
+			self.setSelectable(userData != null);
 			if (parent != null) {
 				GroupNode clash = _parentNodes.put(self, parent);
 				if (clash != null && clash != parent) {

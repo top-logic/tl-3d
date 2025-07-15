@@ -106,6 +106,12 @@ public class GroupNode extends SceneNode {
 	}
 
 	@Override
+	public com.top_logic.threed.threejs.scene.GroupNode setSelectable(boolean value) {
+		internalSetSelectable(value);
+		return this;
+	}
+
+	@Override
 	public com.top_logic.threed.threejs.scene.GroupNode setTransform(java.util.List<? extends Double> value) {
 		internalSetTransform(value);
 		return this;

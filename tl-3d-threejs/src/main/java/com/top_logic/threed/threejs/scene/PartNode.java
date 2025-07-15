@@ -70,6 +70,12 @@ public class PartNode extends SceneNode {
 	}
 
 	@Override
+	public com.top_logic.threed.threejs.scene.PartNode setSelectable(boolean value) {
+		internalSetSelectable(value);
+		return this;
+	}
+
+	@Override
 	public com.top_logic.threed.threejs.scene.PartNode setTransform(java.util.List<? extends Double> value) {
 		internalSetTransform(value);
 		return this;

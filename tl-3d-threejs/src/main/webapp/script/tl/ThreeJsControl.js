@@ -1713,15 +1713,15 @@ getScreenSpaceDistance(pos1, pos2) {
     for (let i = 0; i < intersects.length; i++) {
       const clicked = intersects[i].object;
 
-      this.candidate = clicked;
-      while (this.candidate != null) {
-        const data = this.candidate.userData;
+      let candidate = clicked;
+      while (candidate != null) {
+        const data = candidate.userData;
         const sharedNode = data?.nodeRef;
-        if (sharedNode instanceof SharedObject) {
-          this.value = toggleMode
+        if (sharedNode instanceof SharedObject && sharedNode.selectable) {
+          const doSelect = toggleMode
             ? !this.selection.includes(sharedNode)
             : true;
-          const setCmd = this.setSelected(sharedNode, this.value);
+          const setCmd = this.setSelected(sharedNode, doSelect);
 	      if (setCmd != null) {
             changes.push(setCmd);
           }
@@ -1734,7 +1734,7 @@ getScreenSpaceDistance(pos1, pos2) {
           return;
         }
 
-        this.candidate = this.candidate.parent;
+        candidate = candidate.parent;
       }
     }
 
@@ -2292,6 +2292,7 @@ class GroupNode extends SharedObject {
     this.setProperty(scope, 'contents', json.contents);
     this.setProperty(scope, 'transform', json.transform);
     this.setProperty(scope, 'hidden', json.hidden);
+    this.setProperty(scope, 'selectable', json.selectable);
     this.setProperty(scope, 'color', json.color);
   }
 
@@ -2308,6 +2309,7 @@ class GroupNode extends SharedObject {
   		case 'transform': this.transform = value; break;
    		case 'color': this.color = value; break;
    		case 'hidden': this.hidden = value; break;
+   		case 'selectable': this.selectable = value; break;
    }
   }
 
@@ -2371,20 +2373,22 @@ class PartNode extends SharedObject {
     this.setProperty(scope, 'asset', json.asset);
     this.setProperty(scope, 'transform', json.transform);
     this.setProperty(scope, 'hidden', json.hidden);
+    this.setProperty(scope, 'selectable', json.selectable);
     this.setProperty(scope, 'color', json.color);
   }
 
   setProperty(scope, property, value) {
     switch (property) {
-  		case 'asset': this.asset = scope.loadJson(value); break; 
-   		case 'transform': this.transform = value; break;
-   		case 'color': this.color = value; break;
-   		case 'hidden': {
+      case 'asset': this.asset = scope.loadJson(value); break; 
+      case 'transform': this.transform = value; break;
+      case 'color': this.color = value; break;
+      case 'hidden': {
         if (value) {
           console.log(`Hiding part '${this.id}'`);
         }
         this.hidden = value; break;
       } 
+      case 'selectable': this.selectable = value; break;
     }
   }
 

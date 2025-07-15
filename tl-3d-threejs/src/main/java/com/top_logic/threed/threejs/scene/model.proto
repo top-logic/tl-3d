@@ -56,6 +56,10 @@ abstract message SceneNode extends ScenePart {
 	/** Reference to a custom object that is represented by this scene node. */
 	transient java.lang.Object userData;
 	
+	/** Whether this node can be selected on client side. If this node is not selectable, the first selectable 
+	 * node in the parent hierarchy is selected instead. */
+	boolean selectable;
+	
 	/** Transformation where this scene node lies. */
 	repeated double transform;
 	

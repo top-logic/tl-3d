@@ -19,6 +19,9 @@ public abstract class SceneNode extends ScenePart {
 	/** @see #getUserData() */
 	public static final String USER_DATA__PROP = "userData";
 
+	/** @see #isSelectable() */
+	public static final String SELECTABLE__PROP = "selectable";
+
 	/** @see #getTransform() */
 	public static final String TRANSFORM__PROP = "transform";
 
@@ -29,6 +32,8 @@ public abstract class SceneNode extends ScenePart {
 	public static final String COLOR__PROP = "color";
 
 	private transient java.lang.Object _userData = null;
+
+	private boolean _selectable = false;
 
 	private final java.util.List<Double> _transform = new de.haumacher.msgbuf.util.ReferenceList<Double>() {
 		@Override
@@ -85,6 +90,29 @@ public abstract class SceneNode extends ScenePart {
 	 */
 	public final boolean hasUserData() {
 		return _userData != null;
+	}
+
+	/**
+	 * Whether this node can be selected on client side. If this node is not selectable, the first selectable 
+	 * node in the parent hierarchy is selected instead.
+	 */
+	public final boolean isSelectable() {
+		return _selectable;
+	}
+
+	/**
+	 * @see #isSelectable()
+	 */
+	public com.top_logic.threed.threejs.scene.SceneNode setSelectable(boolean value) {
+		internalSetSelectable(value);
+		return this;
+	}
+
+	/** Internal setter for {@link #isSelectable()} without chain call utility. */
+	protected final void internalSetSelectable(boolean value) {
+		_listener.beforeSet(this, SELECTABLE__PROP, value);
+		_selectable = value;
+		_listener.afterChanged(this, SELECTABLE__PROP);
 	}
 
 	/**
@@ -175,6 +203,7 @@ public abstract class SceneNode extends ScenePart {
 	private static java.util.List<String> PROPERTIES = java.util.Collections.unmodifiableList(
 		java.util.Arrays.asList(
 			USER_DATA__PROP, 
+			SELECTABLE__PROP, 
 			TRANSFORM__PROP, 
 			HIDDEN__PROP, 
 			COLOR__PROP));
@@ -197,6 +226,7 @@ public abstract class SceneNode extends ScenePart {
 	public Object get(String field) {
 		switch (field) {
 			case USER_DATA__PROP: return getUserData();
+			case SELECTABLE__PROP: return isSelectable();
 			case TRANSFORM__PROP: return getTransform();
 			case HIDDEN__PROP: return isHidden();
 			case COLOR__PROP: return getColor();
@@ -208,6 +238,7 @@ public abstract class SceneNode extends ScenePart {
 	public void set(String field, Object value) {
 		switch (field) {
 			case USER_DATA__PROP: internalSetUserData((java.lang.Object) value); break;
+			case SELECTABLE__PROP: internalSetSelectable((boolean) value); break;
 			case TRANSFORM__PROP: internalSetTransform(de.haumacher.msgbuf.util.Conversions.asList(Double.class, value)); break;
 			case HIDDEN__PROP: internalSetHidden((boolean) value); break;
 			case COLOR__PROP: internalSetColor((String) value); break;
@@ -239,6 +270,8 @@ public abstract class SceneNode extends ScenePart {
 	@Override
 	protected void writeFields(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonWriter out) throws java.io.IOException {
 		super.writeFields(scope, out);
+		out.name(SELECTABLE__PROP);
+		out.value(isSelectable());
 		out.name(TRANSFORM__PROP);
 		out.beginArray();
 		for (double x : getTransform()) {
@@ -259,6 +292,10 @@ public abstract class SceneNode extends ScenePart {
 				} else {
 					out.nullValue();
 				}
+				break;
+			}
+			case SELECTABLE__PROP: {
+				out.value(isSelectable());
 				break;
 			}
 			case TRANSFORM__PROP: {
@@ -284,6 +321,7 @@ public abstract class SceneNode extends ScenePart {
 	@Override
 	public void readField(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in, String field) throws java.io.IOException {
 		switch (field) {
+			case SELECTABLE__PROP: setSelectable(in.nextBoolean()); break;
 			case TRANSFORM__PROP: {
 				java.util.List<Double> newValue = new java.util.ArrayList<>();
 				in.beginArray();
