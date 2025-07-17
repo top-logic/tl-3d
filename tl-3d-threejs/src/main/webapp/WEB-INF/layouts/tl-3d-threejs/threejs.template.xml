@@ -86,7 +86,21 @@
 					<en>Rotate</en>
 				</activeResourceKey>
 			</button>
-				<button id="toggleObjectsTransparent"
+			<button id="addSkybox"
+				activeImage="css:fa-solid fa-cube"
+				class="com.top_logic.threed.threejs.component.ToggleSkyboxCommand"
+				image="css:fa-solid fa-cube"
+			>
+				<resourceKey key="dynamic.810af728-de7c-4df8-a8b8-5b655fc4d864">
+					<en>Show Skybox</en>
+					<de>Skybox einblenden</de>
+				</resourceKey>
+				<activeResourceKey key="dynamic.70698648-740b-4ad8-9013-8a60c8fd1835">
+					<en>Hide Skybox</en>
+					<de>Skybox ausblenden</de>
+				</activeResourceKey>
+			</button>
+			<button id="toggleObjectsTransparent"
 				activeImage="css:bi bi-transparency"
 				class="com.top_logic.threed.threejs.component.ToggleObjectsTransparentCommand"
 				group="System"

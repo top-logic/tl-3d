@@ -63,6 +63,8 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 
 	private boolean _isWorkplaneVisible;
 
+	private boolean _isSkyboxVisible;
+
 	private boolean _areObjectsTransparent;
 
 	private boolean _isInEditMode;
@@ -202,6 +204,16 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 
 	public void zoomOutFromSelection() {
     	addUpdate(new JSFunctionCall(getID(), THREEJS_JS_NS, "zoomOutFromSelection"));
+	}
+
+	public boolean getIsSkyboxVisible() {
+		return _isSkyboxVisible;
+	}
+
+	public void setIsSkyboxVisible(boolean visible) {
+		_isSkyboxVisible = visible;
+		
+		addUpdate(new JSFunctionCall(getID(), THREEJS_JS_NS, "toggleSkybox", visible));
 	}
 
 	public boolean getIsWorkplaneVisible() {
@@ -356,6 +368,7 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 			.put("contextPath", context.getContextPath())
 			.put("dataUrl", dataUrl)
 			.put("isWorkplaneVisible", _isWorkplaneVisible)
+			.put("isSkyboxVisible", _isSkyboxVisible)
 			.put("isInEditMode", _isInEditMode)
 			.put("isRotateMode", _isRotateMode)
 			.put("areObjectsTransparent", _areObjectsTransparent)

@@ -9,10 +9,13 @@ import {
   BufferGeometry,
   CanvasTexture,
   Color,
+  CubeTexture,
   DirectionalLight,
+  DoubleSide,
   EdgesGeometry,
   FrontSide,
   Group,
+  ImageLoader,
   Line,
   LinearFilter,
   LineBasicMaterial,
@@ -24,6 +27,7 @@ import {
   MeshStandardMaterial,
   PerspectiveCamera,
   Raycaster,
+  RepeatWrapping,
   RGBAFormat,
   Scene,
   SphereBufferGeometry,
@@ -70,6 +74,7 @@ const GRID_SNAP_THRESHOLD = 200;
  * @property {string} contextPath - The context path for loading resources.
  * @property {string} dataUrl - The URL to fetch the scene data.
  * @property {boolean} isWorkplaneVisible - Visibility state of the workplane.
+ * @property {boolean} isSkyboxVisible - Visibility state of the Skybox.
  * @property {boolean} isInEditMode - State of the edit mode.
  * @property {boolean} isRotateMode - State of the rotate mode.
  * @property {boolean} areObjectsTransparent - State of selection mode: opaque/transparent.
@@ -91,9 +96,13 @@ class ThreeJsControl {
     this.lastLODLevel = -1;
     this.useLOD = true;
     this.zUpRoot = new Group();
+    this.zUpEnvironment = new Group();
     this.multiTransformGroup = new Group();
     this.areObjectsTransparent = initialState.areObjectsTransparent;
     this.useScreenSpaceSnapping = true;
+    
+    this.skyboxEnabled = initialState.skyboxEnabled !== false;
+    this.skyboxTextures = initialState.skyboxTextures || null;
     this.initScene();
     this.initAxesCubeScene();
     this.initRenderer();
@@ -111,6 +120,10 @@ class ThreeJsControl {
       this.toggleRotateMode(initialState.isRotateMode);
       this.zoomOut();
       this.updateLODObjects();
+
+      this.initSkybox().then(() => this.toggleSkybox(initialState.isSkyboxVisible));
+
+      // Recreate floors after scene is loaded - moved to loadScene()
     }, 100));
   }
 
@@ -127,7 +140,9 @@ class ThreeJsControl {
     this.addAxesHelper(this.scene);
 
     this.zUpRoot.rotation.x = -_90_DEGREE;
+    this.zUpEnvironment.rotation.x = -_90_DEGREE;
     this.scene.add(this.zUpRoot);
+    this.scene.add(this.zUpEnvironment);
     this.multiTransformGroup.rotation.x = -_90_DEGREE;
     this.scene.add(this.multiTransformGroup);
   }
@@ -176,11 +191,14 @@ class ThreeJsControl {
     this.controls.enableZoom = true;
     this.controls.screenSpacePanning = true;
 
+    // Limit camera movement to prevent going below floor level
+    // this.controls.maxPolarAngle = Math.PI * 0.5; // Limit polar angle to 90 degrees
+
     this.controlsIsUpdating = false;
 
     this.controls.addEventListener("change", () => {
       if (!this.cubeControlsIsUpdating) {
-        this.controlsIsUpdating = true;
+        this.controlsIsUpdating = true;        
         this.cubeCamera.quaternion.copy(this.camera.quaternion);
         this.cubeCamera.position.copy(
           CameraUtils.calculateCubeCameraPosition(this.camera.position, this.controls.target)
@@ -356,6 +374,202 @@ class ThreeJsControl {
       }
       this.workplane.updateMatrixWorld(true);
       this.render();
+  }
+
+  toggleSkybox(visible) {
+    if (!this.environmentBackground) return;
+
+    // Show/Hide skybox and floors
+    [this.environmentBackground, ...(this.factoryFloors || [])].forEach(obj => {
+      obj.parent?.remove(obj);
+      if (visible) this.zUpEnvironment.add(obj);
+    });
+
+    this.isSkyboxVisible = visible;
+    this.render();
+  }
+
+  async initSkybox() {
+    if (!this.skyboxEnabled) return;
+    // Load cube texture and create skybox environment
+    await this.loadCubeTexture();
+    this.render();
+  }
+
+  createTiledTexture(image, rotation = 0) {
+    // return image;
+
+    // Create a 4x4 tiled texture to make textures appear smaller and more realistic (poor performance)
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // For 90° rotations, swap width/height
+    const [tileW, tileH] = Math.abs(rotation) === Math.PI/2 ? [image.height, image.width] : [image.width, image.height];
+    
+    [canvas.width, canvas.height] = [tileW * 8, tileH * 8];
+    
+    // Draw 4x4 grid of rotated tiles
+    for (let x = 0; x < 8; x++) {
+      for (let y = 0; y < 8; y++) {
+        ctx.save();
+        ctx.translate((x + 0.5) * tileW, (y + 0.5) * tileH);
+        ctx.rotate(rotation);
+        ctx.drawImage(image, -image.width/2, -image.height/2);
+        ctx.restore();
+      }
+    }
+    return canvas;
+  }
+
+  async loadCubeTexture() {
+    const texture = new CubeTexture();
+    const loader = new ImageLoader();
+    
+    // Define texture URLs for different surfaces
+    const lrWallUrl = 'https://as2.ftcdn.net/v2/jpg/03/24/83/79/1000_F_324837965_WzkElQWESPpFBltfwddlJaQIYH8X9D5V.jpg'; // Left/Right walls
+    const fbWallUrl = 'https://as2.ftcdn.net/v2/jpg/01/98/99/89/1000_F_198998931_VZjbdpDglkKPjbqaXa3bnH8fB6axUTcp.jpg'; // Front/Back walls
+    const floorUrl = 'https://as1.ftcdn.net/v2/jpg/01/79/71/02/1000_F_179710260_hVhHw5vQNsXyb9qvIkRbIHBzWUuVcmF7.jpg'; // Floor/Ceiling
+    
+    const urls = [lrWallUrl, fbWallUrl, floorUrl];
+
+    const [ lrWallImg, fbWallImg, floorImg ] = await Promise.all(
+      urls.map(url => new Promise(
+        (resolve) => loader.load(url, resolve, undefined, () => resolve(undefined))
+      ))
+    );
+
+    // Create textures
+    // Cube texture mapping: [+X, -X, +Y, -Y, +Z, -Z] = [Right, Left, Back, Front, Top, Bottom]
+    const images = [lrWallImg, lrWallImg, fbWallImg, fbWallImg, floorImg, floorImg];
+    const rotations = [-Math.PI/2, Math.PI/2, Math.PI, 0, 0, 0];
+    // We need tiled images only for left/right/front/back faces, this is why we skip ceiling/floor by idx
+    texture.images = images.map((img, idx) => img && (idx < 4 ? this.createTiledTexture(img, rotations[idx]) : img));
+    texture.needsUpdate = true;
+    this.createEnvironmentCube(texture);
+  }
+
+  createEnvironmentCube(cubeTexture = null) {
+    this.environmentBackground?.parent?.remove(this.environmentBackground);
+    
+    // Calculate dynamic cube size based on scene dimensions
+    const cubeSize = Math.max(...new Box3().setFromObject(this.zUpRoot).getSize(new Vector3()).toArray()) * 1.2;
+    this.skyboxSize = cubeSize; 
+    
+    if (cubeTexture) {
+      // Create textured skybox cube
+      const geometry = new BoxGeometry(cubeSize, cubeSize, cubeSize).scale(-1, 1, 1);
+      this.environmentBackground = new Mesh(geometry, cubeTexture.images.map(img => 
+        new MeshBasicMaterial({ map: img ? new CanvasTexture(img) : null, side: FrontSide })
+      ));
+    }
+
+    // Position skybox around bounding box center
+    const center = new Vector3();
+    this.boundingBox.getCenter(center);
+    this.environmentBackground.position.set(center.x, center.y, cubeSize/2 - 10);
+    
+    this.createFactoryFloors(cubeTexture);
+    
+    // Update camera max distance based on skybox size
+    // if (this.controls) this.controls.maxDistance = cubeSize * 0.5;
+  }
+  
+createFactoryFloors(cubeTexture) {
+  if (this.factoryFloors) {
+    this.factoryFloors.forEach(floor => {
+      if (floor.parent) {
+        floor.parent.remove(floor);
+      }
+    });
+  }
+  this.factoryFloors = [];
+  
+  // Get floor levels from scene graph
+  const floorLevels = this.getFloorLevels();
+
+  let floorsToCreate = [];
+
+  if (floorLevels.length > 0) {
+    floorsToCreate = floorLevels;
+  } else {
+    // Use numberOfFloors from scene graph or default to 1
+    const numberOfFloors = this.sceneGraph?.numberOfFloors || 1;
+
+    floorsToCreate = Array.from({ length: numberOfFloors }, (_, i) => i);
+  }
+  
+  // Calculate scene size for floor dimensions
+  const sceneBox = new Box3();
+  sceneBox.setFromObject(this.zUpRoot);
+  const sceneSize = sceneBox.getSize(new Vector3());
+  const floorSize = this.skyboxSize
+  
+  let floorTexture;
+  if (cubeTexture && cubeTexture.images && cubeTexture.images[5]) {
+    floorTexture = new CanvasTexture(cubeTexture.images[5]);
+  } else if (this.environmentBackground && this.environmentBackground.material && this.environmentBackground.material[5]) {
+    floorTexture = this.environmentBackground.material[5].map;
+  } 
+  
+  // Get bounding box center for floor positioning
+  const center = new Vector3();
+  if (this.boundingBox) {
+    this.boundingBox.getCenter(center);
+  } else {
+    center.set(0, 0, 0); // fallback to world center
+  }
+  
+  for (const level of floorsToCreate) {
+    // Create material with conditional map property
+    const materialOptions = {
+      side: DoubleSide,
+      color: WHITE
+    };
+    
+    if (floorTexture) {
+      materialOptions.map = floorTexture;
+    }
+    
+    const floor = new Mesh(
+      new BoxGeometry(floorSize, floorSize, 100), 
+      new MeshBasicMaterial(materialOptions)
+    );
+    
+    // Position floor around bounding box center
+    floor.position.set(center.x, center.y, (level * 15000) - 60);
+    this.factoryFloors.push(floor);
+  }
+}
+  
+  getFloorLevels() {
+    // Extract floor levels from scene graph
+    const floorLevels = [];
+    if (this.sceneGraph && this.sceneGraph.root) {
+      const findFloors = (node) => {
+        if (node.name && node.name.startsWith('Floor ')) {
+          // Extract floor number from name (e.g., "Floor 0", "Floor 1")
+          const floorNumber = parseInt(node.name.split(' ')[1]);
+          if (!isNaN(floorNumber)) {
+            floorLevels.push(floorNumber);
+          }
+        }
+        // Recursively search in contents/children
+        if (node.contents) node.contents.forEach(findFloors);
+      };
+      findFloors(this.sceneGraph.root);
+    }
+    // Sort floor levels
+    const sortedLevels = floorLevels.sort((a, b) => a - b);
+    
+    return sortedLevels;
+  }
+  
+  updateFactoryFloors() {
+    // Update floors when scene changes
+    if (this.skyboxEnabled && this.environmentBackground) {
+      this.createFactoryFloors(null);
+      this.render();
+    }
   }
 
   initTransformControls() {
@@ -1304,7 +1518,7 @@ getScreenSpaceDistance(pos1, pos2) {
 
     const targetZoomOutPosition = new Vector3(
       center.x + 12000, // for looking a bit at the right side
-      center.y + 15000, // for looking a bit from the top
+      center.y + 12000, // for looking a bit from the top
       center.z + distance
     );
 
@@ -1530,7 +1744,19 @@ getScreenSpaceDistance(pos1, pos2) {
 
     this.sceneGraph = this.scope.loadJson(dataJson);
     this.sceneGraph.buildGraph(this);
-    this.scope.loadAssets(this).then(() => this.updateObjectsTransparency());
+    
+    // Create floors after sceneGraph is loaded with numberOfFloors
+    if (this.skyboxEnabled) {
+      this.createFactoryFloors(null);
+    }
+    
+    this.scope.loadAssets(this).then(() => {
+      this.updateObjectsTransparency();
+      // Recreate floors after scene is fully loaded with textures
+      if (this.skyboxEnabled) {
+        this.createFactoryFloors(null);
+      }
+    });
 
     this.camera.position.applyMatrix4(this.scene.matrix);
     this.camera.updateProjectionMatrix();
@@ -1832,6 +2058,7 @@ class SceneGraph extends SharedObject {
     this.setProperty(scope, 'coordinateSystem', json.coordinateSystem);
     this.setProperty(scope, 'translateStepSize', json.translateStepSize);
     this.setProperty(scope, 'rotateStepSize', json.rotateStepSize);
+    this.setProperty(scope, 'numberOfFloors', json.numberOfFloors);
   }
   
   removeSelected(node) {
@@ -1864,14 +2091,14 @@ class SceneGraph extends SharedObject {
   setProperty(scope, property, value) {
   	switch (property) {
   		case 'root': {
-			if (this.root != null) {
-				this.root.parent = null;
-			}
-			this.root = scope.loadJson(value); 
-			if (this.root != null) {
-				this.root.parent = this;
-			}
-			break;
+        if (this.root != null) {
+          this.root.parent = null;
+        }
+        this.root = scope.loadJson(value); 
+        if (this.root != null) {
+          this.root.parent = this;
+        }
+			  break;
   		}
   		case 'selection': 
   			this.selection = scope.loadAll(value);
@@ -1885,6 +2112,9 @@ class SceneGraph extends SharedObject {
   		case 'rotateStepSize': 
   			this.rotateStepSize = value;
   			break; 
+      case 'numberOfFloors':
+        this.numberOfFloors = value;
+        break;
   	}
   }
   
@@ -2594,7 +2824,7 @@ const CameraUtils = {
     const fov = 35; // AKA Field of View
     const aspect = container.clientWidth / container.clientHeight;
     const near = 10; // the near clipping plane
-    const far = 600000; // the far clipping plane
+    const far = 1000000; // the far clipping plane
 
     const camera = new PerspectiveCamera(fov, aspect, near, far);
     camera.position.copy(position);
@@ -2755,6 +2985,13 @@ window.services.threejs = {
     const control = ThreeJsControl.control(container);
     if (control != null) {
       control.toggleWorkplane(visible);
+    }
+  },
+
+  toggleSkybox: function (container, visible) {
+    const control = ThreeJsControl.control(container);
+    if (control != null) {
+      control.toggleSkybox(visible);
     }
   },
 

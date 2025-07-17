@@ -166,6 +166,8 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 	private void createScene(TlThreedDemoFactory factory) {
 		Scene scene = factory.createScene();
 		scene.setName(sceneName());
+		int numberOfFloors = getConfig().getNumberFloors();
+		scene.tSetData("numberOfFloors", numberOfFloors);
 		Assembly rootNode = factory.createAssembly();
 		rootNode.setName("Building 1");
 		scene.setRootNode(rootNode);
@@ -174,7 +176,7 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 
 		for (int i = 0; i < getConfig().getNumberFloors(); i++) {
 			Assembly floor = addFloor(factory, rootNode, "Floor " + i);
-			floor.setTx(translate(0, 0, i * 8000).after(rotateZ(i * Math.PI / 2)));
+			floor.setTx(translate(0, 0, i * 15000));
 
 			intermediateCommit();
 		}

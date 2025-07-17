@@ -455,6 +455,14 @@ public class ThreeJsComponent extends BuilderComponent
     	getThreeJSControl().zoomOutFromSelection();
 	}
 
+	public boolean getIsSkyboxVisible() {
+		return getThreeJSControl().getIsSkyboxVisible();
+	}
+
+	public void setIsSkyboxVisible(boolean visible) {
+		getThreeJSControl().setIsSkyboxVisible(visible);
+	}
+
 	public boolean getIsWorkplaneVisible() {
 		return getThreeJSControl().getIsWorkplaneVisible();
 	}
@@ -463,7 +471,7 @@ public class ThreeJsComponent extends BuilderComponent
 		getThreeJSControl().setIsWorkplaneVisible(visible);
 	}
 
-		public boolean getAreObjectsTransparent() {
+	public boolean getAreObjectsTransparent() {
 		return getThreeJSControl().getAreObjectsTransparent();
 	}
 
@@ -522,6 +530,17 @@ public class ThreeJsComponent extends BuilderComponent
 		SceneNode root = builder().getModel(getModel(), this);
 		root.visit(_addToIndex, null);
 		_scene.setRoot(root);
+		
+		// Set number of floors if available
+		Object model = getModel();
+		if (model instanceof TLObject) {
+			TLObject tlObject = (TLObject) model;
+			Object numberOfFloors = tlObject.tGetData("numberOfFloors");
+			if (numberOfFloors instanceof Integer) {
+				int floors = (Integer) numberOfFloors;
+				_scene.setNumberOfFloors(floors);
+			}
+		}
 	}
 
 	private SceneBuilder builder() {

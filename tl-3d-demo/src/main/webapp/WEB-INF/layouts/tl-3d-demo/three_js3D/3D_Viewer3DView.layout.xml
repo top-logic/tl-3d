@@ -20,75 +20,79 @@
 			supportsObject="node -> $node.instanceOf(`tl.threed.demo:Node`)"
 			typesToObserve="tl.threed.demo:Node"
 		>
-			<createNode><![CDATA[node -> switch {
-  $node.instanceOf(`tl.threed.demo:Part`) || $node.get(`tl.threed.demo:Node#asset`) != null: 
-    threejsGltf(
+			<createNode><![CDATA[
+      node -> switch {
+      $node.instanceOf(`tl.threed.demo:Part`) || $node.get(`tl.threed.demo:Node#asset`) != null:
+      threejsGltf(
       tx:  $node.get(`tl.threed.demo:Node#tx`),
       color: $node.get(`tl.threed.demo:Node#color`),
       userData: $node,
       url: $node.get(`tl.threed.demo:Part#asset`).get(`tl.threed.demo:Asset3D#gltfUrl`),
       layoutPoint: {
-        lp = $node.get(`tl.threed.demo:Part#asset`).get(`tl.threed.demo:Asset3D#layoutPoint`);
-        $lp == null ? null : threejsCp(
-              tx: $lp.get(`tl.threed.demo:ConnectionPoint#tx`),
-              classifiers: $lp.get(`tl.threed.demo:ConnectionPoint#classifiers`)
-            )
+      lp = $node.get(`tl.threed.demo:Part#asset`).get(`tl.threed.demo:Asset3D#layoutPoint`);
+      $lp == null ? null : threejsCp(
+      tx: $lp.get(`tl.threed.demo:ConnectionPoint#tx`),
+      classifiers: $lp.get(`tl.threed.demo:ConnectionPoint#classifiers`)
+      )
       },
       snappingPoints : $node.get(`tl.threed.demo:Part#asset`)
-          .get(`tl.threed.demo:Asset3D#snappingPoints`)
-          .map(cp -> 
-            threejsCp(
-              tx: $cp.get(`tl.threed.demo:ConnectionPoint#tx`),
-              classifiers: $cp.get(`tl.threed.demo:ConnectionPoint#classifiers`)
-            )
-          )
+      .get(`tl.threed.demo:Asset3D#snappingPoints`)
+      .map(cp ->
+      threejsCp(
+      tx: $cp.get(`tl.threed.demo:ConnectionPoint#tx`),
+      classifiers: $cp.get(`tl.threed.demo:ConnectionPoint#classifiers`)
+      )
+      )
       );
-  $node.instanceOf(`tl.threed.demo:Assembly`):
-    threejsGroup(
+      $node.instanceOf(`tl.threed.demo:Assembly`):
+      threejsGroup(
       tx: $node.get(`tl.threed.demo:Node#tx`),
       color: $node.get(`tl.threed.demo:Node#color`),
       userData: $node
       );
-}]]></createNode>
+      }
+    ]]></createNode>
 		</modelBuilder>
 		<buttons>
 			<button id="ID_4893bf3f_116f_421c_b560_842f9b4b1073"
 				class="com.top_logic.layout.form.component.InvalidateCommand"
 			/>
 		</buttons>
-		<coordinate-systems><![CDATA[selection -> model -> {
-
-absoluteTx = node -> 
-  $node.recursion(p->$p.referers(`tl.threed.demo:Assembly#children`))
+		<coordinate-systems><![CDATA[
+    selection -> model -> {
+    
+    absoluteTx = node ->
+    $node.recursion(p->$p.referers(`tl.threed.demo:Assembly#children`))
     .reduce(
-      txIdentity(), 
-        subresult -> elt -> 
-          $elt.get(`tl.threed.demo:Node#tx`).txCompose($subresult))
-;
-
-
-partsWithCoordinates = $model.get(`tl.threed.demo:Scene#rootNode`)
-  .recursion(p -> 
-    $p.instanceOf(`tl.element:StructuredElementContainer`) ? 
-      $p.get(`tl.element:StructuredElementContainer#children`) : 
-      [])
-  .filter(p -> {
+    txIdentity(),
+    subresult -> elt ->
+    $elt.get(`tl.threed.demo:Node#tx`).txCompose($subresult))
+    ;
+    
+    
+    partsWithCoordinates = $model.get(`tl.threed.demo:Scene#rootNode`)
+    .recursion(p ->
+    $p.instanceOf(`tl.element:StructuredElementContainer`) ?
+    $p.get(`tl.element:StructuredElementContainer#children`) :
+    [])
+    .filter(p -> {
     name = $p.get(`tl.threed.demo:Part#name`);
     $name.length() > 23 && $name.subString(-23) == " with coordinate system"
-  });
-$partsWithCoordinates.map(p -> {
-  {
-    "label": $p.get(`tl.threed.demo:Part#name`).subString(0, -23), 
+    });
+    $partsWithCoordinates.map(p -> {
+    {
+    "label": $p.get(`tl.threed.demo:Part#name`).subString(0, -23),
     "tx": $absoluteTx($p)
-  }
-}).concat(
-  {
+    }
+    }).concat(
+    {
     "label": "Statisches Koordinatensystem mit Rotation und Verschiebung",
     "tx": txRotateX(1.5708)
-      .txCompose(txRotateZ(0.7854))
-      .txCompose(txTranslate(1000,500,600))
-  }
-);
-}]]></coordinate-systems>
+    .txCompose(txRotateZ(0.7854))
+    .txCompose(txTranslate(1000,500,600))
+    }
+    );
+    }
+  ]]></coordinate-systems>
 	</arguments>
 </config:template-call>

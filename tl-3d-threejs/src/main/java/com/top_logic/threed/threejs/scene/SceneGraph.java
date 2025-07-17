@@ -30,6 +30,9 @@ public class SceneGraph extends ScenePart {
 	/** @see #getTranslateStepSize() */
 	public static final String TRANSLATE_STEP_SIZE__PROP = "translateStepSize";
 
+	/** @see #getNumberOfFloors() */
+	public static final String NUMBER_OF_FLOORS__PROP = "numberOfFloors";
+
 	private com.top_logic.threed.threejs.scene.SceneNode _root = null;
 
 	private final java.util.List<com.top_logic.threed.threejs.scene.SceneNode> _selection = new de.haumacher.msgbuf.util.ReferenceList<com.top_logic.threed.threejs.scene.SceneNode>() {
@@ -69,6 +72,8 @@ public class SceneGraph extends ScenePart {
 	private int _rotateStepSize = 0;
 
 	private int _translateStepSize = 0;
+
+	private int _numberOfFloors = 0;
 
 	/**
 	 * Creates a {@link SceneGraph} instance.
@@ -254,6 +259,28 @@ public class SceneGraph extends ScenePart {
 		_listener.afterChanged(this, TRANSLATE_STEP_SIZE__PROP);
 	}
 
+	/**
+	 * Number of floors in the scene.
+	 */
+	public final int getNumberOfFloors() {
+		return _numberOfFloors;
+	}
+
+	/**
+	 * @see #getNumberOfFloors()
+	 */
+	public com.top_logic.threed.threejs.scene.SceneGraph setNumberOfFloors(int value) {
+		internalSetNumberOfFloors(value);
+		return this;
+	}
+
+	/** Internal setter for {@link #getNumberOfFloors()} without chain call utility. */
+	protected final void internalSetNumberOfFloors(int value) {
+		_listener.beforeSet(this, NUMBER_OF_FLOORS__PROP, value);
+		_numberOfFloors = value;
+		_listener.afterChanged(this, NUMBER_OF_FLOORS__PROP);
+	}
+
 	@Override
 	public String jsonType() {
 		return SCENE_GRAPH__TYPE;
@@ -265,7 +292,8 @@ public class SceneGraph extends ScenePart {
 			SELECTION__PROP, 
 			COORDINATE_SYSTEM__PROP, 
 			ROTATE_STEP_SIZE__PROP, 
-			TRANSLATE_STEP_SIZE__PROP));
+			TRANSLATE_STEP_SIZE__PROP,
+			NUMBER_OF_FLOORS__PROP));
 
 	private static java.util.Set<String> TRANSIENT_PROPERTIES = java.util.Collections.unmodifiableSet(new java.util.HashSet<>(
 			java.util.Arrays.asList(
@@ -289,6 +317,7 @@ public class SceneGraph extends ScenePart {
 			case COORDINATE_SYSTEM__PROP: return getCoordinateSystem();
 			case ROTATE_STEP_SIZE__PROP: return getRotateStepSize();
 			case TRANSLATE_STEP_SIZE__PROP: return getTranslateStepSize();
+			case NUMBER_OF_FLOORS__PROP: return getNumberOfFloors();
 			default: return super.get(field);
 		}
 	}
@@ -301,6 +330,7 @@ public class SceneGraph extends ScenePart {
 			case COORDINATE_SYSTEM__PROP: internalSetCoordinateSystem(de.haumacher.msgbuf.util.Conversions.asList(Double.class, value)); break;
 			case ROTATE_STEP_SIZE__PROP: internalSetRotateStepSize((int) value); break;
 			case TRANSLATE_STEP_SIZE__PROP: internalSetTranslateStepSize((int) value); break;
+			case NUMBER_OF_FLOORS__PROP: internalSetNumberOfFloors((int) value); break;
 			default: super.set(field, value); break;
 		}
 	}
@@ -343,6 +373,8 @@ public class SceneGraph extends ScenePart {
 		out.value(getRotateStepSize());
 		out.name(TRANSLATE_STEP_SIZE__PROP);
 		out.value(getTranslateStepSize());
+		out.name(NUMBER_OF_FLOORS__PROP);
+		out.value(getNumberOfFloors());
 	}
 
 	@Override
@@ -378,6 +410,10 @@ public class SceneGraph extends ScenePart {
 			}
 			case TRANSLATE_STEP_SIZE__PROP: {
 				out.value(getTranslateStepSize());
+				break;
+			}
+			case NUMBER_OF_FLOORS__PROP: {
+				out.value(getNumberOfFloors());
 				break;
 			}
 			default: super.writeFieldValue(scope, out, field);
