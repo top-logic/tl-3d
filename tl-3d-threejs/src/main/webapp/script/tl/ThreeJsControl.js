@@ -732,13 +732,38 @@ createFactoryFloors(cubeTexture) {
       } else {
         this.render();
       }
-   });
+    });
     this.rotateControls = new TransformControls(this.camera, this.renderer.domElement);
     this.rotateControls.setMode("rotate");
     this.rotateControls.setSpace("local");
     this.scene.add(this.rotateControls);
     this.rotateControls.addEventListener("dragging-changed", updateRenderTransform);
-    this.rotateControls.addEventListener("objectChange", () => this.render());
+    this.rotateControls.addEventListener("objectChange", (event) => {
+      if (event.target.dragging) {
+        const selectedObject = event.target.object;
+        // Apply step snapping to single objects
+        if (selectedObject !== this.multiTransformGroup) {
+          this.snapToStepSize(selectedObject);
+        }
+
+        if (selectedObject === this.multiTransformGroup) {
+          this.render();
+          return;
+        }
+      } 
+
+      // throttle render calls during dragging
+      if (event.target.dragging) {
+        if (!this._throttledRender) {
+          this._throttledRender = throttle(() => {
+            this.render();
+          }, 50); 
+        }
+        this._throttledRender();
+      } else {
+        this.render();
+      }
+    });
 
     this.translateControls.enabled = false;
     this.rotateControls.enabled = false;
