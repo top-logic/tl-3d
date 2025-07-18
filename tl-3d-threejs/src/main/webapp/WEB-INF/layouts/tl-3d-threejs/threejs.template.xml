@@ -4,7 +4,7 @@
 	xmlns:config="http://www.top-logic.com/ns/config/6.0"
 	groups="commons"
 >
-	<properties extends="com.top_logic.mig.html.layout.WithDefaultFor, com.top_logic.layout.editor.config.ButtonTemplateParameters, com.top_logic.layout.editor.config.DialogTemplateParameters, com.top_logic.tool.boundsec.InAppSecurityObjectProviderConfig, com.top_logic.tool.boundsec.WithSecurityMaster, com.top_logic.threed.threejs.component.ThreeJsComponent$InAppViewerConfig">
+	<properties extends="com.top_logic.layout.structure.ToolbarOptions, com.top_logic.mig.html.layout.WithDefaultFor, com.top_logic.layout.editor.config.ButtonTemplateParameters, com.top_logic.layout.editor.config.DialogTemplateParameters, com.top_logic.tool.boundsec.InAppSecurityObjectProviderConfig, com.top_logic.tool.boundsec.WithSecurityMaster, com.top_logic.threed.threejs.component.ThreeJsComponent$InAppViewerConfig">
 		<annotations>
 			<display-inherited value="APPEND"/>
 		</annotations>
@@ -48,7 +48,7 @@
 			element-type="com.top_logic.tool.boundsec.CommandHandler$ConfigBase"
 			type="List"
 		>
-			<acceptable-classifiers value="form, commons"/>
+			<acceptable-classifiers value="3DViewer, form, commons"/>
 		</property>
 	</properties>
 
@@ -63,6 +63,9 @@
 		modelBuilder="${modelBuilder}"
 		securityObject="${securityObject}"
 		selection="${selection}"
+		showMaximize="${showMaximize}"
+		showMinimize="${showMinimize}"
+		showPopOut="${showPopOut}"
 		titleKey="${name}"
 	>
 		<selectionModelFactory multiple="${multiSelection}"/>
