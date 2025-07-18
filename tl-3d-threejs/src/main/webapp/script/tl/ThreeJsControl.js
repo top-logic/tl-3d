@@ -474,72 +474,72 @@ class ThreeJsControl {
     // if (this.controls) this.controls.maxDistance = cubeSize * 0.5;
   }
   
-createFactoryFloors(cubeTexture) {
-  if (this.factoryFloors) {
-    this.factoryFloors.forEach(floor => {
-      if (floor.parent) {
-        floor.parent.remove(floor);
-      }
-    });
-  }
-  this.factoryFloors = [];
-  
-  // Get floor levels from scene graph
-  const floorLevels = this.getFloorLevels();
-
-  let floorsToCreate = [];
-
-  if (floorLevels.length > 0) {
-    floorsToCreate = floorLevels;
-  } else {
-    // Use numberOfFloors from scene graph or default to 1
-    const numberOfFloors = this.sceneGraph?.numberOfFloors || 1;
-
-    floorsToCreate = Array.from({ length: numberOfFloors }, (_, i) => i);
-  }
-  
-  // Calculate scene size for floor dimensions
-  const sceneBox = new Box3();
-  sceneBox.setFromObject(this.zUpRoot);
-  const sceneSize = sceneBox.getSize(new Vector3());
-  const floorSize = this.skyboxSize
-  
-  let floorTexture;
-  if (cubeTexture && cubeTexture.images && cubeTexture.images[5]) {
-    floorTexture = new CanvasTexture(cubeTexture.images[5]);
-  } else if (this.environmentBackground && this.environmentBackground.material && this.environmentBackground.material[5]) {
-    floorTexture = this.environmentBackground.material[5].map;
-  } 
-  
-  // Get bounding box center for floor positioning
-  const center = new Vector3();
-  if (this.boundingBox) {
-    this.boundingBox.getCenter(center);
-  } else {
-    center.set(0, 0, 0); // fallback to world center
-  }
-  
-  for (const level of floorsToCreate) {
-    // Create material with conditional map property
-    const materialOptions = {
-      side: DoubleSide,
-      color: WHITE
-    };
+  createFactoryFloors(cubeTexture) {
+    if (this.factoryFloors) {
+      this.factoryFloors.forEach(floor => {
+        if (floor.parent) {
+          floor.parent.remove(floor);
+        }
+      });
+    }
+    this.factoryFloors = [];
     
-    if (floorTexture) {
-      materialOptions.map = floorTexture;
+    // Get floor levels from scene graph
+    const floorLevels = this.getFloorLevels();
+
+    let floorsToCreate = [];
+
+    if (floorLevels.length > 0) {
+      floorsToCreate = floorLevels;
+    } else {
+      // Use numberOfFloors from scene graph or default to 1
+      const numberOfFloors = this.sceneGraph?.numberOfFloors || 1;
+
+      floorsToCreate = Array.from({ length: numberOfFloors }, (_, i) => i);
     }
     
-    const floor = new Mesh(
-      new BoxGeometry(floorSize, floorSize, 100), 
-      new MeshBasicMaterial(materialOptions)
-    );
+    // Calculate scene size for floor dimensions
+    const sceneBox = new Box3();
+    sceneBox.setFromObject(this.zUpRoot);
+    const sceneSize = sceneBox.getSize(new Vector3());
+    const floorSize = this.skyboxSize
     
-    // Position floor around bounding box center
-    floor.position.set(center.x, center.y, (level * 15000) - 60);
-    this.factoryFloors.push(floor);
+    let floorTexture;
+    if (cubeTexture && cubeTexture.images && cubeTexture.images[5]) {
+      floorTexture = new CanvasTexture(cubeTexture.images[5]);
+    } else if (this.environmentBackground && this.environmentBackground.material && this.environmentBackground.material[5]) {
+      floorTexture = this.environmentBackground.material[5].map;
+    } 
+    
+    // Get bounding box center for floor positioning
+    const center = new Vector3();
+    if (this.boundingBox) {
+      this.boundingBox.getCenter(center);
+    } else {
+      center.set(0, 0, 0); // fallback to world center
+    }
+    
+    for (const level of floorsToCreate) {
+      // Create material with conditional map property
+      const materialOptions = {
+        side: DoubleSide,
+        color: WHITE
+      };
+      
+      if (floorTexture) {
+        materialOptions.map = floorTexture;
+      }
+      
+      const floor = new Mesh(
+        new BoxGeometry(floorSize, floorSize, 100), 
+        new MeshBasicMaterial(materialOptions)
+      );
+      
+      // Position floor around bounding box center
+      floor.position.set(center.x, center.y, (level * 15000) - 60);
+      this.factoryFloors.push(floor);
+    }
   }
-}
   
   getFloorLevels() {
     // Extract floor levels from scene graph
@@ -1363,7 +1363,9 @@ getScreenSpaceDistance(pos1, pos2) {
       return; // Not a click.
     }
     const raycaster = getRaycaster(event, this.camera, this.canvas);
-    const intersects = raycaster.intersectObjects(this.scene.children, true);
+    // const intersects = raycaster.intersectObjects(this.scene.children, true);
+    const visibleObjects = this.scene.children.filter(obj => obj.visible);
+    const intersects = raycaster.intersectObjects(visibleObjects, true);
 
     this.updateSelection(intersects, event.ctrlKey);
     this.render();
@@ -1618,7 +1620,7 @@ getScreenSpaceDistance(pos1, pos2) {
       this.setColor(sharedNode.node, WHITE);
       this.selection.splice(index, 1);
       
-      command = this.sceneGraph.removeSelected(sharedNode); 
+      command = this.sceneGraph.removeSelected(sharedNode);
     } else {
       // Currently not selected
       if (!value) {
@@ -1628,12 +1630,14 @@ getScreenSpaceDistance(pos1, pos2) {
       this.setColor(sharedNode.node, RED);
       this.selection.push(sharedNode);
       
-      command = this.sceneGraph.addSelected(sharedNode); 
+      command = this.sceneGraph.addSelected(sharedNode);
     }
     
     this.updateObjectsTransparency();
     this.updateTransformControls();
-    this.updateConnectionPointsVisibility();
+    if (this.isEditMode) {
+      this.updateConnectionPointsVisibility();
+    }
     
     return command;
   }
@@ -1741,7 +1745,9 @@ getScreenSpaceDistance(pos1, pos2) {
     this.selection.length = 0;
     this.clearObjectsTransparency();
 
-    this.updateConnectionPointsVisibility();
+    if (this.isEditMode) {
+      this.updateConnectionPointsVisibility();
+    }
 
     this.disableEditing();
     return this.sceneGraph.clearSelection();
@@ -1853,6 +1859,10 @@ getScreenSpaceDistance(pos1, pos2) {
   }
 
   clearObjectsTransparency() {
+    if (!this.areObjectsTransparent) {
+      return; 
+    }
+    
     this.scene.traverse((object) => {
       if (object.material) {
         this.getMaterials(object).forEach((material) => {
@@ -1883,10 +1893,14 @@ getScreenSpaceDistance(pos1, pos2) {
   }
 
   updateObjectsTransparency() {
-     // Always clear transparency first
+    if (!this.areObjectsTransparent) {
+      return; // Don't do anything if transparency is disabled
+    }
+
+    // Clear transparency first
     this.clearObjectsTransparency();
 
-    if (this.areObjectsTransparent && this.selection.length > 0) {
+    if (this.selection.length > 0) {
       const selectedIds = new Set()
       this.selection.forEach(sharedNode => {
         if (sharedNode.node) {
