@@ -66,6 +66,7 @@ const INTERACTIVE_PIXEL_RATIO = Math.min(window.devicePixelRatio, 1.0);
 const GRID_SMALL_CELL = 500;
 const SNAP_THRESHOLD = 50;
 const GRID_SNAP_THRESHOLD = 200;
+const FLOOR_PADDING = 20000;
 
 /**
  * Initial state configuration for ThreeJsControl.
@@ -140,7 +141,6 @@ class ThreeJsControl {
     this.addAxesHelper(this.scene);
 
     this.zUpRoot.rotation.x = -_90_DEGREE;
-    this.zUpEnvironment.rotation.x = -_90_DEGREE;
     this.scene.add(this.zUpRoot);
     this.scene.add(this.zUpEnvironment);
     this.multiTransformGroup.rotation.x = -_90_DEGREE;
@@ -396,24 +396,20 @@ class ThreeJsControl {
     this.render();
   }
 
-  createTiledTexture(image, rotation = 0) {
-    // return image;
-
+  createTiledTexture(image) {
     // Create a 4x4 tiled texture to make textures appear smaller and more realistic (poor performance)
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
+    const [tileW, tileH] = [image.width, image.height];
+    const koeff = 4;
     
-    // For 90° rotations, swap width/height
-    const [tileW, tileH] = Math.abs(rotation) === Math.PI/2 ? [image.height, image.width] : [image.width, image.height];
-    
-    [canvas.width, canvas.height] = [tileW * 8, tileH * 8];
+    [canvas.width, canvas.height] = [tileW * koeff, tileH * koeff];
     
     // Draw 4x4 grid of rotated tiles
-    for (let x = 0; x < 8; x++) {
-      for (let y = 0; y < 8; y++) {
+    for (let x = 0; x < koeff; x++) {
+      for (let y = 0; y < koeff; y++) {
         ctx.save();
         ctx.translate((x + 0.5) * tileW, (y + 0.5) * tileH);
-        ctx.rotate(rotation);
         ctx.drawImage(image, -image.width/2, -image.height/2);
         ctx.restore();
       }
@@ -438,12 +434,9 @@ class ThreeJsControl {
       ))
     );
 
+    const tiledFrontBackWall = this.createTiledTexture(fbWallImg);
     // Create textures
-    // Cube texture mapping: [+X, -X, +Y, -Y, +Z, -Z] = [Right, Left, Back, Front, Top, Bottom]
-    const images = [lrWallImg, lrWallImg, fbWallImg, fbWallImg, floorImg, floorImg];
-    const rotations = [-Math.PI/2, Math.PI/2, Math.PI, 0, 0, 0];
-    // We need tiled images only for left/right/front/back faces, this is why we skip ceiling/floor by idx
-    texture.images = images.map((img, idx) => img && (idx < 4 ? this.createTiledTexture(img, rotations[idx]) : img));
+    texture.images = [lrWallImg, lrWallImg, floorImg,  floorImg, tiledFrontBackWall, tiledFrontBackWall];
     texture.needsUpdate = true;
     this.createEnvironmentCube(texture);
   }
@@ -451,22 +444,30 @@ class ThreeJsControl {
   createEnvironmentCube(cubeTexture = null) {
     this.environmentBackground?.parent?.remove(this.environmentBackground);
     
-    // Calculate dynamic cube size based on scene dimensions
-    const cubeSize = Math.max(...new Box3().setFromObject(this.zUpRoot).getSize(new Vector3()).toArray()) * 1.2;
-    this.skyboxSize = cubeSize; 
+    const center = new Vector3();
+    this.boundingBox.getCenter(center);
     
+    const boxSize = this.boundingBox.getSize(new Vector3());
+    const [x, y, z] = boxSize.toArray();
+
+    const floorSizes = { 
+      x: x + FLOOR_PADDING,
+      z: z + FLOOR_PADDING,
+    };
+
+    this.floorSizes = floorSizes;
+
     if (cubeTexture) {
       // Create textured skybox cube
-      const geometry = new BoxGeometry(cubeSize, cubeSize, cubeSize).scale(-1, 1, 1);
+      const geometry = new BoxGeometry(floorSizes.x, y * 2, floorSizes.z).scale(-1, 1, 1);
       this.environmentBackground = new Mesh(geometry, cubeTexture.images.map(img => 
         new MeshBasicMaterial({ map: img ? new CanvasTexture(img) : null, side: FrontSide })
       ));
     }
 
-    // Position skybox around bounding box center
-    const center = new Vector3();
-    this.boundingBox.getCenter(center);
-    this.environmentBackground.position.set(center.x, center.y, cubeSize/2 - 10);
+    // Adjusting the cube's Y position to match the bottom of the bounding box height
+    const cubeYposition = center.y + y / 2 - 100;
+    this.environmentBackground.position.set(center.x, cubeYposition, center.z);
     
     this.createFactoryFloors(cubeTexture);
     
@@ -501,14 +502,17 @@ class ThreeJsControl {
     // Calculate scene size for floor dimensions
     const sceneBox = new Box3();
     sceneBox.setFromObject(this.zUpRoot);
-    const sceneSize = sceneBox.getSize(new Vector3());
-    const floorSize = this.skyboxSize
+    const floorSizes = this.floorSizes;
     
+    if (!floorSizes) {
+      return;
+    }
+
     let floorTexture;
-    if (cubeTexture && cubeTexture.images && cubeTexture.images[5]) {
-      floorTexture = new CanvasTexture(cubeTexture.images[5]);
-    } else if (this.environmentBackground && this.environmentBackground.material && this.environmentBackground.material[5]) {
-      floorTexture = this.environmentBackground.material[5].map;
+    if (cubeTexture && cubeTexture.images && cubeTexture.images[3]) {
+      floorTexture = new CanvasTexture(cubeTexture.images[3]);
+    } else if (this.environmentBackground && this.environmentBackground.material && this.environmentBackground.material[3]) {
+      floorTexture = this.environmentBackground.material[3].map;
     } 
     
     // Get bounding box center for floor positioning
@@ -531,12 +535,13 @@ class ThreeJsControl {
       }
       
       const floor = new Mesh(
-        new BoxGeometry(floorSize, floorSize, 100), 
+        new BoxGeometry(floorSizes.x, 100, floorSizes.z), 
         new MeshBasicMaterial(materialOptions)
       );
       
-      // Position floor around bounding box center
-      floor.position.set(center.x, center.y, (level * 15000) - 60);
+      const floorY = level * 15000 - 100;
+      floor.position.set(center.x, floorY, center.z);
+
       this.factoryFloors.push(floor);
     }
   }
@@ -1328,7 +1333,7 @@ getScreenSpaceDistance(pos1, pos2) {
 
   createBoundingBox() {
     this.boundingBox = new Box3();
-    this.scene.traverse((object) => {
+    this.zUpRoot.traverse((object) => {
       if (object.type === "Mesh") {
         this.boundingBox.expandByObject(object);
       }
@@ -1783,10 +1788,6 @@ getScreenSpaceDistance(pos1, pos2) {
     
     this.scope.loadAssets(this).then(() => {
       this.updateObjectsTransparency();
-      // Recreate floors after scene is fully loaded with textures
-      if (this.skyboxEnabled) {
-        this.createFactoryFloors(null);
-      }
     });
 
     this.camera.position.applyMatrix4(this.scene.matrix);
