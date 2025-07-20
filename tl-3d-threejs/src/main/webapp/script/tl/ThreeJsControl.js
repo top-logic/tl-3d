@@ -47,6 +47,7 @@ const DARK_GREY = "#333333";
 const RED = 0xff0000;
 const YELLOW = 0xffff00;
 const GREEN = 0x00ff00;
+const SELECTION_COLOR = GREEN;
 const LIGHT_BLUE = 0x77aacc;
 const MIDDLE_BLUE = 0x447799;
 const DARK_BLUE = 0x001122;
@@ -1632,7 +1633,7 @@ getScreenSpaceDistance(pos1, pos2) {
         // Cannot remove from selection
         return;
       }
-      this.setColor(sharedNode.node, RED);
+      this.setColor(sharedNode.node, SELECTION_COLOR);
       this.selection.push(sharedNode);
       
       command = this.sceneGraph.addSelected(sharedNode);
@@ -1657,7 +1658,7 @@ getScreenSpaceDistance(pos1, pos2) {
 
     // apply selection to new objects that have to be selected
     for (const shared3JSNode of selectedSharedNodes) {
-      this.setColor(shared3JSNode.node, RED);
+      this.setColor(shared3JSNode.node, SELECTION_COLOR);
       this.selection.push(shared3JSNode);
     }
 
