@@ -68,6 +68,8 @@ const GRID_SMALL_CELL = 500;
 const SNAP_THRESHOLD = 50;
 const GRID_SNAP_THRESHOLD = 200;
 const FLOOR_PADDING = 20000;
+// Make non-selected objects 30% transparent
+const TRANSPARENCY_LEVEL = 0.3;
 
 /**
  * Initial state configuration for ThreeJsControl.
@@ -1749,7 +1751,9 @@ getScreenSpaceDistance(pos1, pos2) {
       this.setColor(sharedNode.node, WHITE);
     }
     this.selection.length = 0;
-    this.clearObjectsTransparency();
+    if (this.areObjectsTransparent) {
+	    this.clearObjectsTransparency();
+    }
 
     if (this.isEditMode) {
       this.updateConnectionPointsVisibility();
@@ -1861,10 +1865,6 @@ getScreenSpaceDistance(pos1, pos2) {
   }
 
   clearObjectsTransparency() {
-    if (!this.areObjectsTransparent) {
-      return; 
-    }
-    
     this.scene.traverse((object) => {
       if (object.material) {
         this.getMaterials(object).forEach((material) => {
@@ -1875,10 +1875,41 @@ getScreenSpaceDistance(pos1, pos2) {
       }
     });
   }
+  
+  setObjectsTransparency() {
+    if (this.selection.length > 0) {
+      const selectedIds = new Set()
+      this.selection.forEach(sharedNode => {
+        if (sharedNode.node) {
+          sharedNode.node.traverse(child => {
+            selectedIds.add(child.id);
+          });
+        }
+      });
 
-  toggleObjectsTransparent(shouldBeTransparent) {    
+      this.scene.traverse((object) => {
+        if (object.material && !selectedIds.has(object.id) && object !== this.workplane && !this.isWorkplaneChild(object)) {
+          this.getMaterials(object).forEach((material) => {
+            this.setObjectTransparency(material, TRANSPARENCY_LEVEL); 
+          });
+        }
+      });
+    }
+  }
+
+  toggleObjectsTransparent(shouldBeTransparent) {
+    if (this.areObjectsTransparent == shouldBeTransparent) {
+      return;
+    }
+    
     this.areObjectsTransparent = shouldBeTransparent;
-    this.updateObjectsTransparency();
+    if (this.areObjectsTransparent) {
+      this.setObjectsTransparency();
+    } else {
+      this.clearObjectsTransparency();
+    }
+
+    this.render();
   }
 
   isWorkplaneChild(object) {
@@ -1901,26 +1932,9 @@ getScreenSpaceDistance(pos1, pos2) {
 
     // Clear transparency first
     this.clearObjectsTransparency();
-
-    if (this.selection.length > 0) {
-      const selectedIds = new Set()
-      this.selection.forEach(sharedNode => {
-        if (sharedNode.node) {
-          sharedNode.node.traverse(child => {
-            selectedIds.add(child.id);
-          });
-        }
-      });
-
-      this.scene.traverse((object) => {
-        if (object.material && !selectedIds.has(object.id) && object !== this.workplane && !this.isWorkplaneChild(object)) {
-          this.getMaterials(object).forEach((material) => {
-            // Make non-selected objects 30% transparent
-            this.setObjectTransparency(material, 0.3); 
-          });
-        }
-      });
-    }
+    
+    // Make objects transparent
+    this.setObjectsTransparency();
 
     this.render();
   }
