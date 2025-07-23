@@ -551,6 +551,10 @@ public class ThreeJsComponent extends BuilderComponent
 		SceneNode root = builder().getModel(getModel(), this);
 		root.visit(_addToIndex, null);
 		_scene.setRoot(root);
+
+		for (Object hiddenElement : CollectionUtil.asSet(hiddenChannel().get())) {
+			setHiddenForNodeOfPath(hiddenElement, true);
+		}
 		
 		// Set number of floors if available
 		Object model = getModel();
@@ -593,7 +597,11 @@ public class ThreeJsComponent extends BuilderComponent
 		linkSelectionChannel(log);
 
 		selectionChannel().addListener(this::handleNewSelectionChannelValue);
-		getChannel(HIDDEN_ELEMENTS.getName()).addListener(this::handleNewHiddenElementsChannelValue);
+		hiddenChannel().addListener(this::handleNewHiddenElementsChannelValue);
+	}
+
+	private ComponentChannel hiddenChannel() {
+		return getChannel(HIDDEN_ELEMENTS.getName());
 	}
 	
 	@Override
