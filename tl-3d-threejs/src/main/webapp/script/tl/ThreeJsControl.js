@@ -1,4 +1,4 @@
-import {
+﻿import {
   AmbientLight,
   AxesHelper,
   Box3,
@@ -27,7 +27,6 @@ import {
   MeshStandardMaterial,
   PerspectiveCamera,
   Raycaster,
-  RepeatWrapping,
   RGBAFormat,
   Scene,
   SphereBufferGeometry,
@@ -106,7 +105,6 @@ class ThreeJsControl {
     this.useScreenSpaceSnapping = true;
     
     this.skyboxEnabled = initialState.skyboxEnabled !== false;
-    this.skyboxTextures = initialState.skyboxTextures || null;
     this.initScene();
     this.initAxesCubeScene();
     this.initRenderer();
@@ -218,7 +216,6 @@ class ThreeJsControl {
     this.cubeScene.background = null;
 
     this.cubeCamera = CameraUtils.createCubeCamera();
-    this.cubeTarget = new Vector3(0, 0, 0);
     this.cubeScene.rotation.x = -_90_DEGREE;
 
     SceneUtils.addCubeSceneLights(this.cubeScene);
@@ -590,7 +587,6 @@ class ThreeJsControl {
     const updateRenderTransform = (function () {
       let lastMatrix = new Matrix4();
       let lastWorldMatrixes = {};
-      let lastObject = null;
 
       return (event) => {
         // disable/enable orbit controls when drag starts/ends
@@ -665,7 +661,6 @@ class ThreeJsControl {
 
           if (event.value) {
             lastMatrix.copy(currentMatrix);
-            lastObject = object;
             // Store starting position and rotation for incremental snapping
             object.userData.dragStartPosition = object.position.clone();
             object.userData.dragStartRotation = object.rotation.clone();
@@ -694,7 +689,6 @@ class ThreeJsControl {
     this.translateControls.addEventListener("objectChange", (event) => {
       if (event.target.dragging) {
         const selectedObject = event.target.object;
-        const isGroup = selectedObject.children.length > 0;
         // Apply step snapping to single objects
         if (selectedObject !== this.multiTransformGroup) {
           this.snapToStepSize(selectedObject);
@@ -1371,7 +1365,6 @@ getScreenSpaceDistance(pos1, pos2) {
       return; // Not a click.
     }
     const raycaster = getRaycaster(event, this.camera, this.canvas);
-    // const intersects = raycaster.intersectObjects(this.scene.children, true);
     const visibleObjects = this.scene.children.filter(obj => obj.visible);
     const intersects = raycaster.intersectObjects(visibleObjects, true);
 
@@ -1677,7 +1670,6 @@ getScreenSpaceDistance(pos1, pos2) {
         while (rootNode?.parent) {
           const c = rootNode.userData?.color;
           if (typeof c === 'string') {
-            // console.log('Applying color from userData:', c);
             applyColorToObject(node, c);
             break;
           }
@@ -1728,7 +1720,6 @@ getScreenSpaceDistance(pos1, pos2) {
 	      if (setCmd != null) {
             changes.push(setCmd);
           }
-
           // this.addBoxHelpers();
 
           this.render();
@@ -2032,13 +2023,11 @@ class Scope {
           // if gltf for the given url exists in the cache let's return it
           if (this.gltfs[url]) {
             loadedAssets++;
-            // console.log(`Loading from cache: ${url} (${loadedAssets}/${totalAssets})`);
+
             resolve(this.gltfs[url]);
             return;
           }
 
-          // console.log(`Loading model: ${url} (${loadedAssets}/${totalAssets})`);
-          
           gltfLoader.load(url, (gltf) => {
               loadedAssets++;
               // store gltf in the cache
@@ -2056,7 +2045,7 @@ class Scope {
         }
       });
     const loadURLs = async (localURLs, assetsByURL) => {
-      // console.log(`Loading URLS: ${localURLs}`);
+
       await Promise.all(localURLs.map(loadUrl));
       for (const url of localURLs) {
         const gltf = this.gltfs[contextPath + url];
@@ -2464,7 +2453,6 @@ class GltfAsset extends SharedObject {
 
     this.group.remove(this.placeholder);
 
-    // const model = this.gltf.scene.clone();
     const useLOD = true;
     
     if (useLOD) {
@@ -2485,7 +2473,6 @@ class GltfAsset extends SharedObject {
       lod.addLevel(lowDetailModel, LOD_LOW_DISTANCE);  // visible from low distance and beyond
       
     } else {
-      // console.log('[GltfAsset] Using standard rendering');
       // standard non-LOD rendering
       const model = this.gltf.scene.clone();
       model.traverse((obj) => {
@@ -2504,7 +2491,6 @@ class GltfAsset extends SharedObject {
   
   // create a model with specific level of detail
   createDetailLevel(originalScene, detailLevel) {
-    // console.log(`[LOD] Creating ${detailLevel} detail level`);
     const model = originalScene.clone();
 
     model.traverse((obj) => {
@@ -2907,12 +2893,6 @@ const CameraUtils = {
 };
 
 const SceneUtils = {
-  createLine: function(start, end, color, linewidth) {
-    const geometry = new BufferGeometry().setFromPoints([start, end]);
-    const material = new LineBasicMaterial({ color, linewidth });
-    return new Line(geometry, material);
-  },
-
   createDetailedGrid: function(size) {
     const z = 0;
     const edge = size / 2;
@@ -2992,23 +2972,6 @@ const SceneUtils = {
     scene.add(light2);
     
     return { ambientLight: scene.children[0], mainLight: light, secondaryLight: light2 };
-  },
-  
-  getRaycaster: function(event, camera, canvas) {
-    const raycaster = new Raycaster();
-    const mouse = new Vector2();
-
-    const rect = canvas.getBoundingClientRect();
-    const mousePos = {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    };
-    mouse.x = (mousePos.x / canvas.clientWidth) * 2 - 1;
-    mouse.y = -(mousePos.y / canvas.clientHeight) * 2 + 1;
-
-    raycaster.setFromCamera(mouse, camera);
-
-    return raycaster;
   }
 };
 
