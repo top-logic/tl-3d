@@ -39,23 +39,23 @@ import { InsertElement, RemoveElement, SetProperty } from "./Commands.js";
 import { CameraUtils, SceneUtils, applyColorToObject, getLocalMatrix, getMatrixDiff, toMatrix, getRaycaster, isDescendantOfAny, throttle  } from "./ThreeJsUtils.js";
 
 import { 
-  WHITE,
-  LIGHT_GREY,
-  DARK_GREY,
-  YELLOW,
-  GREEN,
-  SELECTION_COLOR,
   CAMERA_MOVE_DURATION,
   C_P_RADIUS,
-  WIDTH_SEGMENTS,
-  HEIGHT_SEGMENTS,
-  _90_DEGREE,
-  OPTIMIZED_PIXEL_RATIO,
-  INTERACTIVE_PIXEL_RATIO,
-  GRID_SMALL_CELL,
-  SNAP_THRESHOLD,
+  DARK_GREY,
   FLOOR_PADDING,
-  TRANSPARENCY_LEVEL
+  GREEN,
+  GRID_SMALL_CELL,
+  HEIGHT_SEGMENTS,
+  INTERACTIVE_PIXEL_RATIO,
+  LIGHT_GREY,
+  OPTIMIZED_PIXEL_RATIO,
+  SELECTION_COLOR,
+  SNAP_THRESHOLD,
+  TRANSPARENCY_LEVEL,
+  WHITE,
+  WIDTH_SEGMENTS,
+  YELLOW,
+  _90_DEGREE
 } from './Constants.js';
 
 /**
