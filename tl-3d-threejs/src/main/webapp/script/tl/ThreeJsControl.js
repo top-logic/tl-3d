@@ -1572,6 +1572,8 @@ getScreenSpaceDistance(pos1, pos2) {
   applySceneChanges(changesString) {
     try {
       const changes = JSON.parse(changesString);
+      let needsFullReload = false;
+      
       for (const change of changes) {
         var command = change[0];
         var cmdProps = command[1];
@@ -1582,12 +1584,23 @@ getScreenSpaceDistance(pos1, pos2) {
           case 'I': cmd = new InsertElement(cmdProps["id"]); break;
           case 'S': cmd = new SetProperty(cmdProps["id"]); break;
         }
+
+        // If not a selection change, need full reload
+        if (cmdProps["p"] !== 'selection') {
+          needsFullReload = true;
+        }
         change.shift();
         cmd.loadJson(cmdProps, change);
         cmd.apply(this.scope);
       }
 
-      this.sceneGraph.reload(this.scope);
+      if (needsFullReload) {
+        this.sceneGraph.reload(this.scope);
+      } else {
+        this.applySelection(this.sceneGraph.selection);
+        this.updateTransformControls();
+        this.render();
+      }
     } catch (ex) { 
       console.error(ex);
       throw ex;

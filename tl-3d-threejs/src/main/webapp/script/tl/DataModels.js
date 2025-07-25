@@ -32,7 +32,7 @@ import {
   applyColorToObject,
 } from './ThreeJsUtils.js';
 
-import { SetProperty } from './Commands.js';
+import { InsertElement, RemoveElement, SetProperty } from './Commands.js';
 import { GLTFLoader } from "GLTFLoader";
 
 export class Scope {
