@@ -10,11 +10,7 @@ import {
   BoxGeometry,
   BoxHelper,
   Color,
-  CubeTexture,
-  DoubleSide,
-  FrontSide,
   Group,
-  ImageLoader,
   Matrix4,
   Mesh,
   MeshBasicMaterial,
@@ -33,17 +29,15 @@ import { Scope, SharedObject} from "./DataModels.js";
 import { InsertElement, RemoveElement, SetProperty } from "./Commands.js";
 import { CameraUtils, SceneUtils, applyColorToObject, getLocalMatrix, getMatrixDiff, toMatrix, getRaycaster, isDescendantOfAny, throttle  } from "./ThreeJsUtils.js";
 import { NavigationCube } from "./NavigationCube.js";
+import { SkyboxManager } from "./SkyboxManager.js";
 
 import { 
   CAMERA_MOVE_DURATION,
   C_P_RADIUS,
-  DARK_GREY,
-  FLOOR_PADDING,
   GREEN,
   GRID_SMALL_CELL,
   HEIGHT_SEGMENTS,
   INTERACTIVE_PIXEL_RATIO,
-  LIGHT_GREY,
   OPTIMIZED_PIXEL_RATIO,
   SELECTION_COLOR,
   SNAP_THRESHOLD,
@@ -87,7 +81,8 @@ class ThreeJsControl {
     this.areObjectsTransparent = initialState.areObjectsTransparent;
     this.useScreenSpaceSnapping = true;
     
-    this.skyboxEnabled = initialState.skyboxEnabled !== false;
+    this.skyboxManager = new SkyboxManager(this);
+    this.skyboxManager.setEnabled(initialState.skyboxEnabled !== false);
     this.initScene();
     this.initRenderer();
     this.initControls();
@@ -104,7 +99,7 @@ class ThreeJsControl {
       this.zoomOut();
       this.updateLODObjects();
 
-      this.initSkybox().then(() => this.toggleSkybox(initialState.isSkyboxVisible));
+      this.skyboxManager.initSkybox().then(() => this.skyboxManager.toggleSkybox(initialState.isSkyboxVisible));
 
       // Recreate floors after scene is loaded - moved to loadScene()
     }, 100));
@@ -248,202 +243,13 @@ class ThreeJsControl {
   }
 
   toggleSkybox(visible) {
-    if (!this.environmentBackground) return;
-
-    // Show/Hide skybox and floors
-    [this.environmentBackground, ...(this.factoryFloors || [])].forEach(obj => {
-      obj.parent?.remove(obj);
-      if (visible) this.zUpEnvironment.add(obj);
-    });
-
-    this.isSkyboxVisible = visible;
-    this.render();
+    this.skyboxManager.toggleSkybox(visible);
   }
 
-  async initSkybox() {
-    if (!this.skyboxEnabled) return;
-    // Load cube texture and create skybox environment
-    await this.loadCubeTexture();
-    this.render();
-  }
-
-  createTiledTexture(image) {
-    // Create a 4x4 tiled texture to make textures appear smaller and more realistic (poor performance)
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const [tileW, tileH] = [image.width, image.height];
-    const koeff = 4;
-    
-    [canvas.width, canvas.height] = [tileW * koeff, tileH * koeff];
-    
-    // Draw 4x4 grid of rotated tiles
-    for (let x = 0; x < koeff; x++) {
-      for (let y = 0; y < koeff; y++) {
-        ctx.save();
-        ctx.translate((x + 0.5) * tileW, (y + 0.5) * tileH);
-        ctx.drawImage(image, -image.width/2, -image.height/2);
-        ctx.restore();
-      }
-    }
-    return canvas;
-  }
-
-  async loadCubeTexture() {
-    const texture = new CubeTexture();
-    const loader = new ImageLoader();
-    
-    // Define texture URLs for different surfaces
-    const lrWallUrl = 'https://as2.ftcdn.net/v2/jpg/03/24/83/79/1000_F_324837965_WzkElQWESPpFBltfwddlJaQIYH8X9D5V.jpg'; // Left/Right walls
-    const fbWallUrl = 'https://as2.ftcdn.net/v2/jpg/01/98/99/89/1000_F_198998931_VZjbdpDglkKPjbqaXa3bnH8fB6axUTcp.jpg'; // Front/Back walls
-    const floorUrl = 'https://as1.ftcdn.net/v2/jpg/01/79/71/02/1000_F_179710260_hVhHw5vQNsXyb9qvIkRbIHBzWUuVcmF7.jpg'; // Floor/Ceiling
-    
-    const urls = [lrWallUrl, fbWallUrl, floorUrl];
-
-    const [ lrWallImg, fbWallImg, floorImg ] = await Promise.all(
-      urls.map(url => new Promise(
-        (resolve) => loader.load(url, resolve, undefined, () => resolve(undefined))
-      ))
-    );
-
-    const tiledFrontBackWall = this.createTiledTexture(fbWallImg);
-    // Create textures
-    texture.images = [lrWallImg, lrWallImg, floorImg,  floorImg, tiledFrontBackWall, tiledFrontBackWall];
-    texture.needsUpdate = true;
-    this.createEnvironmentCube(texture);
-  }
-
-  createEnvironmentCube(cubeTexture = null) {
-    this.environmentBackground?.parent?.remove(this.environmentBackground);
-    
-    const center = new Vector3();
-    this.boundingBox.getCenter(center);
-    
-    const boxSize = this.boundingBox.getSize(new Vector3());
-    const [x, y, z] = boxSize.toArray();
-
-    const floorSizes = { 
-      x: x + FLOOR_PADDING,
-      z: z + FLOOR_PADDING,
-    };
-
-    this.floorSizes = floorSizes;
-
-    if (cubeTexture) {
-      // Create textured skybox cube
-      const geometry = new BoxGeometry(floorSizes.x, y * 2, floorSizes.z).scale(-1, 1, 1);
-      this.environmentBackground = new Mesh(geometry, cubeTexture.images.map(img => 
-        new MeshBasicMaterial({ map: img ? new CanvasTexture(img) : null, side: FrontSide })
-      ));
-    }
-
-    // Adjusting the cube's Y position to match the bottom of the bounding box height
-    const cubeYposition = center.y + y / 2 - 100;
-    this.environmentBackground.position.set(center.x, cubeYposition, center.z);
-    
-    this.createFactoryFloors(cubeTexture);
-    
-    // Update camera max distance based on skybox size
-    // if (this.controls) this.controls.maxDistance = cubeSize * 0.5;
-  }
-  
-  createFactoryFloors(cubeTexture) {
-    if (this.factoryFloors) {
-      this.factoryFloors.forEach(floor => {
-        if (floor.parent) {
-          floor.parent.remove(floor);
-        }
-      });
-    }
-    this.factoryFloors = [];
-    
-    // Get floor levels from scene graph
-    const floorLevels = this.getFloorLevels();
-
-    let floorsToCreate = [];
-
-    if (floorLevels.length > 0) {
-      floorsToCreate = floorLevels;
-    } else {
-      // Use numberOfFloors from scene graph or default to 1
-      const numberOfFloors = this.sceneGraph?.numberOfFloors || 1;
-
-      floorsToCreate = Array.from({ length: numberOfFloors }, (_, i) => i);
-    }
-    
-    // Calculate scene size for floor dimensions
-    const sceneBox = new Box3();
-    sceneBox.setFromObject(this.zUpRoot);
-    const floorSizes = this.floorSizes;
-    
-    if (!floorSizes) {
-      return;
-    }
-
-    let floorTexture;
-    if (cubeTexture && cubeTexture.images && cubeTexture.images[3]) {
-      floorTexture = new CanvasTexture(cubeTexture.images[3]);
-    } else if (this.environmentBackground && this.environmentBackground.material && this.environmentBackground.material[3]) {
-      floorTexture = this.environmentBackground.material[3].map;
-    } 
-    
-    // Get bounding box center for floor positioning
-    const center = new Vector3();
-    if (this.boundingBox) {
-      this.boundingBox.getCenter(center);
-    } else {
-      center.set(0, 0, 0); // fallback to world center
-    }
-    
-    for (const level of floorsToCreate) {
-      // Create material with conditional map property
-      const materialOptions = {
-        side: DoubleSide,
-        color: WHITE
-      };
-      
-      if (floorTexture) {
-        materialOptions.map = floorTexture;
-      }
-      
-      const floor = new Mesh(
-        new BoxGeometry(floorSizes.x, 100, floorSizes.z), 
-        new MeshBasicMaterial(materialOptions)
-      );
-      
-      const floorY = level * 15000 - 100;
-      floor.position.set(center.x, floorY, center.z);
-
-      this.factoryFloors.push(floor);
-    }
-  }
-  
-  getFloorLevels() {
-    // Extract floor levels from scene graph
-    const floorLevels = [];
-    if (this.sceneGraph && this.sceneGraph.root) {
-      const findFloors = (node) => {
-        if (node.name && node.name.startsWith('Floor ')) {
-          // Extract floor number from name (e.g., "Floor 0", "Floor 1")
-          const floorNumber = parseInt(node.name.split(' ')[1]);
-          if (!isNaN(floorNumber)) {
-            floorLevels.push(floorNumber);
-          }
-        }
-        // Recursively search in contents/children
-        if (node.contents) node.contents.forEach(findFloors);
-      };
-      findFloors(this.sceneGraph.root);
-    }
-    // Sort floor levels
-    const sortedLevels = floorLevels.sort((a, b) => a - b);
-    
-    return sortedLevels;
-  }
-  
   updateFactoryFloors() {
     // Update floors when scene changes
-    if (this.skyboxEnabled && this.environmentBackground) {
-      this.createFactoryFloors(null);
+    if (this.skyboxManager.isEnabled() && this.skyboxManager.getEnvironmentBackground()) {
+      this.skyboxManager.createFactoryFloors(null);
       this.render();
     }
   }
@@ -1616,8 +1422,8 @@ getScreenSpaceDistance(pos1, pos2) {
     this.sceneGraph.buildGraph(this);
     
     // Create floors after sceneGraph is loaded with numberOfFloors
-    if (this.skyboxEnabled) {
-      this.createFactoryFloors(null);
+    if (this.skyboxManager.isEnabled()) {
+      this.skyboxManager.createFactoryFloors(null);
     }
     
     this.scope.loadAssets(this).then(() => {
