@@ -7,19 +7,14 @@ import {
   AxesHelper,
   Box3,
   Box3Helper,
-  BoxBufferGeometry,
   BoxGeometry,
   BoxHelper,
-  CanvasTexture,
   Color,
   CubeTexture,
   DoubleSide,
-  EdgesGeometry,
   FrontSide,
   Group,
   ImageLoader,
-  LineBasicMaterial,
-  LineSegments,
   Matrix4,
   Mesh,
   MeshBasicMaterial,
@@ -37,6 +32,7 @@ import { gsap } from "gsap";
 import { Scope, SharedObject} from "./DataModels.js";
 import { InsertElement, RemoveElement, SetProperty } from "./Commands.js";
 import { CameraUtils, SceneUtils, applyColorToObject, getLocalMatrix, getMatrixDiff, toMatrix, getRaycaster, isDescendantOfAny, throttle  } from "./ThreeJsUtils.js";
+import { NavigationCube } from "./NavigationCube.js";
 
 import { 
   CAMERA_MOVE_DURATION,
@@ -93,11 +89,9 @@ class ThreeJsControl {
     
     this.skyboxEnabled = initialState.skyboxEnabled !== false;
     this.initScene();
-    this.initAxesCubeScene();
     this.initRenderer();
-    this.initAxesCubeRenderer();
     this.initControls();
-    this.initAxesCubeControls();
+    this.initNavigationCube();
     this.initTransformControls();
     this.render();
     this.isEditMode = false;
@@ -185,130 +179,20 @@ class ThreeJsControl {
     this.controlsIsUpdating = false;
 
     this.controls.addEventListener("change", () => {
-      if (!this.cubeControlsIsUpdating) {
-        this.controlsIsUpdating = true;        
-        this.cubeCamera.quaternion.copy(this.camera.quaternion);
-        this.cubeCamera.position.copy(
-          CameraUtils.calculateCubeCameraPosition(this.camera.position, this.controls.target)
-        );
-        this.cubeControls.update();
-        this.controlsIsUpdating = false;
-        this.render();
+      if (this.navigationCube) {
+        this.navigationCube.updateFromMainCamera();
       }
+      this.render();
     });
   }
 
-  initAxesCubeScene() {
-    this.cubeScene = new Scene();
-    this.cubeScene.background = null;
-
-    this.cubeCamera = CameraUtils.createCubeCamera();
-    this.cubeScene.rotation.x = -_90_DEGREE;
-
-    SceneUtils.addCubeSceneLights(this.cubeScene);
-
-    this.axesCube = this.createAxesCube();
-    this.cubeScene.add(this.axesCube);
-
-    this.render();
-  }
-
-  createAxesCube() {
-    const cubeSize = 6;
-    const cubeGeometry = new BoxBufferGeometry(cubeSize, cubeSize, cubeSize);
-    const cubeMaterials = [
-      new MeshStandardMaterial({ map: this.createTextTexture("Right"), side: FrontSide }),
-      new MeshStandardMaterial({ map: this.createTextTexture("Left"), side: FrontSide }),    
-      new MeshStandardMaterial({ map: this.createTextTexture("Back"), side: FrontSide }),
-      new MeshStandardMaterial({ map: this.createTextTexture("Front"), side: FrontSide }),
-      new MeshStandardMaterial({ map: this.createTextTexture("Top"), side: FrontSide }), 
-      new MeshStandardMaterial({ map: this.createTextTexture("Bottom"), side: FrontSide }),    
-    ];
-
-    const cube = new Mesh(cubeGeometry, cubeMaterials);
-    cube.position.set(0, 0, 0);
-
-    const edgeGeometry = new EdgesGeometry(cubeGeometry);
-    const edgeMaterial = new LineBasicMaterial({ color: DARK_GREY });
-    const cubeEdges = new LineSegments(edgeGeometry, edgeMaterial);
-
-    const group = new Group();
-    group.add(cube);
-    group.add(cubeEdges);
-
-    this.originalMaterials = cubeMaterials.map((material) => material.clone());
-
-    return group;
-  }
-
-  createTextTexture(text) {
-    const size = 256;
-    const textCanvas = document.createElement("canvas");
-    textCanvas.width = size;
-    textCanvas.height = size;
-    const context = textCanvas.getContext("2d");
-
-    context.fillStyle = LIGHT_GREY;
-    context.fillRect(0, 0, size, size);
-
-    context.fillStyle = DARK_GREY;
-    context.font = "bold 70px Arial";
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-
-    context.translate(size / 2, size / 2);
-
-    switch (text) {
-      case "Right": context.rotate(-_90_DEGREE);
-        break;
-      case "Left": context.rotate(_90_DEGREE);
-        break;
-      case "Back": context.rotate(Math.PI);
-        break;
-      case "Bottom": context.rotate(Math.PI);
-        break;
-    }
-    context.fillText(text, 0, 0);
-
-    return new CanvasTexture(textCanvas);
-  }
-
-  initAxesCubeRenderer() {
-    const container = this.container;
-    this.cubeRenderer = new WebGLRenderer({ alpha: true });
-    this.cubeRenderer.shadowMap.enabled = true;
-    this.cubeRenderer.setSize(100, 100);
-    this.cubeRenderer.setPixelRatio(window.devicePixelRatio);
-    this.cubeCanvas = this.cubeRenderer.domElement;
-    this.cubeCanvas.style.position = "absolute";
-    this.cubeCanvas.style.top = "0";
-    container.append(this.cubeCanvas);
-    this.cubeCanvas.addEventListener("mousemove", (event) => this.onCubeHover(event), false);
-    this.cubeCanvas.addEventListener("mousedown", (event) => this.onMouseDown(event));
-    this.cubeCanvas.addEventListener("click", (event) => this.onCubeClick(event), false);
-  }
-
-  initAxesCubeControls() {
-    this.cubeControls = new OrbitControls(this.cubeCamera, this.cubeCanvas);
-    this.cubeControls.enableZoom = false;
-    this.cubeControls.enablePan = false;
-    this.cubeControls.target.set(0, 0, 0);
-
-    this.cubeControlsIsUpdating = false;
-
-    this.cubeControls.addEventListener("change", () => {
-      if (!this.controlsIsUpdating) {
-        this.cubeControlsIsUpdating = true;
-        this.camera.quaternion.copy(this.cubeCamera.quaternion);
-        this.camera.position.copy(
-          CameraUtils.calculateMainCameraPosition(this.cubeCamera.position, this.camera.position, this.controls.target)
-        );
-        this.controls.update();
-        this.cubeControlsIsUpdating = false;
-
-        this.render();
-      }
-    });
+  initNavigationCube() {
+    this.navigationCube = new NavigationCube(
+      this.container,
+      () => this.render(),
+      this.camera,
+      this.controls
+    );
   }
 
   createCamera() {
@@ -1336,6 +1220,12 @@ getScreenSpaceDistance(pos1, pos2) {
     this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
     this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
     this.camera.updateProjectionMatrix();
+    
+    // Update navigation cube size if it exists
+    if (this.navigationCube) {
+      this.navigationCube.updateSize();
+    }
+    
     this.render();
   }
 
@@ -1385,70 +1275,6 @@ getScreenSpaceDistance(pos1, pos2) {
     this._throttledMouseWheel(event);
   }
 
-  onCubeHover(event) {
-    if (!this._throttledCubeHover) {
-      this._throttledCubeHover = throttle((event) => {
-        const raycaster = getRaycaster(event, this.cubeCamera, this.cubeCanvas);
-        const intersects = raycaster.intersectObject(this.axesCube.children[0], true);
-
-        const materials = this.axesCube.children[0].material;
-        materials.forEach((material, index) => {
-          material.color.copy(this.originalMaterials[index].color);
-          material.map = this.originalMaterials[index].map;
-        });
-
-        if (intersects.length > 0) {
-          const intersectedFace = intersects[0].face;
-          materials[intersectedFace.materialIndex].color.set("#66bbff");
-        }
-
-        this.render();
-      }, 100); 
-    }
-    this._throttledCubeHover(event);
-  }
-
-  onCubeClick(event) {
-    if (Date.now() - this.clickStart > 500) {
-      return; // Not a click
-    }
-    const raycaster = getRaycaster(event, this.cubeCamera, this.cubeCanvas);
-    const intersects = raycaster.intersectObjects(
-      this.cubeScene.children,
-      true
-    );
-    const intersectedFace = intersects.find((i) => !!i.face)?.face;
-
-    if (!intersectedFace) return;
-
-    const faceIndex = intersectedFace.materialIndex;
-
-    const facePositions = {
-      0: { x: 10, y: 0, z: 0 }, // Right
-      1: { x: -10, y: 0, z: 0 }, // Left
-      2: { x: 0, y: 0, z: -10 }, // Back
-      3: { x: 0, y: 0, z: 10 }, // Front
-      4: { x: 0, y: 10, z: 1 }, // Top
-      5: { x: 0, y: -10, z: 1 }, // Bottom
-    };
-
-    const newPos = facePositions[faceIndex];
-
-    gsap.to(this.cubeControls.object.position, {
-      x: newPos.x,
-      y: newPos.y,
-      z: newPos.z,
-      duration: CAMERA_MOVE_DURATION,
-      ease: "power2.out",
-      onUpdate: () => {
-        this.cubeControls.update();
-        this.render();
-      },
-      onComplete: () => {
-        this.render();
-      },
-    });
-  }
 
   zoomToSelection() {
     const selectedObject = this.selection[0]?.node;
@@ -1944,7 +1770,7 @@ getScreenSpaceDistance(pos1, pos2) {
 
   render() {
     requestAnimationFrame(() => {
-      const { renderer, cubeRenderer, scene, camera, cubeScene, cubeCamera } = this;
+      const { renderer, scene, camera } = this;
 
       // update LOD objects if enabled
       if (this.useLOD) {
@@ -1952,7 +1778,11 @@ getScreenSpaceDistance(pos1, pos2) {
       }
 
       renderer.render(scene, camera);
-        cubeRenderer.render(cubeScene, cubeCamera);
+      
+      // Render navigation cube
+      if (this.navigationCube) {
+        this.navigationCube.render();
+      }
     });
   }
 }
