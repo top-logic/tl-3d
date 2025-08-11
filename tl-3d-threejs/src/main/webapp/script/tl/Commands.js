@@ -74,7 +74,35 @@ export class InsertElement extends ListUpdate {
   	if (target == null) {
   		return;
   	}
+  	
+  	// Store old element for reference updating
+  	const oldElement = target[this.property] && target[this.property][this.idx];
+  	
   	target.insertElementAt(scope, this.property, this.idx, this.element);
+  	
+  	// Update 3D object references if this is a PartNode replacement
+  	if (this.property === 'contents' && oldElement) {
+  		// Get the newly inserted element
+  		const newElement = target[this.property] && target[this.property][this.idx];
+  		if (newElement) {
+  			this.updateNodeReferences(scope, oldElement, newElement);
+  		}
+  	}
+  }
+  
+  updateNodeReferences(scope, oldSharedObject, newSharedObject) {
+  	// Skip if not dealing with SharedObjects that have 3D nodes
+  	if (!oldSharedObject || !newSharedObject) {
+  		return;
+  	}
+  	
+  	// Update the nodeRef in the 3D object's userData
+  	if (oldSharedObject.node && oldSharedObject.node.userData) {
+  		oldSharedObject.node.userData.nodeRef = newSharedObject;
+  		// Transfer the 3D node to the new SharedObject
+  		newSharedObject.node = oldSharedObject.node;
+  		oldSharedObject.node = null;
+  	}
   }
 
   extract() {
@@ -104,7 +132,17 @@ export class RemoveElement extends ListUpdate {
   	if (target == null) {
   		return;
   	}
+  	
+  	// Store element being removed for cleanup
+  	const removedElement = target[this.property] && target[this.property][this.idx];
+  	
   	target.removeElementAt(scope, this.property, this.idx);
+  	
+  	// Clean up 3D object references if this was a PartNode
+  	if (this.property === 'contents' && removedElement && removedElement.node) {
+  		// The 3D node will be orphaned, but that's expected for removal
+  		removedElement.node = null;
+  	}
   }
 
   extract() {

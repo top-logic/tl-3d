@@ -167,6 +167,16 @@ export class SharedObject {
     this.transform = toTX(newTransformation);
     return SetProperty.prototype.create(this.id, 'transform', this.transform);
   }
+  
+  setProperty(scope, property, value) {
+    switch (property) {
+      case 'parent': 
+        this.parent = scope.loadJson(value); 
+        break;
+      default:
+        break;
+    }
+  }
 }
 
 export class SceneGraph extends SharedObject {
@@ -248,6 +258,9 @@ export class SceneGraph extends SharedObject {
         break; 
       case 'numberOfFloors':
         this.numberOfFloors = value;
+        break;
+      default:
+        super.setProperty(scope, property, value);
         break;
     }
   }
@@ -334,6 +347,9 @@ export class ConnectionPoint extends SharedObject {
     switch (property) {
       case 'transform': this.transform = value; break;
       case 'classifiers': this.classifiers = value; break;
+      default:
+        super.setProperty(scope, property, value);
+        break;
     }
   }
   
@@ -373,12 +389,21 @@ export class GroupNode extends SharedObject {
     transform(group, this.transform);
     this.contents.forEach((c) => c.build(group, context));
 
+    // Apply color to this group node
+    if (this.color) {
+      applyColorToObject(group, this.color);
+    }
+
     // Link to scene node
     group.userData = {
       ...group.userData,
       nodeRef: this,
       color: this.color || null
     };
+    
+    // Set initial visibility
+    group.visible = !this.hidden;
+    
     this.node = group;
   }
 
@@ -401,9 +426,22 @@ export class GroupNode extends SharedObject {
         break;
       } 
       case 'transform': this.transform = value; break;
-      case 'color': this.color = value; break;
-      case 'hidden': this.hidden = value; break;
+      case 'color': 
+        this.color = value; 
+        if (this.node && value) {
+          applyColorToObject(this.node, value);
+        }
+        break;
+      case 'hidden': 
+        this.hidden = value; 
+        if (this.node) {
+          this.node.visible = !value;
+        }
+        break;
       case 'selectable': this.selectable = value; break;
+      default:
+        super.setProperty(scope, property, value);
+        break;
    }
   }
 
@@ -460,6 +498,10 @@ export class PartNode extends SharedObject {
       nodeRef: this,
       color: this.color || null
     };
+    
+    // Set initial visibility
+    group.visible = !this.hidden;
+    
     this.node = group;
   }
 
@@ -475,14 +517,25 @@ export class PartNode extends SharedObject {
     switch (property) {
       case 'asset': this.asset = scope.loadJson(value); break; 
       case 'transform': this.transform = value; break;
-      case 'color': this.color = value; break;
-      case 'hidden': {
-        if (value) {
-          console.log(`Hiding part '${this.id}'`);
+      case 'color': 
+        this.color = value; 
+        // Update 3D object color
+        if (this.node && value) {
+          applyColorToObject(this.node, value);
         }
-        this.hidden = value; break;
+        break;
+      case 'hidden': {
+        this.hidden = value; 
+        // Update 3D object visibility
+        if (this.node) {
+          this.node.visible = !value;
+        }
+        break;
       } 
       case 'selectable': this.selectable = value; break;
+      default:
+        super.setProperty(scope, property, value);
+        break;
     }
   }
 
@@ -670,6 +723,9 @@ export class GltfAsset extends SharedObject {
       case 'url': this.url = value; break;
       case 'layoutPoint': this.layoutPoint = scope.loadJson(value); break; 
       case 'snappingPoints': this.snappingPoints = scope.loadAll(value); break; 
+      default:
+        super.setProperty(scope, property, value);
+        break;
     }
   }
   insertElementAt(scope, property, idx, value) {

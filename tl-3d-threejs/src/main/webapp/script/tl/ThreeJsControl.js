@@ -1585,8 +1585,10 @@ getScreenSpaceDistance(pos1, pos2) {
           case 'S': cmd = new SetProperty(cmdProps["id"]); break;
         }
 
-        // If not a selection change, need full reload
-        if (cmdProps["p"] !== 'selection') {
+        // Be conservative - only allow known safe incremental properties
+        const safeIncrementalProperties = ['selection', 'parent', 'transform', 'hidden', 'color', 'selectable', 'contents'];
+        
+        if (!safeIncrementalProperties.includes(cmdProps["p"])) {
           needsFullReload = true;
         }
         change.shift();
@@ -1599,6 +1601,7 @@ getScreenSpaceDistance(pos1, pos2) {
       } else {
         this.applySelection(this.sceneGraph.selection);
         this.updateTransformControls();
+        this.applyColors();
         this.render();
       }
     } catch (ex) { 
@@ -1658,6 +1661,15 @@ getScreenSpaceDistance(pos1, pos2) {
     }
 
     this.updateObjectsTransparency();
+  }
+
+  // Apply colors to all objects that have color and 3D node
+  applyColors() {
+    for (const [id, obj] of Object.entries(this.scope.objects)) {
+      if (obj.color && obj.node && obj.color.trim() !== '') {
+        applyColorToObject(obj.node, obj.color);
+      }
+    }
   }
 
   setColor(node, color) {
