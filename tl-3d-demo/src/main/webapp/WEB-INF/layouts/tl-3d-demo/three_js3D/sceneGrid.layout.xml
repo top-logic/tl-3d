@@ -12,8 +12,9 @@
 		multiSelection="true"
 		type="tl.threed.demo:Node"
 	>
-		<name key="dynamic.e534fe8f-98eb-4cf2-bfa2-aa25ddf981a9">
-			<de>Scene</de>
+		<name key="dynamic.44f7d577-da26-413a-aa4f-8797ba6b0010">
+			<en>Scene</en>
+			<de>Szene</de>
 		</name>
 		<modelBuilder class="com.top_logic.model.search.providers.TreeModelByExpression"
 			children="node->$node.get(`tl.element:StructuredElementContainer#children`)"
@@ -36,9 +37,7 @@
 		<buttons>
 			<button id="exportExcelGrid"
 				class="com.top_logic.layout.table.export.StreamingExcelExportHandler"
-			>
-				<downloadNameProvider class="com.top_logic.layout.table.export.ComponentDownloadName"/>
-			</button>
+			/>
 			<button id="createNewRow"
 				class="com.top_logic.model.search.providers.GridCreateHandlerByExpression"
 				createContext="model -> $model"
@@ -60,6 +59,7 @@
 				target="selection(self())"
 			>
 				<resourceKey key="dynamic.5afcd5ae-112a-4dfc-99e8-576ac1b1f953">
+					<en>Grouping</en>
 					<de>Gruppieren</de>
 				</resourceKey>
 				<executability>
@@ -82,6 +82,7 @@
 				target="selection(self())"
 			>
 				<resourceKey key="dynamic.49d7eb5a-3068-4fe3-95f9-263ace934ef4">
+					<en>Project from selection</en>
 					<de>Projekt aus Selektion</de>
 				</resourceKey>
 				<executability>
@@ -102,9 +103,7 @@
 			<button id="ID_38e16012_e1b7_44e3_8776_eccfd8bbf060"
 				class="com.top_logic.layout.component.GenericDeleteCommandHandler"
 				target="selection(self())"
-			>
-				<confirmation class="com.top_logic.tool.boundsec.confirm.DefaultDeleteConfirmation"/>
-			</button>
+			/>
 		</buttons>
 	</arguments>
 </config:template-call>
