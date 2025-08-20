@@ -101,4 +101,7 @@ message SceneGraph extends ScenePart {
 	/** Step size to use when an element is translated. */
 	int translateStepSize;
 	
+	/** Number of floors in the scene. */
+	int numberOfFloors;
+	
 }

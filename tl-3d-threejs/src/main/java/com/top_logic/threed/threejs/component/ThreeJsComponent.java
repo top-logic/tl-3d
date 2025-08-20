@@ -560,7 +560,7 @@ public class ThreeJsComponent extends BuilderComponent
 		Object model = getModel();
 		if (model instanceof TLObject) {
 			TLObject tlObject = (TLObject) model;
-			Object numberOfFloors = tlObject.tGetData("numberOfFloors");
+			Object numberOfFloors = tlObject.tGetData(SceneGraph.NUMBER_OF_FLOORS__PROP);
 			if (numberOfFloors instanceof Integer) {
 				int floors = (Integer) numberOfFloors;
 				_scene.setNumberOfFloors(floors);

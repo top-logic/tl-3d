@@ -292,7 +292,7 @@ public class SceneGraph extends ScenePart {
 			SELECTION__PROP, 
 			COORDINATE_SYSTEM__PROP, 
 			ROTATE_STEP_SIZE__PROP, 
-			TRANSLATE_STEP_SIZE__PROP,
+			TRANSLATE_STEP_SIZE__PROP, 
 			NUMBER_OF_FLOORS__PROP));
 
 	private static java.util.Set<String> TRANSIENT_PROPERTIES = java.util.Collections.unmodifiableSet(new java.util.HashSet<>(
@@ -446,6 +446,7 @@ public class SceneGraph extends ScenePart {
 			break;
 			case ROTATE_STEP_SIZE__PROP: setRotateStepSize(in.nextInt()); break;
 			case TRANSLATE_STEP_SIZE__PROP: setTranslateStepSize(in.nextInt()); break;
+			case NUMBER_OF_FLOORS__PROP: setNumberOfFloors(in.nextInt()); break;
 			default: super.readField(scope, in, field);
 		}
 	}

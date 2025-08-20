@@ -32,6 +32,7 @@ import com.top_logic.threed.demo.model.Part;
 import com.top_logic.threed.demo.model.Scene;
 import com.top_logic.threed.demo.model.TlThreedDemoFactory;
 import com.top_logic.threed.demo.scripting.actions.CreateComplexSceneAction.Config;
+import com.top_logic.threed.threejs.scene.SceneGraph;
 
 /**
  * Test action that creates a complex {@link Scene}.
@@ -167,7 +168,7 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 		Scene scene = factory.createScene();
 		scene.setName(sceneName());
 		int numberOfFloors = getConfig().getNumberFloors();
-		scene.tSetData("numberOfFloors", numberOfFloors);
+		scene.tSetData(SceneGraph.NUMBER_OF_FLOORS__PROP, numberOfFloors);
 		Assembly rootNode = factory.createAssembly();
 		rootNode.setName("Building 1");
 		scene.setRootNode(rootNode);
