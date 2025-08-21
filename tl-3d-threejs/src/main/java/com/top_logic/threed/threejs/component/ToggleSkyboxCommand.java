@@ -5,6 +5,7 @@
  */
 package com.top_logic.threed.threejs.component;
 
+import com.top_logic.basic.annotation.InApp;
 import com.top_logic.basic.config.InstantiationContext;
 import com.top_logic.basic.config.annotation.defaults.ClassDefault;
 import com.top_logic.basic.config.annotation.defaults.NullDefault;
@@ -14,6 +15,7 @@ import com.top_logic.mig.html.layout.LayoutComponent;
 import com.top_logic.tool.boundsec.CommandHandler;
 import com.top_logic.tool.boundsec.commandhandlers.ToggleCommandHandler;
 
+@InApp(classifiers = { "3DViewer" })
 public class ToggleSkyboxCommand extends ToggleCommandHandler {
 
 	public interface Config extends ToggleCommandHandler.Config {
