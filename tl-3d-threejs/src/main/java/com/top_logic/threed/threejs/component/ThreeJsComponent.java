@@ -526,9 +526,20 @@ public class ThreeJsComponent extends BuilderComponent
 	ThreeJsControl getThreeJSControl() {
 		if (_control == null) {
 			_control = new ThreeJsControl(getScene());
+			setCoordinateSystems(getSelected());
 		}
 
 		return _control;
+	}
+
+	private void setCoordinateSystems(Object selectionChannelValue) {
+		Collection<?> newSelection;
+		if (selectionChannelValue instanceof Collection) {
+			newSelection = (Collection<?>) selectionChannelValue;
+		} else {
+			newSelection = CollectionUtil.singletonOrEmptyList(selectionChannelValue);
+		}
+		_control.setCoordinateSystems(getGlobalCoordinateSystems(newSelection));
 	}
 
 	@Override
@@ -689,13 +700,9 @@ public class ThreeJsComponent extends BuilderComponent
 
 	private void internalSetSelection(Object newValue) {
 		_selectionModel.setSelection(addNodesForBusinessObjects(newValue, new HashSet<>()));
-		Collection<?> newSelection;
-		if (newValue instanceof Collection) {
-			newSelection = (Collection<?>) newValue;
-		} else {
-			newSelection = CollectionUtil.singletonOrEmptyList(newValue);
+		if (_control != null) {
+			setCoordinateSystems(newValue);
 		}
-		_control.setCoordinateSystems(getGlobalCoordinateSystems(newSelection));
 	}
 
 	private <T extends Collection<? super SceneNode>> T addNodesForBusinessObjects(Object newValue, T out) {
