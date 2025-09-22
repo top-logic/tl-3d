@@ -9,7 +9,7 @@
 	</parent>
 	
 	<artifactId>tl-3d-demo</artifactId>
-	<version>1.0.0-SNAPSHOT</version>
+	<version>0.9.0</version>
 	
 	<licenses>
 		<license>
@@ -55,7 +55,7 @@
 		<dependency>
 			<groupId>com.top-logic</groupId>
 			<artifactId>tl-3d-threejs</artifactId>
-			<version>1.0.0-SNAPSHOT</version>
+			<version>0.9.0</version>
 		</dependency>
 
 		<!-- TopLogic -->
