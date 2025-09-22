@@ -14,8 +14,14 @@ import com.top_logic.mig.html.layout.LayoutComponent;
 import com.top_logic.tool.boundsec.CommandHandler;
 import com.top_logic.tool.boundsec.commandhandlers.ToggleCommandHandler;
 
+/**
+ * Command to toggle rotate and translate.
+ */
 public class ToggleRotateAxes extends ToggleCommandHandler {
 
+	/**
+	 * Configuration of {@link ToggleRotateAxes}.
+	 */
 	public interface Config extends ToggleCommandHandler.Config {
 		@Override
 		@ClassDefault(ToggleRotateAxes.class)

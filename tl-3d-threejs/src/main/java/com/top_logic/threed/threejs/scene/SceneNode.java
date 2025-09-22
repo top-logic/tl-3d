@@ -1,7 +1,7 @@
 package com.top_logic.threed.threejs.scene;
 
 /**
- * Base class for a node in a {@link SceneGraph}
+ * Base class for a node in a {@link SceneGraph}.
  */
 public abstract class SceneNode extends ScenePart {
 

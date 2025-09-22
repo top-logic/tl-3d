@@ -202,44 +202,71 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 		addUpdate(new JSFunctionCall(getID(), THREEJS_JS_NS, "zoomToSelection"));
 	}
 
+	/**
+	 * Sends the command to the client to zoom out from selection.
+	 */
 	public void zoomOutFromSelection() {
     	addUpdate(new JSFunctionCall(getID(), THREEJS_JS_NS, "zoomOutFromSelection"));
 	}
 
+	/**
+	 * Whether the skybox is visible.
+	 */
 	public boolean getIsSkyboxVisible() {
 		return _isSkyboxVisible;
 	}
 
+	/**
+	 * Setter for {@link #getIsWorkplaneVisible()}.
+	 */
 	public void setIsSkyboxVisible(boolean visible) {
 		_isSkyboxVisible = visible;
 		
 		addUpdate(new JSFunctionCall(getID(), THREEJS_JS_NS, "toggleSkybox", visible));
 	}
 
+	/**
+	 * Whether the workplane is visible.
+	 */
 	public boolean getIsWorkplaneVisible() {
 		return _isWorkplaneVisible;
 	}
 
+	/**
+	 * Setter for {@link #getIsWorkplaneVisible()}.
+	 */
 	public void setIsWorkplaneVisible(boolean visible) {
 		_isWorkplaneVisible = visible;
 		
 		addUpdate(new JSFunctionCall(getID(), THREEJS_JS_NS, "toggleWorkplane", visible));
 	}
 
+	/**
+	 * Whether objects are transparent.
+	 */
 	public boolean getAreObjectsTransparent() {
 		return _areObjectsTransparent;
 	}
 
+	/**
+	 * Setter for {@link #getAreObjectsTransparent()}.
+	 */
 	public void setAreObjectsTransparent(boolean transparent) {
 		_areObjectsTransparent = transparent;
 		
 		addUpdate(new JSFunctionCall(getID(), THREEJS_JS_NS, "toggleObjectsTransparent", transparent));
 	}
 
+	/**
+	 * Whether edit mode is active.
+	 */
 	public boolean getIsInEditMode() {
 		return _isInEditMode;
 	}
 
+	/**
+	 * Sets to edit mode.
+	 */
 	public void setIsInEditMode(boolean value) {
 		_isInEditMode = value;
 		_gizmoControl.setEditable(value);
@@ -247,10 +274,16 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 		addUpdate(new JSFunctionCall(getID(), THREEJS_JS_NS, "toggleEditMode", value));
 	}
 
+	/**
+	 * Whether rotate or translate mode is active.
+	 */
 	public boolean getIsRotateMode() {
 		return _isRotateMode;
 	}
 
+	/**
+	 * Setter for {@link #getIsRotateMode()}.
+	 */
 	public void setIsRotateMode(boolean value) {
 		_isRotateMode = value;
 

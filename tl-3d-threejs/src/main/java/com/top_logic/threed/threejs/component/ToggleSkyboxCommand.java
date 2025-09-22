@@ -15,9 +15,15 @@ import com.top_logic.mig.html.layout.LayoutComponent;
 import com.top_logic.tool.boundsec.CommandHandler;
 import com.top_logic.tool.boundsec.commandhandlers.ToggleCommandHandler;
 
+/**
+ * Command to toggle visibility of the skybox.
+ */
 @InApp(classifiers = { "3DViewer" })
 public class ToggleSkyboxCommand extends ToggleCommandHandler {
 
+	/**
+	 * Configuration of a {@link ToggleSkyboxCommand}.
+	 */
 	public interface Config extends ToggleCommandHandler.Config {
 		@Override
 		@ClassDefault(ToggleSkyboxCommand.class)

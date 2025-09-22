@@ -73,7 +73,7 @@ import de.haumacher.msgbuf.observer.Listener;
 import de.haumacher.msgbuf.observer.Observable;
 
 /**
- * 3D-Viewer using the <code>Three.js</code> library.
+ * {@link BuilderComponent} displaying a 3D-Viewer using the <code>Three.js</code> library.
  */
 public class ThreeJsComponent extends BuilderComponent
 		implements SelectionListener, SelectableWithSelectionModel, Editor {
@@ -465,54 +465,51 @@ public class ThreeJsComponent extends BuilderComponent
 		return _selectionModel;
 	}
 
-	/**
-	 * Shows the current selection in the viewport.
-	 */
-	public void zoomToSelection() {
+	void zoomToSelection() {
 		getThreeJSControl().zoomToSelection();
 	}
 
-	public void zoomOutFromSelection() {
+	void zoomOutFromSelection() {
     	getThreeJSControl().zoomOutFromSelection();
 	}
 
-	public boolean getIsSkyboxVisible() {
+	boolean getIsSkyboxVisible() {
 		return getThreeJSControl().getIsSkyboxVisible();
 	}
 
-	public void setIsSkyboxVisible(boolean visible) {
+	void setIsSkyboxVisible(boolean visible) {
 		getThreeJSControl().setIsSkyboxVisible(visible);
 	}
 
-	public boolean getIsWorkplaneVisible() {
+	boolean getIsWorkplaneVisible() {
 		return getThreeJSControl().getIsWorkplaneVisible();
 	}
 
-	public void setIsWorkplaneVisible(boolean visible) {
+	void setIsWorkplaneVisible(boolean visible) {
 		getThreeJSControl().setIsWorkplaneVisible(visible);
 	}
 
-	public boolean getAreObjectsTransparent() {
+	boolean getAreObjectsTransparent() {
 		return getThreeJSControl().getAreObjectsTransparent();
 	}
 
-	public void setAreObjectsTransparent(boolean transparent) {
+	void setAreObjectsTransparent(boolean transparent) {
 		getThreeJSControl().setAreObjectsTransparent(transparent);
 	}
 
-	public boolean getIsInEditMode() {
+	boolean getIsInEditMode() {
 		return getThreeJSControl().getIsInEditMode();
 	}
 
-	public void setIsInEditMode(boolean editing) {
+	void setIsInEditMode(boolean editing) {
 		getThreeJSControl().setIsInEditMode(editing);
 	}
 
-	public boolean getIsRotateMode() {
+	boolean getIsRotateMode() {
 		return getThreeJSControl().getIsRotateMode();
 	}
 
-	public void setIsRotateMode(boolean editing) {
+	void setIsRotateMode(boolean editing) {
 		getThreeJSControl().setIsRotateMode(editing);
 	}
 

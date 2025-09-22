@@ -14,8 +14,14 @@ import com.top_logic.mig.html.layout.LayoutComponent;
 import com.top_logic.tool.boundsec.CommandHandler;
 import com.top_logic.tool.boundsec.commandhandlers.ToggleCommandHandler;
 
+/**
+ * Command to toggle object transparency.
+ */
 public class ToggleObjectsTransparentCommand extends ToggleCommandHandler {
 
+	/**
+	 * Configuration of {@link ToggleObjectsTransparentCommand}.
+	 */
 	public interface Config extends ToggleCommandHandler.Config {
 		@Override
 		@ClassDefault(ToggleObjectsTransparentCommand.class)

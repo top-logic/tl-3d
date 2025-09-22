@@ -1,7 +1,7 @@
 package com.top_logic.threed.threejs.scene;
 
 /**
- * A glTF artifact loaded from an URL.
+ * A <tt>glTF</tt> artifact loaded from an URL.
  */
 public class GltfAsset extends Asset {
 
@@ -35,7 +35,7 @@ public class GltfAsset extends Asset {
 	}
 
 	/**
-	 * The URL from which to retrieve glTF data.
+	 * The URL from which to retrieve <tt>glTF</tt> data.
 	 */
 	public final String getUrl() {
 		return _url;

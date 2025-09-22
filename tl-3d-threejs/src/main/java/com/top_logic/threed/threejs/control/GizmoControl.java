@@ -656,6 +656,9 @@ public class GizmoControl extends AbstractControl {
 		return _formContext.getField(name);
 	}
 
+	/**
+	 * Current translate step size.
+	 */
 	public int getTranslateStepSize() {
 		FormField field = field(TRANSLATE_STEP_SIZE);
 		if (field.hasValue() && field.getValue() != null) {
@@ -664,6 +667,9 @@ public class GizmoControl extends AbstractControl {
 		return 1;
 	}
 
+	/**
+	 * Current rotate step size.
+	 */
 	public int getRotateStepSize() {
 		FormField field = field(ROTATE_STEP_SIZE);
 		if (field.hasValue() && field.getValue() != null) {

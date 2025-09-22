@@ -16,15 +16,19 @@ abstract message Asset {
 
 }
 
-/** A glTF artifact loaded from an URL. */
+/** A <tt>glTF</tt> artifact loaded from an URL. */
 message GltfAsset extends Asset {
-	/** The URL from which to retrieve glTF data. */
+	/** The URL from which to retrieve <tt>glTF</tt> data. */
 	string url;
 }
 
+/** A <tt>glTF</tt> artifact displaying a cube. */
 message Cube extends Asset {
+	/** Width of the cube. */
 	float width;
+	/** Height of the cube. */
 	float height;
+	/** Depth of the cube. */
 	float depth;
 }
 
@@ -42,7 +46,7 @@ message ConnectionPoint {
 	repeated string classifiers;
 }
 
-/** Base class for a part in a {@link SceneGraph} */
+/** Base class for a part in a {@link SceneGraph}. */
 abstract message ScenePart {
 
 	/** The {@link ScenePart} where this {@link ScenePart} is a part of. */
@@ -51,7 +55,7 @@ abstract message ScenePart {
 
 }
 
-/** Base class for a node in a {@link SceneGraph} */
+/** Base class for a node in a {@link SceneGraph}. */
 abstract message SceneNode extends ScenePart {
 	/** Reference to a custom object that is represented by this scene node. */
 	transient java.lang.Object userData;

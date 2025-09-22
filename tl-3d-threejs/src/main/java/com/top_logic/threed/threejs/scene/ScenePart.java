@@ -1,7 +1,7 @@
 package com.top_logic.threed.threejs.scene;
 
 /**
- * Base class for a part in a {@link SceneGraph}
+ * Base class for a part in a {@link SceneGraph}.
  */
 public abstract class ScenePart extends de.haumacher.msgbuf.graph.AbstractSharedGraphNode {
 

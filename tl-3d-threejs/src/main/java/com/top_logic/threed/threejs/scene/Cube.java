@@ -1,5 +1,8 @@
 package com.top_logic.threed.threejs.scene;
 
+/**
+ * A <tt>glTF</tt> artifact displaying a cube.
+ */
 public class Cube extends Asset {
 
 	/**
@@ -41,6 +44,9 @@ public class Cube extends Asset {
 		return TypeKind.CUBE;
 	}
 
+	/**
+	 * Width of the cube.
+	 */
 	public final float getWidth() {
 		return _width;
 	}
@@ -60,6 +66,9 @@ public class Cube extends Asset {
 		_listener.afterChanged(this, WIDTH__PROP);
 	}
 
+	/**
+	 * Height of the cube.
+	 */
 	public final float getHeight() {
 		return _height;
 	}
@@ -79,6 +88,9 @@ public class Cube extends Asset {
 		_listener.afterChanged(this, HEIGHT__PROP);
 	}
 
+	/**
+	 * Depth of the cube.
+	 */
 	public final float getDepth() {
 		return _depth;
 	}

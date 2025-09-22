@@ -14,8 +14,14 @@ import com.top_logic.mig.html.layout.LayoutComponent;
 import com.top_logic.tool.boundsec.CommandHandler;
 import com.top_logic.tool.boundsec.commandhandlers.ToggleCommandHandler;
 
+/**
+ * Command to toggle visibility of workplane.
+ */
 public class ToggleWorkplaneCommand extends ToggleCommandHandler {
 
+	/**
+	 * Configuration of a {@link ToggleWorkplaneCommand}.
+	 */
 	public interface Config extends ToggleCommandHandler.Config {
 		@Override
 		@ClassDefault(ToggleWorkplaneCommand.class)

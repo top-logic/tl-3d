@@ -23,8 +23,7 @@ import com.top_logic.threed.threejs.scene.ConnectionPoint;
 import com.top_logic.util.error.TopLogicException;
 
 /**
- * 
- * @author <a href="mailto:daniel.busche@top-logic.com">Daniel Busche</a>
+ * Creates a {@link ConnectionPoint}.
  */
 public class ThreejsCp extends GenericMethod {
 
