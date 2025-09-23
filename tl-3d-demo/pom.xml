@@ -253,27 +253,4 @@
 		</plugins>
 	</build>
 
-	<distributionManagement>
-		<repository>
-			<id>my-releases</id>
-			<url>fill-out-here</url>
-			<releases>
-				<enabled>true</enabled>
-			</releases>
-			<snapshots>
-				<enabled>false</enabled>
-			</snapshots>
-		</repository>
-
-		<snapshotRepository>
-			<id>my-snapshots</id>
-			<url>fill-out-here</url>
-			<releases>
-				<enabled>false</enabled>
-			</releases>
-			<snapshots>
-				<enabled>true</enabled>
-			</snapshots>
-		</snapshotRepository>
-	</distributionManagement>
 </project>
