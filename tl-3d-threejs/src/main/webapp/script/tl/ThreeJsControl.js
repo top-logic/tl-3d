@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Main class for managing 3D scenes using Three.js library.
  * Provides methods for initializing and controlling a 3D scene with various functionalities+
  */
@@ -24,12 +24,14 @@ import {
 
 import { OrbitControls } from "OrbitControls";
 import { TransformControls } from "TransformControls";
+import { GLTFLoader } from "GLTFLoader";
 import { gsap } from "gsap";
-import { Scope, SharedObject} from "./DataModels.js";
+import { Scope, SharedObject, GltfAsset} from "./DataModels.js";
 import { InsertElement, RemoveElement, SetProperty } from "./Commands.js";
 import { CameraUtils, SceneUtils, applyColorToObject, getLocalMatrix, getMatrixDiff, toMatrix, getRaycaster, isDescendantOfAny, throttle  } from "./ThreeJsUtils.js";
 import { NavigationCube } from "./NavigationCube.js";
 import { SkyboxManager } from "./SkyboxManager.js";
+import { DragDropManager } from "./DragDropManager.js";
 
 import { 
   CAMERA_MOVE_DURATION,
@@ -90,6 +92,7 @@ class ThreeJsControl {
     this.initControls();
     this.initNavigationCube();
     this.initTransformControls();
+    this.initDragDrop();
     this.render();
     this.isEditMode = false;
     this.loadScene().then(() => setTimeout(() => {
@@ -102,13 +105,10 @@ class ThreeJsControl {
       this.updateLODObjects();
 
       this.skyboxManager.initSkybox().then(() => this.skyboxManager.toggleSkybox(initialState.isSkyboxVisible));
-
-      // Recreate floors after scene is loaded - moved to loadScene()
     }, 100));
   }
 
   initScene() {
-    // Filled in loadScene().
     this.sceneGraph = null;
     this.selection = [];
 
@@ -448,6 +448,13 @@ class ThreeJsControl {
 
     this.translateControls.enabled = false;
     this.rotateControls.enabled = false;
+  }
+
+  initDragDrop() {
+    // Initialize drag and drop functionality after DOM is ready
+    setTimeout(() => {
+      this.dragDropManager = new DragDropManager(this);
+    }, 500);
   }
 
   updateTransformControls() {
@@ -1592,6 +1599,38 @@ getScreenSpaceDistance(pos1, pos2) {
         this.navigationCube.render();
       }
     });
+  }
+
+  createGltfAssetFromModel(gltf, name, url) {
+    const assetId = 'asset_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
+    
+    const gltfAsset = new GltfAsset(assetId);
+    gltfAsset.name = name;
+    gltfAsset.url = url;
+    gltfAsset.selectable = true;
+    
+    // First build the asset group to create the Three.js objects
+    const assetGroup = gltfAsset.build(this.zUpRoot);
+    assetGroup.position.set((Math.random() - 0.5) * 10, 0, (Math.random() - 0.5) * 10);
+    
+    // Then set the GLTF data to replace the placeholder with the actual model
+    gltfAsset.setGLTF(gltf, this);
+    
+    if (this.sceneGraph && this.sceneGraph.contents) {
+      const insertCommand = new InsertElement(this.sceneGraph.id);
+      insertCommand.property = 'contents';
+      insertCommand.idx = this.sceneGraph.contents.length;
+      insertCommand.element = gltfAsset;
+      
+      insertCommand.apply(this.scope);
+      this.sendSceneChanges([insertCommand]);
+    }
+    
+    this.render();
+  }
+
+  createGltfAssetFromDrop(name, url, gltf) {
+    this.createGltfAssetFromModel(gltf, name, url);
   }
 }
 

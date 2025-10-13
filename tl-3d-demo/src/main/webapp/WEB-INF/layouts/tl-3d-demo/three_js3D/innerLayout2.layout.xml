@@ -10,6 +10,9 @@
 			<layout-reference resource="tl-3d-demo/three_js3D/projektSelector.layout.xml">
 				<layoutInfo size="90px"/>
 			</layout-reference>
+			<layout-reference resource="tl-3d-demo/three_js3D/assetsGrid3D.layout.xml">
+				<layoutInfo size="300px"/>
+			</layout-reference>
 			<layout-reference resource="tl-3d-demo/three_js3D/sceneGrid.layout.xml">
 				<layoutInfo/>
 			</layout-reference>
