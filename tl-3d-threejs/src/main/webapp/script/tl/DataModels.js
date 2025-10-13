@@ -561,6 +561,18 @@ export class GltfAsset extends SharedObject {
     this.group = new Group();
     parentGroup.add(this.group);
 
+    // Link to scene node
+    this.group.userData = {
+      ...this.group.userData,
+      nodeRef: this,
+      color: this.color || null
+    };
+    
+    // Set initial visibility
+    this.group.visible = !this.hidden;
+    
+    this.node = this.group;
+
     this.layoutPoint?.build(this.group, true);
     if (this.layoutPoint?.transform) {
        this.group.applyMatrix4(toMatrix(this.layoutPoint.transform).invert());
@@ -592,6 +604,12 @@ export class GltfAsset extends SharedObject {
     // Ensure group is initialized before trying to use it
     if (!this.group) {
       return;
+    }
+
+    // Save the placeholder color before removing it
+    let placeholderColor = null;
+    if (this.placeholder && this.placeholder.material) {
+      placeholderColor = this.placeholder.material.color.clone();
     }
 
     this.group.remove(this.placeholder);
@@ -628,8 +646,10 @@ export class GltfAsset extends SharedObject {
       this.group.add(model);
     }
 
-    const currentColor = this.placeholder.material.color;
-    ctrl.setColor(this.group, currentColor);
+    // Apply the saved color if it exists
+    if (placeholderColor && ctrl) {
+      ctrl.setColor(this.group, placeholderColor);
+    }
   }
   
   // create a model with specific level of detail

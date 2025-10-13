@@ -9,6 +9,7 @@
 		type="tl.threed.demo:Asset3D"
 	>
 		<name key="dynamic.ce4bec8f-28d4-4323-9c3c-23364a7b4ae5">
+			<en>Assets</en>
 			<de>Assets</de>
 		</name>
 		<modelBuilder class="com.top_logic.model.search.providers.ListModelByExpression"
