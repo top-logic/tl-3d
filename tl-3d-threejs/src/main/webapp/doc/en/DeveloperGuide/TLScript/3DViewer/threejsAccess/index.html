@@ -1,0 +1,54 @@
+<h2>Syntax</h2>
+
+<pre><code>$object.threejsAccess($property)</code></pre>
+
+<h2>Description</h2>
+
+<p>Reflection access to the object.</p>
+
+<h2>Parameters</h2>
+
+<table class="tlDocTable">
+	<thead>
+		<tr>
+			<th>Object name</th>
+			<th>Type</th>
+			<th>Type Description</th>
+			<th>Mandatory</th>
+			<th>Default</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>object</td>
+			<td>A 3D object</td>
+			<td>Object from which information is required.</td>
+			<td>yes</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>property</td>
+			<td>string</td>
+			<td>Name of the property to be accessed.</td>
+			<td>yes</td>
+			<td> </td>
+		</tr>
+	</tbody>
+</table>
+
+<h2>Return value</h2>
+
+<p><span style="color:#3498db"><strong>Type:</strong></span> Object</p>
+
+<p> </p>
+
+<h2>Examples</h2>
+
+<h3>Example 1</h3>
+
+<pre><code>tx = ...;
+cp = threejsCP(tx: $tx, classifiers: "important);
+
+cp.threejsAccess("tx") == $tx; // true</code></pre>
+
+<p><span style="color:#3498db"><strong>Output:</strong></span> true</p>

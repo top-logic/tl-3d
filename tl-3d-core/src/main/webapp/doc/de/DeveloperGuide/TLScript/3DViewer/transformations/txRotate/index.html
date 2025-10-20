@@ -1,0 +1,60 @@
+<h2>Syntax</h2>
+
+<pre><code>rotate(
+  x: $xAngle,
+  y: $yAngle,
+  z: $zAngle
+)</code></pre>
+
+<h2>Beschreibung</h2>
+
+<p>Erstellt einen Rotationsmatrix die um die gegebenen Werte rotiert, zuerst um die z-Achse, dann um die y-Achse und dann um die x-Achse</p>
+
+<h2>Parameter</h2>
+
+<table class="tlDocTable">
+	<thead>
+		<tr>
+			<th>Name</th>
+			<th>Typ</th>
+			<th>Beschreibung</th>
+			<th>Pflicht</th>
+			<th>Default</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>x</td>
+			<td>double</td>
+			<td>Grad in Bogenmaß um den um die x-Achse rotiert werden soll: x \in [0, 2*\pi]</td>
+			<td>nein</td>
+			<td>0</td>
+		</tr>
+		<tr>
+			<td>y</td>
+			<td>double</td>
+			<td>Grad in Bogenmaß um den um die y-Achse rotiert werden soll: y \in [0, 2*\pi]</td>
+			<td>nein</td>
+			<td>0</td>
+		</tr>
+		<tr>
+			<td>z</td>
+			<td>double</td>
+			<td>Grad in Bogenmaß um den um die z-Achse rotiert werden soll: z \in [0, 2*\pi]</td>
+			<td>nein</td>
+			<td>0</td>
+		</tr>
+	</tbody>
+</table>
+
+<h2>Rückgabewert</h2>
+
+<p><span style="color:#3498db"><strong>Typ:</strong></span> <code class="hljs inlineCode">`tl.threed.core:Transformation`</code></p>
+
+<h2>Beispiele</h2>
+
+<h3>Beispiel 1</h3>
+
+<pre><code>rotate(Math.PI, Math.PI, Math.Pi/2);</code></pre>
+
+<p><span style="color:#3498db"><strong>Ausgabe:</strong></span> Eine Transformation die ein Objekt erst um 90° um die z-Achse dreht und dann um je 180° an der y-Achse und der x-Achse.</p>

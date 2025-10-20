@@ -1,0 +1,98 @@
+<h2>Syntax</h2>
+
+<pre><code>threejsGltf(
+  tx: $tx,
+  userData: $userData,
+  hidden: $hidden,
+  color: $color,
+  layoutPoint: $layoutPoint,
+  snappingPoints: $snappingPoints,
+  url: $url,
+  imageData: $imageData
+)</code></pre>
+
+<h2>Description</h2>
+
+<p>Creates a scene node that represents an image.</p>
+
+<h2>Parameters</h2>
+
+<table class="tlDocTable">
+	<thead>
+		<tr>
+			<th>name</th>
+			<th>Type</th>
+			<th>Type Description</th>
+			<th>Mandatory</th>
+			<th>Default</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>tx</td>
+			<td>Transformation</td>
+			<td>Transformation that is applied to the node. The transformation is relative to the surrounding node group.</td>
+			<td>no</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>userData</td>
+			<td>Object</td>
+			<td>Specialist object for the node. This object is used for cross-highlighting, for example</td>
+			<td>no</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>hidden</td>
+			<td>boolean</td>
+			<td>Whether the node should be displayed.</td>
+			<td>no</td>
+			<td>false</td>
+		</tr>
+		<tr>
+			<td>color</td>
+			<td>Color</td>
+			<td>Color in which the node should be colored.</td>
+			<td>no</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>layoutPoint</td>
+			<td>Connection point</td>
+			<td>Point within the node that is used for layouting.</td>
+			<td>no</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>snappingPoints</td>
+			<td>List of connection points</td>
+			<td>Points to which other elements can be docked</td>
+			<td>no</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>url</td>
+			<td>String</td>
+			<td>URL relative to the application where the image can be retrieved.</td>
+			<td>no</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>imageData</td>
+			<td>Dynamic image</td>
+			<td>Image whose content is calculated dynamically, e.g. by accessing a binary attribute</td>
+			<td>no</td>
+			<td> </td>
+		</tr>
+	</tbody>
+</table>
+
+<h2>Return value</h2>
+
+<p><span style="color:#3498db"><strong>Type:</strong></span> Scene node</p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>

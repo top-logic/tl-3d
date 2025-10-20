@@ -1,0 +1,60 @@
+<h2>Syntax</h2>
+
+<pre><code>rotate(
+  x: $xAngle,
+  y: $yAngle,
+  z: $zAngle
+)</code></pre>
+
+<h2>Description</h2>
+
+<p>Creates a rotation matrix that rotates around the given values, first around the z-axis, then around the y-axis and then around the x-axis</p>
+
+<h2>Parameters</h2>
+
+<table class="tlDocTable">
+	<thead>
+		<tr>
+			<th>Parameter Name</th>
+			<th>Type</th>
+			<th>Type Description</th>
+			<th>Mandatory</th>
+			<th>Default</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>x</td>
+			<td>double</td>
+			<td>Degree in radians by which to rotate around the x-axis: x \in [0, 2*\pi]</td>
+			<td>no</td>
+			<td>0</td>
+		</tr>
+		<tr>
+			<td>y</td>
+			<td>double</td>
+			<td>Degree in radians around which the y-axis is to be rotated: y \in [0, 2*\pi]</td>
+			<td>no</td>
+			<td>0</td>
+		</tr>
+		<tr>
+			<td>z</td>
+			<td>double</td>
+			<td>Degree in radians by which to rotate around the z-axis: z \in [0, 2*\pi]</td>
+			<td>no</td>
+			<td>0</td>
+		</tr>
+	</tbody>
+</table>
+
+<h2>Return value</h2>
+
+<p><span style="color:#3498db"><strong>Type:</strong></span> <code class="hljs inlineCode">`tl.threed.core:Transformation`</code></p>
+
+<h2>Examples</h2>
+
+<h3>Example 1</h3>
+
+<pre><code>rotate(Math.PI, Math.PI, Math.Pi/2);</code></pre>
+
+<p><span style="color:#3498db"><strong>Output:</strong></span> A transformation that first rotates an object by 90° around the z-axis and then by 180° on the y-axis and the x-axis.</p>

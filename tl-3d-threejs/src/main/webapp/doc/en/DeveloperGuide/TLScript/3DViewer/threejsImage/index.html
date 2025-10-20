@@ -1,0 +1,68 @@
+<h2>Syntax</h2>
+
+<pre><code>threejsImage(
+  userData: $userData,
+  data: $data,
+  imageID: $imageID
+)
+</code></pre>
+
+<h2>Description</h2>
+
+<p>An image object that dynamically retrieves the actual image data.</p>
+
+<h2>Parameters</h2>
+
+<table class="tlDocTable">
+	<thead>
+		<tr>
+			<th>Image name</th>
+			<th>Type</th>
+			<th>Type Description</th>
+			<th>Mandatory</th>
+			<th>Default</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>userData</td>
+			<td>Object</td>
+			<td>The object from which the image data is read out</td>
+			<td>yes</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>data</td>
+			<td>function</td>
+			<td>Function that receives the userData object and calculates the image data.</td>
+			<td>yes</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>imageID</td>
+			<td>String</td>
+			<td>ID for the image. If several image objects have the same imageID, the image is only retrieved once.</td>
+			<td>no</td>
+			<td>is calculated from the userData object</td>
+		</tr>
+	</tbody>
+</table>
+
+<h2>Return value</h2>
+
+<p><span style="color:#3498db"><strong>Type:</strong></span> Image data object</p>
+
+<h2>Examples</h2>
+
+<h3>Example 1: Output</h3>
+
+<pre><code>// Part has an image attribute `image`
+
+part = ....;
+threejsImage(
+  userData: $project
+  data: x -&gt; $x.get(`image`)
+);
+</code></pre>
+
+<p><span style="color:#3498db"><strong>Output:</strong></span> Dynamic image that reads the actual image data from <code class="hljs inlineCode">project</code> from the attribute <code class="hljs inlineCode">image</code>.</p>

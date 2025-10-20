@@ -1,0 +1,44 @@
+<h2>Syntax</h2>
+
+<pre><code>threejsCp(
+  tx: $tx,
+  classifiers: $classifiers
+)</code></pre>
+
+<h2>Beschreibung</h2>
+
+<p>Erstellt ein Verbindungspunkt der mit anderen Punkten mit überschneidenen Classifiers eine Verbindung eingehen kann</p>
+
+<h2>Parameter</h2>
+
+<table class="tlDocTable">
+	<thead>
+		<tr>
+			<th>Name</th>
+			<th>Typ</th>
+			<th>Beschreibung</th>
+			<th>Pflicht</th>
+			<th>Default</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>tx</td>
+			<td>Transformation</td>
+			<td>Position des Verbindungspunktes</td>
+			<td>ja</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>classifiers</td>
+			<td>Liste von Zeichenketten</td>
+			<td>Klassifizierung des Verbindungspunktes. Es können nur Verbindungen zu Punkten eingegegangen werden, wo mindestens ein gemeinsamer Klassifikator existiert.</td>
+			<td>nein</td>
+			<td> </td>
+		</tr>
+	</tbody>
+</table>
+
+<h2>Rückgabewert</h2>
+
+<p><span style="color:#3498db"><strong>Typ:</strong></span> Verbindungspunkt</p>

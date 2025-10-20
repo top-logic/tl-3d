@@ -1,0 +1,135 @@
+<h2>Syntax</h2>
+
+<pre><code>txCreate(x,y,z)
+
+txCreate(a,b,c, d,e,f, g,h,i)
+
+txCreate(a,b,c, d,e,f, g,h,i, x,y,z)</code></pre>
+
+<h2>Beschreibung</h2>
+
+<p>Erstellt eine Transformation mit der gegebenen Translation und Rotation.</p>
+
+<h2>Parameter</h2>
+
+<table class="tlDocTable">
+	<thead>
+		<tr>
+			<th>Name</th>
+			<th>Typ</th>
+			<th>Beschreibung</th>
+			<th>Pflicht</th>
+			<th>Default</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>a</td>
+			<td>double</td>
+			<td>Wert a_1_1 der Rotationsmatrix A</td>
+			<td>ja</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>b</td>
+			<td>double</td>
+			<td>Wert a_1_2 der Rotationsmatrix A</td>
+			<td>ja</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>c</td>
+			<td>double</td>
+			<td>Wert a_1_3 der Rotationsmatrix A</td>
+			<td>ja</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>d</td>
+			<td>double</td>
+			<td>Wert a_2_1 der Rotationsmatrix A</td>
+			<td>ja</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>e</td>
+			<td>double</td>
+			<td>Wert a_2_2 der Rotationsmatrix A</td>
+			<td>ja</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>f</td>
+			<td>double</td>
+			<td>Wert a_2_3 der Rotationsmatrix A</td>
+			<td>ja</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>g</td>
+			<td>double</td>
+			<td>Wert a_3_1 der Rotationsmatrix A</td>
+			<td>ja</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>h</td>
+			<td>double</td>
+			<td>Wert a_3_2 der Rotationsmatrix A</td>
+			<td>ja</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>i</td>
+			<td>double</td>
+			<td>Wert a_3_3 der Rotationsmatrix A</td>
+			<td>ja</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>x</td>
+			<td>double</td>
+			<td>Translation in x-Richtung</td>
+			<td>ja</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>y</td>
+			<td>double</td>
+			<td>Translation in y-Richtung</td>
+			<td>ja</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>z</td>
+			<td>double</td>
+			<td>Translation in z-Richtung</td>
+			<td>ja</td>
+			<td> </td>
+		</tr>
+	</tbody>
+</table>
+
+<h2>Rückgabewert</h2>
+
+<p><span style="color:#3498db"><strong>Typ:</strong></span> <code class="hljs inlineCode">`tl.threed.core:Transformation`</code></p>
+
+<p>Transformation mit den gegebenen Werten</p>
+
+<h2>Beispiele</h2>
+
+<h3>Beispiel 1</h3>
+
+<pre><code>txCreate(20, 30, 5)</code></pre>
+
+<p><span style="color:#3498db"><strong>Ausgabe:</strong></span> Eine Transformation die ein Element um 20 in x-Richtung, 30 in y-Richtung und 5 in z-Richtung verschiebt. Keine Rotation.</p>
+
+<p>​</p>
+
+<h3> Beispiel </h3>
+
+<pre><code>txCreate(0,-1,0, 1,0,0, 0,0,1)</code></pre>
+
+<p><strong>Ausgabe:</strong> Eine Rotation die ein Element um 90° um die z-Achse dreht. Keine Verschiebung.</p>
+
+<p>​</p>

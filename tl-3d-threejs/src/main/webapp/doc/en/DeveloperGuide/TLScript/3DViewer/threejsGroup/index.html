@@ -1,0 +1,70 @@
+<h2>Syntax</h2>
+
+<pre><code>threejsGroup(
+  tx: $tx,
+  userData: $userData,
+  hidden: $hidden,
+  color: $color,
+  components: $components
+)</code></pre>
+
+<h2>Description</h2>
+
+<p>Creates a scene node that combines other nodes. If, for example, this node is moved, all inner nodes are also moved.</p>
+
+<h2>Parameters</h2>
+
+<table class="tlDocTable">
+	<thead>
+		<tr>
+			<th>Node name</th>
+			<th>Type</th>
+			<th>Type Description</th>
+			<th>Mandatory</th>
+			<th>Default</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>tx</td>
+			<td>Transformation</td>
+			<td>Transformation that is applied to the node. The transformation is relative to the surrounding node group.</td>
+			<td>no</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>userData</td>
+			<td>Object</td>
+			<td>Specialist object for the node. This object is used for cross-highlighting, for example</td>
+			<td>no</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>hidden</td>
+			<td>boolean</td>
+			<td>Whether the node should be displayed.</td>
+			<td>no</td>
+			<td>false</td>
+		</tr>
+		<tr>
+			<td>color</td>
+			<td>Color</td>
+			<td>Color in which the node should be colored.</td>
+			<td>no</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>components</td>
+			<td>List of scene nodes</td>
+			<td>Nodes that this group contains</td>
+			<td>no</td>
+			<td> </td>
+		</tr>
+	</tbody>
+</table>
+
+<h2>Return value</h2>
+
+<p><span style="color:#3498db"><strong>Type:</strong></span> Scene node</p>
+
+<p>A node that summarizes the given <code class="hljs inlineCode">components</code>.</p>
