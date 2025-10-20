@@ -14,6 +14,12 @@ import com.top_logic.layout.I18NConstantsBase;
 public class I18NConstants extends I18NConstantsBase {
 
 	/**
+	 * @en Argument must be an image data object or binary content. Received ''{0}'' in expression:
+	 *     {1}
+	 */
+	public static ResKey2 ERROR_IMAGE_DATA_EXPECTED__ACTUAL_EXPR;
+
+	/**
 	 * @en A connection point is expected. Received ''{0}'' in expression: {1}
 	 */
 	public static ResKey2 ERROR_CONNECTION_POINT_EXPECTED__ACTUAL_EXPR;

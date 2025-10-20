@@ -8,33 +8,46 @@ package com.top_logic.threed.threejs.script;
 import java.util.Collections;
 import java.util.List;
 
+import com.top_logic.basic.ConfigurationError;
 import com.top_logic.basic.config.ConfigurationException;
 import com.top_logic.basic.config.InstantiationContext;
+import com.top_logic.basic.io.BinaryContent;
 import com.top_logic.model.search.expr.GenericMethod;
 import com.top_logic.model.search.expr.SearchExpression;
+import com.top_logic.model.search.expr.config.ExprFormat;
 import com.top_logic.model.search.expr.config.dom.Expr;
 import com.top_logic.model.search.expr.config.operations.AbstractSimpleMethodBuilder;
 import com.top_logic.model.search.expr.config.operations.ArgumentDescriptor;
+import com.top_logic.model.search.expr.query.QueryExecutor;
 import com.top_logic.threed.core.math.Transformation;
 import com.top_logic.threed.threejs.scene.ConnectionPoint;
 import com.top_logic.threed.threejs.scene.GltfAsset;
+import com.top_logic.threed.threejs.scene.ImageData;
 import com.top_logic.threed.threejs.scene.PartNode;
+import com.top_logic.util.error.TopLogicException;
 
 /**
  * TL-Script constructor function for an {@link PartNode}.
  */
 public class ThreejsGltf extends ThreejsSceneNode<PartNode> {
 
+	private QueryExecutor _userObjectAsContent;
+
 	/**
 	 * Creates a {@link ThreejsGltf} method.
 	 */
-	protected ThreejsGltf(String name, SearchExpression[] arguments) {
+	protected ThreejsGltf(String name, SearchExpression[] arguments) throws ConfigurationException {
 		super(name, arguments);
+		_userObjectAsContent = QueryExecutor.compile(ExprFormat.INSTANCE.getValue("threejsGLTF", "x->$x"));
 	}
 
 	@Override
 	public GenericMethod copy(SearchExpression[] arguments) {
-		return new ThreejsGltf(getName(), arguments);
+		try {
+			return new ThreejsGltf(getName(), arguments);
+		} catch (ConfigurationException ex) {
+			throw new ConfigurationError(ex);
+		}
 	}
 
 	@Override
@@ -55,7 +68,27 @@ public class ThreejsGltf extends ThreejsSceneNode<PartNode> {
 		String url = (String) arguments[7];
 		asset.setUrl(url);
 
+		ImageData imageData = asImageData(arguments[8]);
+		asset.setDynamicImage(imageData);
+
 		return super.createNode(arguments).setAsset(asset);
+	}
+
+	private ImageData asImageData(Object data) {
+		if (data == null) {
+			return null;
+		}
+		if (data instanceof ImageData image) {
+			return image;
+		}
+		if (data instanceof BinaryContent binary) {
+			ImageData image = ImageData.create();
+			image.setUserData(binary);
+			image.setData(_userObjectAsContent);
+			return image;
+		}
+		throw new TopLogicException(
+			I18NConstants.ERROR_IMAGE_DATA_EXPECTED__ACTUAL_EXPR.fill(data.getClass().getName(), this));
 	}
 
 	private List<ConnectionPoint> toConnectionPointList(SearchExpression expr, Object value) {
@@ -92,6 +125,7 @@ public class ThreejsGltf extends ThreejsSceneNode<PartNode> {
 			.optional("layoutPoint")
 			.optional("snappingPoints")
 			.optional("url")
+			.optional("imageData")
 			.build();
 
 		/**
