@@ -279,6 +279,9 @@ public class Transformation extends MapLike {
 	 * A rotation along the X axis.
 	 */
 	public static Transformation rotateX(double a) {
+		if (a == 0) {
+			return identity();
+		}
 		double cosa = cos(a);
 		double sina = sin(a);
 		return new Transformation(
@@ -292,6 +295,9 @@ public class Transformation extends MapLike {
 	 * A rotation along the Y axis.
 	 */
 	public static Transformation rotateY(double a) {
+		if (a == 0) {
+			return identity();
+		}
 		double cosa = cos(a);
 		double sina = sin(a);
 		return new Transformation(
@@ -305,6 +311,9 @@ public class Transformation extends MapLike {
 	 * A rotation along the Z axis.
 	 */
 	public static Transformation rotateZ(double a) {
+		if (a == 0) {
+			return identity();
+		}
 		double cosa = cos(a);
 		double sina = sin(a);
 		return new Transformation(
