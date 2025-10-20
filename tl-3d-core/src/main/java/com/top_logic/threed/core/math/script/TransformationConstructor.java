@@ -19,7 +19,6 @@ import com.top_logic.model.search.expr.GenericMethod;
 import com.top_logic.model.search.expr.SearchExpression;
 import com.top_logic.model.search.expr.config.dom.Expr;
 import com.top_logic.model.search.expr.config.operations.AbstractSimpleMethodBuilder;
-import com.top_logic.model.search.expr.config.operations.ArgumentDescriptor;
 import com.top_logic.threed.core.math.Transformation;
 import com.top_logic.threed.core.math.format.TxParser;
 import com.top_logic.threed.core.model.TlThreedCoreFactory;
@@ -143,34 +142,11 @@ public class TransformationConstructor extends GenericMethod {
 	 */
 	public static final class Builder extends AbstractSimpleMethodBuilder<TransformationConstructor> {
 
-		private static final ArgumentDescriptor DESCRIPTOR = ArgumentDescriptor.builder()
-			.optional("a", 1)
-			.optional("b", 0)
-			.optional("c", 0)
-
-			.optional("d", 0)
-			.optional("e", 1)
-			.optional("f", 0)
-
-			.optional("g", 0)
-			.optional("h", 0)
-			.optional("i", 1)
-
-			.optional("x", 0)
-			.optional("y", 0)
-			.optional("z", 0)
-			.build();
-
 		/**
 		 * Creates a {@link Builder}.
 		 */
 		public Builder(InstantiationContext context, Config<?> config) {
 			super(context, config);
-		}
-
-		@Override
-		public ArgumentDescriptor descriptor() {
-			return TransformationConstructor.Builder.DESCRIPTOR;
 		}
 
 		@Override
