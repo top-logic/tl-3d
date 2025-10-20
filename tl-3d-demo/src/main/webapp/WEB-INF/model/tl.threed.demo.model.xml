@@ -29,8 +29,9 @@
 							<query>
 								<expr><![CDATA[a -> {
     jt = $a.get(`tl.threed.demo:Asset3D#jtFile`);
+    $jt == null ? null : 
     "/assets/" + regex(".jt$").regexReplace(
-        regex("[\\\\]").regexReplace($jt, "/"), ".glb")
+        regex("[\\\\]").regexReplace($jt, "/"), ".glb");
 }]]></expr>
 							</query>
 						</storage-algorithm>
@@ -66,6 +67,13 @@
 					navigate="true"
 					type="ConnectionPoint"
 				/>
+				<property name="image"
+					type="tl.core:Binary"
+				>
+					<annotations>
+						<accepted-types value="*.glb, model/gltf-binary"/>
+					</annotations>
+				</property>
 			</attributes>
 		</class>
 		<class name="AssetCollection">

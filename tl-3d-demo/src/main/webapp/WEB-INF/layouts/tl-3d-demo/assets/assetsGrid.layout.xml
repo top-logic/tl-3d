@@ -5,7 +5,8 @@
 	template="com.top_logic.element/grid.template.xml"
 >
 	<arguments
-		defaultColumns="name,jtFile,snappingPoints,layoutPoint"
+		defaultColumns="name,jtFile,image,snappingPoints,layoutPoint"
+		fixedColumns="3"
 		type="tl.threed.demo:Asset3D"
 	>
 		<name key="dynamic.ce4bec8f-28d4-4323-9c3c-23364a7b4ae5">
