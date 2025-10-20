@@ -15,6 +15,7 @@ import com.top_logic.model.search.expr.GenericMethod;
 import com.top_logic.model.search.expr.SearchExpression;
 import com.top_logic.model.search.expr.config.dom.Expr;
 import com.top_logic.model.search.expr.config.operations.AbstractSimpleMethodBuilder;
+import com.top_logic.model.search.expr.config.operations.ArgumentDescriptor;
 import com.top_logic.model.search.expr.config.operations.MethodBuilder;
 import com.top_logic.threed.core.math.Transformation;
 import com.top_logic.threed.core.model.TlThreedCoreFactory;
@@ -60,15 +61,24 @@ public class Rotation extends GenericMethod {
 	 */
 	public static final class Builder extends AbstractSimpleMethodBuilder<Rotation> {
 
+		private static final ArgumentDescriptor DESCRIPTOR = ArgumentDescriptor.builder()
+			.optional("x", 0)
+			.optional("y", 0)
+			.optional("z", 0)
+			.build();
+
 		/** Creates a {@link Builder}. */
 		public Builder(InstantiationContext context, Config<?> config) {
 			super(context, config);
 		}
 
 		@Override
-		public Rotation build(Expr expr, SearchExpression[] args) throws ConfigurationException {
-			checkThreeArgs(expr, args);
+		public ArgumentDescriptor descriptor() {
+			return DESCRIPTOR;
+		}
 
+		@Override
+		public Rotation build(Expr expr, SearchExpression[] args) throws ConfigurationException {
 			return new Rotation(getConfig().getName(), args);
 		}
 

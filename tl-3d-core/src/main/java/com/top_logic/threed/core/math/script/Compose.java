@@ -12,10 +12,10 @@ import com.top_logic.basic.config.InstantiationContext;
 import com.top_logic.model.TLType;
 import com.top_logic.model.search.expr.EvalContext;
 import com.top_logic.model.search.expr.GenericMethod;
-import com.top_logic.model.search.expr.I18NConstants;
 import com.top_logic.model.search.expr.SearchExpression;
 import com.top_logic.model.search.expr.config.dom.Expr;
 import com.top_logic.model.search.expr.config.operations.AbstractSimpleMethodBuilder;
+import com.top_logic.model.search.expr.config.operations.ArgumentDescriptor;
 import com.top_logic.model.search.expr.config.operations.MethodBuilder;
 import com.top_logic.threed.core.math.Transformation;
 import com.top_logic.threed.core.model.TlThreedCoreFactory;
@@ -48,18 +48,16 @@ public class Compose extends GenericMethod {
 
 	@Override
 	protected Object eval(Object[] arguments, EvalContext definitions) {
-		Object first = arguments[0];
-		Object second = arguments[1];
-		if (first == null) {
-			return second;
+		Transformation self = asTransformation(arguments[0]);
+		Transformation other = asTransformation(arguments[1]);
+		if (self == null) {
+			return other;
 		}
-		if (second == null) {
-			return first;
+		if (other == null) {
+			return self;
 		}
-		Transformation firstTransformation = asTransformation(first);
-		Transformation secondTransformation = asTransformation(second);
 
-		return firstTransformation.after(secondTransformation);
+		return self.after(other);
 	}
 
 	private Transformation asTransformation(Object value) {
@@ -67,16 +65,20 @@ public class Compose extends GenericMethod {
 	}
 
 	/**
-	 * Converts the given value to an <code>Transformation</code> value.
+	 * Converts the given value to an {@link Transformation} value.
 	 */
 	public static Transformation asTransformation(SearchExpression context, Object value) {
 		value = asSingleElement(context, value);
 
-		if (value instanceof Transformation) {
-			return (Transformation) value;
-		} else {
-			throw new TopLogicException(I18NConstants.ERROR_NUMBER_REQUIRED__VALUE_EXPR.fill(value, context));
+		if (value == null) {
+			return null;
 		}
+
+		if (value instanceof Transformation tx) {
+			return tx;
+		}
+
+		throw new TopLogicException(I18NConstants.ERROR_TRANSFORMATION_EXPECTED__ACTUAL_EXPR.fill(value, context));
 	}
 
 	/**
@@ -84,15 +86,23 @@ public class Compose extends GenericMethod {
 	 */
 	public static final class Builder extends AbstractSimpleMethodBuilder<Compose> {
 
+		private static final ArgumentDescriptor DESCRIPTOR = ArgumentDescriptor.builder()
+			.mandatory("self")
+			.mandatory("other")
+			.build();
+
 		/** Creates a {@link Builder}. */
 		public Builder(InstantiationContext context, Config<?> config) {
 			super(context, config);
 		}
 
 		@Override
-		public Compose build(Expr expr, SearchExpression[] args) throws ConfigurationException {
-			checkTwoArgs(expr, args);
+		public ArgumentDescriptor descriptor() {
+			return DESCRIPTOR;
+		}
 
+		@Override
+		public Compose build(Expr expr, SearchExpression[] args) throws ConfigurationException {
 			return new Compose(getConfig().getName(), args);
 		}
 
