@@ -66,6 +66,7 @@ export class Scope {
         case 'GroupNode': obj = new GroupNode(id); break;
         case 'PartNode': obj = new PartNode(id); break;
         case 'GltfAsset': obj = new GltfAsset(id); break;
+        case 'ImageData': obj = new ImageData(id); break;
         case 'ConnectionPoint': obj = new ConnectionPoint(id); break;
       }
       this.objects[id] = obj;
@@ -80,20 +81,18 @@ export class Scope {
   }
 
   async loadAssets(ctrl) {
-    const contextPath = ctrl.contextPath;
     const gltfLoader = new GLTFLoader();
     
     // track loading progress
     let totalAssets = 0;
     let loadedAssets = 0;
 
-    const loadUrl = (localURL) =>
+    const loadUrl = (url) =>
       new Promise((resolve, reject) => {
-        if (localURL == null) {
+        if (url == null) {
             resolve(null);
             return;
         }
-        const url = contextPath + localURL;
         try {
           totalAssets++;
           
@@ -121,11 +120,11 @@ export class Scope {
           reject(msg);
         }
       });
-    const loadURLs = async (localURLs, assetsByURL) => {
+    const loadURLs = async (urls, assetsByURL) => {
 
-      await Promise.all(localURLs.map(loadUrl));
-      for (const url of localURLs) {
-        const gltf = this.gltfs[contextPath + url];
+      await Promise.all(urls.map(loadUrl));
+      for (const url of urls) {
+        const gltf = this.gltfs[url];
         if (gltf != null) {
           for (const asset of assetsByURL.get(url)) {
             asset.setGLTF(gltf, ctrl);
@@ -136,7 +135,15 @@ export class Scope {
     };
 
     // load assets in batches to prevent overwhelming the browser
-    const assetsByURL = Map.groupBy(this.assets, asset => asset.url);
+    const assetsByURL = Map.groupBy(this.assets, asset => {
+      if (asset.dynamicImage) {
+        return ctrl.imageUrl + "/" + asset.dynamicImage.imageID;
+      } else if (asset.url) {
+        return ctrl.contextPath + asset.url;
+      } else {
+        return null;
+      }
+    });
     const batchSize = 10;
 
     var urls = new Array(batchSize);
@@ -301,6 +308,36 @@ export class SceneGraph extends SharedObject {
     
     this.ctrl.toggleWorkplane(this.ctrl.isWorkplaneVisible);
   }
+}
+
+export class ImageData extends SharedObject {
+  constructor(id) {
+    super(id);
+  }
+
+  loadJson(scope, json) {
+    this.setProperty(scope, 'imageID', json.imageID);
+  }
+  
+  setProperty(scope, property, value) {
+    switch (property) {
+      case 'imageID': this.imageID = value; break;
+      default:
+        super.setProperty(scope, property, value);
+        break;
+    }
+  }
+  
+  insertElementAt(scope, property, idx, value) {
+    switch (property) {
+    }
+  }
+  
+  removeElementAt(scope, property, idx) {
+    switch (property) {
+    }
+  }
+  
 }
 
 export class ConnectionPoint extends SharedObject {
@@ -714,6 +751,7 @@ export class GltfAsset extends SharedObject {
 
   loadJson(scope, json) {
     this.setProperty(scope, 'url', json.url);
+    this.setProperty(scope, 'dynamicImage', json.dynamicImage);
     this.setProperty(scope, 'layoutPoint', json.layoutPoint);
     this.setProperty(scope, 'snappingPoints', json.snappingPoints);
   }
@@ -721,6 +759,7 @@ export class GltfAsset extends SharedObject {
   setProperty(scope, property, value) {
     switch (property) {
       case 'url': this.url = value; break;
+      case 'dynamicImage': this.dynamicImage = scope.loadJson(value); break;
       case 'layoutPoint': this.layoutPoint = scope.loadJson(value); break; 
       case 'snappingPoints': this.snappingPoints = scope.loadAll(value); break; 
       default:

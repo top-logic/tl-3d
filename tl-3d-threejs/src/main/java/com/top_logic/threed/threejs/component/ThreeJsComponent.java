@@ -20,7 +20,9 @@ import org.apache.commons.lang3.mutable.MutableBoolean;
 
 import com.top_logic.base.services.simpleajax.HTMLFragment;
 import com.top_logic.basic.CollectionUtil;
+import com.top_logic.basic.IdentifierUtil;
 import com.top_logic.basic.Log;
+import com.top_logic.basic.StringServices;
 import com.top_logic.basic.col.FilterUtil;
 import com.top_logic.basic.config.ConfigurationException;
 import com.top_logic.basic.config.ConfigurationItem;
@@ -34,6 +36,7 @@ import com.top_logic.basic.config.annotation.defaults.ClassDefault;
 import com.top_logic.basic.config.annotation.defaults.ItemDefault;
 import com.top_logic.event.infoservice.InfoService;
 import com.top_logic.knowledge.service.Transaction;
+import com.top_logic.knowledge.wrap.WrapperHistoryUtils;
 import com.top_logic.layout.DisplayContext;
 import com.top_logic.layout.channel.ChannelSPI;
 import com.top_logic.layout.channel.ComponentChannel;
@@ -61,7 +64,10 @@ import com.top_logic.model.search.expr.query.QueryExecutor;
 import com.top_logic.model.util.TLModelUtil;
 import com.top_logic.threed.core.math.Transformation;
 import com.top_logic.threed.threejs.control.ThreeJsControl;
+import com.top_logic.threed.threejs.scene.Asset;
+import com.top_logic.threed.threejs.scene.GltfAsset;
 import com.top_logic.threed.threejs.scene.GroupNode;
+import com.top_logic.threed.threejs.scene.ImageData;
 import com.top_logic.threed.threejs.scene.PartNode;
 import com.top_logic.threed.threejs.scene.SceneGraph;
 import com.top_logic.threed.threejs.scene.SceneNode;
@@ -210,6 +216,8 @@ public class ThreeJsComponent extends BuilderComponent
 
 	private final Map<SceneNode, GroupNode> _parentNodes = new HashMap<>();
 
+	private final Map<String, ImageData> _imageByID = new HashMap<>();
+
 	private boolean _sceneValid;
 
 	private ThreeJsControl _control;
@@ -268,7 +276,11 @@ public class ThreeJsComponent extends BuilderComponent
 
 	};
 
-	private SceneNode.Visitor<Void, GroupNode, RuntimeException> _addToIndex = new SceneNode.Visitor<>() {
+	private class AddToIndexVisitor implements SceneNode.Visitor<Void, GroupNode, RuntimeException> {
+
+		private int _imageCnt = 0;
+
+		private Map<Object, String> _imageCache = new HashMap<>();
 
 		@Override
 		public Void visit(GroupNode self, GroupNode parent) {
@@ -282,7 +294,44 @@ public class ThreeJsComponent extends BuilderComponent
 		@Override
 		public Void visit(PartNode self, GroupNode parent) {
 			add(self, parent);
+			addImage(self);
 			return null;
+		}
+
+		private void addImage(PartNode self) {
+			if (!self.hasAsset()) {
+				return;
+			}
+			Asset asset = self.getAsset();
+			if (asset instanceof GltfAsset gltfAsset) {
+				ImageData dynamicImage = gltfAsset.getDynamicImage();
+				if (dynamicImage != null) {
+					if (StringServices.isEmpty(dynamicImage.getImageID())) {
+						dynamicImage.setImageID(determineImageID(dynamicImage.getUserData()));
+					}
+					_imageByID.put(dynamicImage.getImageID(), dynamicImage);
+				}
+			}
+		}
+
+		private String determineImageID(Object userData) {
+			if (userData instanceof TLObject obj) {
+				StringBuilder stringBuilder = new StringBuilder();
+				stringBuilder.append("obj_");
+				stringBuilder.append(IdentifierUtil.toExternalForm(obj.tIdLocal()));
+				if (!WrapperHistoryUtils.isCurrent(obj)) {
+					stringBuilder.append("_");
+					stringBuilder.append(obj.tHistoryContext());
+				}
+				return stringBuilder.toString();
+			}
+			String cachedID = _imageCache.get(userData);
+			if (cachedID != null) {
+				return cachedID;
+			}
+			String newID = "img_" + Integer.toString(_imageCnt++);
+			_imageCache.put(userData, newID);
+			return newID;
 		}
 
 		private void add(SceneNode self, GroupNode parent) {
@@ -303,8 +352,14 @@ public class ThreeJsComponent extends BuilderComponent
 				}
 			}
 		}
-		
-	};
+
+		void reset() {
+			_imageCnt = 0;
+			_imageCache.clear();
+		}
+	}
+
+	private AddToIndexVisitor _addToIndex = new AddToIndexVisitor();
 
 	private SceneNode.Visitor<Void, Void, RuntimeException> _removeFromIndex = new SceneNode.Visitor<>() {
 
@@ -522,7 +577,7 @@ public class ThreeJsComponent extends BuilderComponent
 
 	ThreeJsControl getThreeJSControl() {
 		if (_control == null) {
-			_control = new ThreeJsControl(getScene());
+			_control = new ThreeJsControl(getScene(), _imageByID);
 			setCoordinateSystems(getSelected());
 		}
 
@@ -556,6 +611,9 @@ public class ThreeJsComponent extends BuilderComponent
 	private void buildScene() {
 		_nodeByModel.clear();
 		_parentNodes.clear();
+		_imageByID.clear();
+		_addToIndex.reset();
+
 		SceneNode root = builder().getModel(getModel(), this);
 		root.visit(_addToIndex, null);
 		_scene.setRoot(root);
