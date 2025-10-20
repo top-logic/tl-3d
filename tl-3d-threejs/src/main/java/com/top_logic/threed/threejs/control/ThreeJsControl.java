@@ -59,7 +59,7 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 
 	private SceneGraph _model;
 
-	private final ExternalScope _scope;
+	private final ExternalScope _nodeScope;
 
 	private boolean _isWorkplaneVisible;
 
@@ -177,7 +177,7 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 	public ThreeJsControl(SceneGraph model) {
 		super(COMMANDS);
 		_model = model;
-		_scope = new ExternalScope(2, 0);
+		_nodeScope = new ExternalScope(2, 0);
 	}
 
 	@Override
@@ -368,17 +368,17 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 
 	@Override
 	protected boolean hasUpdates() {
-		return super.hasUpdates() || _scope.hasChanges();
+		return super.hasUpdates() || _nodeScope.hasChanges();
 	}
 
 	@Override
 	protected void internalRevalidate(DisplayContext context, UpdateQueue actions) {
 		super.internalRevalidate(context, actions);
 
-		if (_scope.hasChanges()) {
+		if (_nodeScope.hasChanges()) {
 			Writer out = new StringW();
 			try {
-				_scope.createPatch(new JsonWriter(out));
+				_nodeScope.createPatch(new JsonWriter(out));
 			} catch (IOException ex) {
 				throw new UncheckedIOException(ex);
 			}
@@ -425,8 +425,8 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 		response.setContentType("application/json");
 		response.setCharacterEncoding("utf-8");
 
-		_scope.clear();
-		_scope.writeRefOrData(new JsonWriter(new WriterAdapter(response.getWriter())), _model);
+		_nodeScope.clear();
+		_nodeScope.writeRefOrData(new JsonWriter(new WriterAdapter(response.getWriter())), _model);
 	}
 
 	/**
@@ -465,15 +465,15 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 	 * Applies commands from the UI.
 	 */
 	void applyChange(String changes) {
-		if (_scope.hasChanges()) {
+		if (_nodeScope.hasChanges()) {
 			throw new IllegalStateException("Scope has changes which were not delivered to the client.");
 		}
 		try {
-			_scope.applyChanges(new JsonReader(new StringR(changes)));
+			_nodeScope.applyChanges(new JsonReader(new StringR(changes)));
 		} catch (IOException ex) {
 			throw new UncheckedIOException(ex);
 		}
-		_scope.dropChanges();
+		_nodeScope.dropChanges();
 	}
 
 	/**
