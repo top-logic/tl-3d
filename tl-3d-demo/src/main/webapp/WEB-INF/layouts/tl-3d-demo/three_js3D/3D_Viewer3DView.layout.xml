@@ -103,8 +103,7 @@ $partsWithCoordinates.map(p -> {
 }).concat(
   {
     "label": "Statisches Koordinatensystem mit Rotation und Verschiebung",
-    "tx": txRotateX(1.5708)
-      .txCompose(txRotateZ(0.7854))
+    "tx": txRotate(x: 1.5708, z: 0.7854)
       .txCompose(txTranslate(1000,500,600))
   }
 );
