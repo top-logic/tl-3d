@@ -16,17 +16,18 @@ import com.top_logic.model.search.expr.SearchExpression;
 import com.top_logic.model.search.expr.config.dom.Expr;
 import com.top_logic.model.search.expr.config.operations.AbstractSimpleMethodBuilder;
 import com.top_logic.model.search.expr.config.operations.ArgumentDescriptor;
-import com.top_logic.threed.threejs.scene.SceneNode;
+
+import de.haumacher.msgbuf.graph.AbstractSharedGraphNode;
 
 /**
- * {@link GenericMethod} to access fields of a {@link SceneNode}.
+ * {@link GenericMethod} to access fields of a {@link ThreejsSharedGraphNodeAccess}.
  */
-public class ThreejsSceneNodeAccess extends GenericMethod {
+public class ThreejsSharedGraphNodeAccess extends GenericMethod {
 
 	/**
-	 * Creates a {@link ThreejsSceneNodeAccess}.
+	 * Creates a {@link ThreejsSharedGraphNodeAccess}.
 	 */
-	protected ThreejsSceneNodeAccess(String name, SearchExpression[] arguments) {
+	protected ThreejsSharedGraphNodeAccess(String name, SearchExpression[] arguments) {
 		super(name, arguments);
 	}
 
@@ -37,12 +38,12 @@ public class ThreejsSceneNodeAccess extends GenericMethod {
 
 	@Override
 	public GenericMethod copy(SearchExpression[] arguments) {
-		return new ThreejsSceneNodeAccess(getName(), arguments);
+		return new ThreejsSharedGraphNodeAccess(getName(), arguments);
 	}
 
 	@Override
 	protected Object eval(Object[] arguments, EvalContext definitions) {
-		SceneNode object = (SceneNode) arguments[0];
+		AbstractSharedGraphNode object = (AbstractSharedGraphNode) arguments[0];
 		String property = asString(arguments[1]);
 		return object.get(property);
 	}
@@ -53,9 +54,9 @@ public class ThreejsSceneNodeAccess extends GenericMethod {
 	}
 
 	/**
-	 * Factory for {@link ThreejsSceneNodeAccess} methods.
+	 * Factory for {@link ThreejsSharedGraphNodeAccess} methods.
 	 */
-	public static final class Builder extends AbstractSimpleMethodBuilder<ThreejsSceneNodeAccess> {
+	public static final class Builder extends AbstractSimpleMethodBuilder<ThreejsSharedGraphNodeAccess> {
 
 		private static final ArgumentDescriptor DESCRIPTOR = ArgumentDescriptor.builder()
 			.mandatory("object")
@@ -75,9 +76,9 @@ public class ThreejsSceneNodeAccess extends GenericMethod {
 		}
 
 		@Override
-		public ThreejsSceneNodeAccess build(Expr expr, SearchExpression[] args)
+		public ThreejsSharedGraphNodeAccess build(Expr expr, SearchExpression[] args)
 				throws ConfigurationException {
-			return new ThreejsSceneNodeAccess(getConfig().getName(), args);
+			return new ThreejsSharedGraphNodeAccess(getConfig().getName(), args);
 		}
 
 	}
