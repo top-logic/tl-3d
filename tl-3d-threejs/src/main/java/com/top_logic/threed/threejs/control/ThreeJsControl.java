@@ -6,6 +6,7 @@
 package com.top_logic.threed.threejs.control;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -14,6 +15,8 @@ import java.util.Map;
 
 import com.top_logic.base.services.simpleajax.JSFunctionCall;
 import com.top_logic.basic.col.MapBuilder;
+import com.top_logic.basic.io.BinaryContent;
+import com.top_logic.basic.io.StreamUtilities;
 import com.top_logic.basic.json.JSON;
 import com.top_logic.basic.util.ResKey;
 import com.top_logic.basic.xml.TagWriter;
@@ -25,11 +28,13 @@ import com.top_logic.layout.UpdateQueue;
 import com.top_logic.layout.basic.AbstractControl;
 import com.top_logic.layout.basic.ControlCommand;
 import com.top_logic.mig.html.HTMLUtil;
+import com.top_logic.model.search.expr.query.QueryExecutor;
 import com.top_logic.threed.core.math.Transformation;
 import com.top_logic.threed.core.math.TransformationUtil;
 import com.top_logic.threed.threejs.component.CoordinateSystem;
 import com.top_logic.threed.threejs.component.CoordinateSystemProvider;
 import com.top_logic.threed.threejs.scene.ConnectionPoint;
+import com.top_logic.threed.threejs.scene.ImageData;
 import com.top_logic.threed.threejs.scene.SceneGraph;
 import com.top_logic.threed.threejs.scene.SceneNode;
 import com.top_logic.threed.threejs.scene.ScenePart;
@@ -46,6 +51,7 @@ import de.haumacher.msgbuf.json.JsonWriter;
 import de.haumacher.msgbuf.observer.Listener;
 import de.haumacher.msgbuf.observer.Observable;
 import de.haumacher.msgbuf.server.io.WriterAdapter;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
@@ -57,7 +63,9 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 
 	private static final Map<String, ControlCommand> COMMANDS = createCommandMap(ApplySceneChange.INSTANCE);
 
-	private SceneGraph _model;
+	private final SceneGraph _model;
+
+	private final Map<String, ImageData> _imageByID;
 
 	private final ExternalScope _nodeScope;
 
@@ -171,12 +179,50 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 
 	private GizmoControl _gizmoControl = new GizmoControl();
 
+	private ContentHandler _imageData = new ContentHandler() {
+
+		@Override
+		public void handleContent(DisplayContext context, String id, URLParser url)
+				throws IOException, ServletException {
+			HttpServletResponse response = context.asResponse();
+			if (url.isEmpty()) {
+				response.sendError(HttpServletResponse.SC_NOT_FOUND, "No image ID given");
+				return;
+			}
+			String imageID = url.removeResource();
+
+			ImageData imageData = _imageByID.get(imageID);
+			if (imageData == null) {
+				response.sendError(HttpServletResponse.SC_NOT_FOUND, "Unknown image ID: " + imageID);
+				return;
+			}
+
+			QueryExecutor imageExpr = imageData.getData();
+			Object image = imageExpr.execute(imageData.getUserData());
+			if (image == null) {
+				response.sendError(HttpServletResponse.SC_NOT_FOUND, "No image for ID " + imageID + ".");
+				return;
+			}
+			if (!(image instanceof BinaryContent)) {
+				response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+					"No image for ID " + imageID + ". Got " + image.getClass().getName());
+				return;
+			}
+
+			response.setContentType("model/gltf-binary");
+			try (InputStream content = ((BinaryContent) image).getStream()) {
+				StreamUtilities.copyStreamContents(content, response.getOutputStream());
+			}
+		}
+	};
+
 	/**
 	 * Creates a {@link ThreeJsControl}.
 	 */
-	public ThreeJsControl(SceneGraph model) {
+	public ThreeJsControl(SceneGraph model, Map<String, ImageData> dynamicImages) {
 		super(COMMANDS);
 		_model = model;
+		_imageByID = dynamicImages;
 		_nodeScope = new ExternalScope(2, 0);
 	}
 
@@ -309,6 +355,11 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 			});
 
 		getFrameScope().registerContentHandler(getID(), this);
+		getFrameScope().registerContentHandler(imageDataID(), _imageData);
+	}
+
+	private String imageDataID() {
+		return getID() + "-image";
 	}
 
 	private void updateGizmoControl(SceneNode node) {
@@ -360,6 +411,7 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 
 	@Override
 	protected void internalDetach() {
+		getFrameScope().deregisterContentHandler(_imageData);
 		getFrameScope().deregisterContentHandler(this);
 		_sceneListener.detach(_model);
 
@@ -395,11 +447,13 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 		
 		String dataUrl =
 			getFrameScope().getURL(context, this).appendParameter("t", Long.toString(System.nanoTime())).getURL();
+		String imageUrl = getFrameScope().getURL(context, _imageData).getURL();
 
 		Map<String, Object> initialState = new MapBuilder<String, Object>()
 			.put("controlId", getID())
 			.put("contextPath", context.getContextPath())
 			.put("dataUrl", dataUrl)
+			.put("imageUrl", imageUrl)
 			.put("isWorkplaneVisible", _isWorkplaneVisible)
 			.put("isSkyboxVisible", _isSkyboxVisible)
 			.put("isInEditMode", _isInEditMode)

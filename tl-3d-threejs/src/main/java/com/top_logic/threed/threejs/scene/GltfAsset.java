@@ -18,7 +18,12 @@ public class GltfAsset extends Asset {
 	/** @see #getUrl() */
 	public static final String URL__PROP = "url";
 
+	/** @see #getDynamicImage() */
+	public static final String DYNAMIC_IMAGE__PROP = "dynamicImage";
+
 	private String _url = "";
+
+	private com.top_logic.threed.threejs.scene.ImageData _dynamicImage = null;
 
 	/**
 	 * Creates a {@link GltfAsset} instance.
@@ -36,6 +41,12 @@ public class GltfAsset extends Asset {
 
 	/**
 	 * The URL from which to retrieve <tt>glTF</tt> data.
+	 *
+	 * <p>
+	 * The URL is not used when a dynamic image is set.
+	 * </p>
+	 *
+	 * @see #getDynamicImage()
 	 */
 	public final String getUrl() {
 		return _url;
@@ -54,6 +65,37 @@ public class GltfAsset extends Asset {
 		_listener.beforeSet(this, URL__PROP, value);
 		_url = value;
 		_listener.afterChanged(this, URL__PROP);
+	}
+
+	/**
+	 * Dynamic image delivering the <tt>glTF</tt> data.
+	 *
+	 * @see #getUrl()
+	 */
+	public final com.top_logic.threed.threejs.scene.ImageData getDynamicImage() {
+		return _dynamicImage;
+	}
+
+	/**
+	 * @see #getDynamicImage()
+	 */
+	public com.top_logic.threed.threejs.scene.GltfAsset setDynamicImage(com.top_logic.threed.threejs.scene.ImageData value) {
+		internalSetDynamicImage(value);
+		return this;
+	}
+
+	/** Internal setter for {@link #getDynamicImage()} without chain call utility. */
+	protected final void internalSetDynamicImage(com.top_logic.threed.threejs.scene.ImageData value) {
+		_listener.beforeSet(this, DYNAMIC_IMAGE__PROP, value);
+		_dynamicImage = value;
+		_listener.afterChanged(this, DYNAMIC_IMAGE__PROP);
+	}
+
+	/**
+	 * Checks, whether {@link #getDynamicImage()} has a value.
+	 */
+	public final boolean hasDynamicImage() {
+		return _dynamicImage != null;
 	}
 
 	@Override
@@ -81,7 +123,8 @@ public class GltfAsset extends Asset {
 
 	private static java.util.List<String> PROPERTIES = java.util.Collections.unmodifiableList(
 		java.util.Arrays.asList(
-			URL__PROP));
+			URL__PROP, 
+			DYNAMIC_IMAGE__PROP));
 
 	private static java.util.Set<String> TRANSIENT_PROPERTIES = java.util.Collections.unmodifiableSet(new java.util.HashSet<>(
 			java.util.Arrays.asList(
@@ -101,6 +144,7 @@ public class GltfAsset extends Asset {
 	public Object get(String field) {
 		switch (field) {
 			case URL__PROP: return getUrl();
+			case DYNAMIC_IMAGE__PROP: return getDynamicImage();
 			default: return super.get(field);
 		}
 	}
@@ -109,6 +153,7 @@ public class GltfAsset extends Asset {
 	public void set(String field, Object value) {
 		switch (field) {
 			case URL__PROP: internalSetUrl((String) value); break;
+			case DYNAMIC_IMAGE__PROP: internalSetDynamicImage((com.top_logic.threed.threejs.scene.ImageData) value); break;
 			default: super.set(field, value); break;
 		}
 	}
@@ -133,6 +178,10 @@ public class GltfAsset extends Asset {
 		super.writeFields(scope, out);
 		out.name(URL__PROP);
 		out.value(getUrl());
+		if (hasDynamicImage()) {
+			out.name(DYNAMIC_IMAGE__PROP);
+			getDynamicImage().writeTo(scope, out);
+		}
 	}
 
 	@Override
@@ -140,6 +189,14 @@ public class GltfAsset extends Asset {
 		switch (field) {
 			case URL__PROP: {
 				out.value(getUrl());
+				break;
+			}
+			case DYNAMIC_IMAGE__PROP: {
+				if (hasDynamicImage()) {
+					getDynamicImage().writeTo(scope, out);
+				} else {
+					out.nullValue();
+				}
 				break;
 			}
 			default: super.writeFieldValue(scope, out, field);
@@ -150,6 +207,7 @@ public class GltfAsset extends Asset {
 	public void readField(de.haumacher.msgbuf.graph.Scope scope, de.haumacher.msgbuf.json.JsonReader in, String field) throws java.io.IOException {
 		switch (field) {
 			case URL__PROP: setUrl(de.haumacher.msgbuf.json.JsonUtil.nextStringOptional(in)); break;
+			case DYNAMIC_IMAGE__PROP: setDynamicImage(com.top_logic.threed.threejs.scene.ImageData.readImageData(scope, in)); break;
 			default: super.readField(scope, in, field);
 		}
 	}

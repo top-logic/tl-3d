@@ -54,6 +54,7 @@ import {
  * @property {string} controlId - The ID of the control element.
  * @property {string} contextPath - The context path for loading resources.
  * @property {string} dataUrl - The URL to fetch the scene data.
+ * @property {string} imageUrl - Base URL to fetch the dynamic image data.
  * @property {boolean} isWorkplaneVisible - Visibility state of the workplane.
  * @property {boolean} isSkyboxVisible - Visibility state of the Skybox.
  * @property {boolean} isInEditMode - State of the edit mode.
@@ -71,6 +72,7 @@ class ThreeJsControl {
     this.controlId = initialState.controlId;
     this.contextPath = initialState.contextPath;
     this.dataUrl = initialState.dataUrl;
+    this.imageUrl = initialState.imageUrl;
     this.scope = new Scope();
     
     this.lastLODLevel = -1;

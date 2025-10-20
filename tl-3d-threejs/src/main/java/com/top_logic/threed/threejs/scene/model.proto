@@ -18,8 +18,45 @@ abstract message Asset {
 
 /** A <tt>glTF</tt> artifact loaded from an URL. */
 message GltfAsset extends Asset {
-	/** The URL from which to retrieve <tt>glTF</tt> data. */
+
+	/**
+	 * The URL from which to retrieve <tt>glTF</tt> data.
+	 * 
+	 * <p>
+	 * The URL is not used when a dynamic image is set.
+	 * </p>
+	 *
+	 * @see #getDynamicImage()
+	 */
 	string url;
+
+	/** 
+	 * Dynamic image delivering the <tt>glTF</tt> data.
+	 * 
+	 * @see #getUrl()
+	 */
+	ImageData dynamicImage;
+}
+
+/** Holder object for retrieving dynamic <tt>glTF</tt> data. */
+message ImageData {
+
+	/**
+	 * ID for this image. Multiple images with the same are ID are loaded once.
+	 */
+	string imageID;
+	
+	/**
+	 * User object for this data.
+	 */
+	transient java.lang.Object userData;
+	
+	/**
+	 * {@link com.top_logic.model.search.expr.query.QueryExecutor} computing the actual image data 
+	 * from {@link #getUserData()}.
+	 */
+	transient com.top_logic.model.search.expr.query.QueryExecutor data;
+	
 }
 
 /** A <tt>glTF</tt> artifact displaying a cube. */
