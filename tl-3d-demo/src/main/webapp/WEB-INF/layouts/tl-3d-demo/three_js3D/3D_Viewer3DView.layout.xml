@@ -21,12 +21,17 @@
 			typesToObserve="tl.threed.demo:Node"
 		>
 			<createNode><![CDATA[node -> switch {
-  $node.instanceOf(`tl.threed.demo:Part`) || $node.get(`tl.threed.demo:Node#asset`) != null: 
+  $node.instanceOf(`tl.threed.demo:Part`) || $node.get(`tl.threed.demo:Node#asset`) != null: {
+    asset = $node.get(`tl.threed.demo:Part#asset`);
+    uploadedImage = $asset.get(`tl.threed.demo:Asset3D#image`);
     threejsGltf(
       tx:  $node.get(`tl.threed.demo:Node#tx`),
       color: $node.get(`tl.threed.demo:Node#color`),
       userData: $node,
-      url: $node.get(`tl.threed.demo:Part#asset`).get(`tl.threed.demo:Asset3D#gltfUrl`),
+      url: $asset.get(`tl.threed.demo:Asset3D#gltfUrl`),
+      imageData: $uploadedImage == null ? 
+        null :
+        threejsImage(userData: $asset, data: ud -> $ud.get(`tl.threed.demo:Asset3D#image`)) ,
       layoutPoint: {
         lp = $node.get(`tl.threed.demo:Part#asset`).get(`tl.threed.demo:Asset3D#layoutPoint`);
         $lp == null ? null : threejsCp(
@@ -42,7 +47,7 @@
               classifiers: $cp.get(`tl.threed.demo:ConnectionPoint#classifiers`)
             )
           )
-      );
+      )};
   $node.instanceOf(`tl.threed.demo:Assembly`):
     threejsGroup(
       tx: $node.get(`tl.threed.demo:Node#tx`),
