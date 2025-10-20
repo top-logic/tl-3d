@@ -47,18 +47,18 @@ public abstract class ThreejsSceneNode<T extends SceneNode> extends GenericMetho
 	protected T createNode(Object[] arguments) {
 		T node = allocate();
 
-		Transformation transform = asTransformation(getArguments()[1], arguments[1]);
+		Transformation transform = asTransformation(getArguments()[0], arguments[0]);
 		if (transform != null) {
 			node.setTransform(TransformationUtil.toList(transform));
 		}
 
-		Object userData = arguments[2];
+		Object userData = arguments[1];
 		node.setUserData(userData);
 
-		Boolean isHidden = asBoolean(arguments[3]);
+		Boolean isHidden = asBoolean(arguments[2]);
 		node.setHidden(isHidden.booleanValue());
 
-		Color color = asColor(getArguments()[4], arguments[4]);
+		Color color = asColor(getArguments()[3], arguments[3]);
 		if (color != null) {
 			node.setColor(ColorFormat.formatColor(color));
 		}
