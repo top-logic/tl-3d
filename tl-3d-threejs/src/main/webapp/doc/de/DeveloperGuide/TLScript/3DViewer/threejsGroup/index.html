@@ -1,0 +1,70 @@
+<h2>Syntax</h2>
+
+<pre><code>threejsGroup(
+  tx: $tx,
+  userData: $userData,
+  hidden: $hidden,
+  color: $color,
+  components: $components
+)</code></pre>
+
+<h2>Beschreibung</h2>
+
+<p>Erstellt einen Szenenknoten der andere Knoten zusammenfasst. Wird z.B. dieser Knoten verschoben werden alle inneren Knoten mitverschoben.</p>
+
+<h2>Parameter</h2>
+
+<table class="tlDocTable">
+	<thead>
+		<tr>
+			<th>Name</th>
+			<th>Typ</th>
+			<th>Beschreibung</th>
+			<th>Pflicht</th>
+			<th>Default</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>tx</td>
+			<td>Transformation</td>
+			<td>Transformation die auf den Knoten angewandt wird. Die Transformation is relativ zu der umgebenen Knotengruppe.</td>
+			<td>nein</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>userData</td>
+			<td>Objekt</td>
+			<td>Fachobjekt für dem Knoten. Dieses Objekt wird z.B. für das Cross-Highlighting benutzt</td>
+			<td>nein</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>hidden</td>
+			<td>boolean</td>
+			<td>Ob der Knoten dargestellt werden soll.</td>
+			<td>nein</td>
+			<td>false</td>
+		</tr>
+		<tr>
+			<td>color</td>
+			<td>Color</td>
+			<td>Farbe in der der Knoten gefärbt werden soll.</td>
+			<td>nein</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>components</td>
+			<td>Liste von Szenenknoten</td>
+			<td>Knoten die diese Gruppe enthält</td>
+			<td>nein</td>
+			<td> </td>
+		</tr>
+	</tbody>
+</table>
+
+<h2>Rückgabewert</h2>
+
+<p><span style="color:#3498db"><strong>Typ:</strong></span> Szenenknoten</p>
+
+<p>Ein Knoten der die gegebenen <code class="hljs inlineCode">components</code> zusammenfasst.</p>

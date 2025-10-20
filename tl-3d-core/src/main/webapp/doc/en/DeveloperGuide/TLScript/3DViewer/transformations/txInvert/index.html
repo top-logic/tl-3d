@@ -1,0 +1,66 @@
+<h2>Syntax</h2>
+
+<pre><code>$tx.invert()</code></pre>
+
+<h2>Description</h2>
+
+<p>Creates a transformation that inverts a given transformation</p>
+
+<h2>Parameters</h2>
+
+<table class="tlDocTable">
+	<thead>
+		<tr>
+			<th>name</th>
+			<th>Type</th>
+			<th>Type Description</th>
+			<th>Mandatory</th>
+			<th>Default</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>tx</td>
+			<td>Transformation</td>
+			<td>A transformation whose effect is to be inverted.</td>
+			<td>yes</td>
+			<td> </td>
+		</tr>
+	</tbody>
+</table>
+
+<h2>Return value</h2>
+
+<p><span style="color:#3498db"><strong>Type:</strong></span> <code class="hljs inlineCode">`tl.threed.core:Transformation`</code></p>
+
+<h2>Examples</h2>
+
+<h3>Example 1</h3>
+
+<pre><code>txIdentity().invert()</code></pre>
+
+<p><span style="color:#3498db"><strong>Output:</strong></span> <code class="hljs inlineCode">`txIdentity()`</code></p>
+
+<p>The unit transformation is inverse to itself.</p>
+
+<h3>Example 2</h3>
+
+<pre><code>translate(100, 100, 50)</code></pre>
+
+<p><span style="color:#3498db"><strong>Output:</strong></span> <code class="hljs inlineCode">translate(-100, -100, -50)</code></p>
+
+<p></p>
+
+<h3> Example 3</h3>
+
+<pre><code>rotate(Math.PI, Math.PI, Math.PI/2)</code></pre>
+
+<p><strong>Output:</strong> <code class="hljs inlineCode">rotate(z: Math.PI/2)</code></p>
+
+<p> </p>
+
+<p> </p>
+
+<p></p>
+
+<p> </p>

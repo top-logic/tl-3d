@@ -1,0 +1,41 @@
+<h2>Syntax</h2>
+
+<pre><code>$self.txCompose($other)</code></pre>
+
+<h2>Description</h2>
+
+<p>Creates a transformation that first executes <code class="hljs inlineCode">$other</code> and then <code><code class="hljs inlineCode">self</code>.</code></p>
+
+<h2>parameters</h2>
+
+<table class="tlDocTable">
+	<thead>
+		<tr>
+			<th>Name</th>
+			<th>Type</th>
+			<th>Type Description</th>
+			<th>Mandatory</th>
+			<th>Default</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>self</td>
+			<td>Transformation</td>
+			<td>Transformation to be executed second</td>
+			<td>yes</td>
+			<td> </td>
+		</tr>
+		<tr>
+			<td>other</td>
+			<td>transformation</td>
+			<td>Transformation to be executed first</td>
+			<td>yes</td>
+			<td> </td>
+		</tr>
+	</tbody>
+</table>
+
+<h2>Return value</h2>
+
+<p><span style="color:#3498db"><strong>Type:</strong></span> <code class="hljs inlineCode">`tl.threed.core:Transformation`</code></p>
