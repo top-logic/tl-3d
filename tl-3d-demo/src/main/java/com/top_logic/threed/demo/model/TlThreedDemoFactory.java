@@ -41,6 +41,13 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 	}
 
 	/**
+	 * Lookup {@link Asset3D#IMAGE_ATTR} of {@link Asset3D}.
+	 */
+	public static com.top_logic.model.TLProperty getImageAsset3DAttr() {
+		return (com.top_logic.model.TLProperty) getAsset3DType().getPart(Asset3D.IMAGE_ATTR);
+	}
+
+	/**
 	 * Lookup {@link Asset3D#JT_FILE_ATTR} of {@link Asset3D}.
 	 */
 	public static com.top_logic.model.TLProperty getJtFileAsset3DAttr() {

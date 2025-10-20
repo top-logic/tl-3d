@@ -27,6 +27,15 @@ public interface Asset3DBase extends com.top_logic.model.TLNamed {
 	String GLTF_URL_ATTR = "gltfUrl";
 
 	/**
+	 * Part <code>image</code> of <code>Asset3D</code>
+	 * 
+	 * <p>
+	 * Declared as <code>tl.core:Binary</code> in configuration.
+	 * </p>
+	 */
+	String IMAGE_ATTR = "image";
+
+	/**
 	 * Part <code>jtFile</code> of <code>Asset3D</code>
 	 * 
 	 * <p>
@@ -67,6 +76,20 @@ public interface Asset3DBase extends com.top_logic.model.TLNamed {
 	 */
 	default String getGltfUrl() {
 		return (String) tValueByName(GLTF_URL_ATTR);
+	}
+
+	/**
+	 * Getter for part {@link #IMAGE_ATTR}.
+	 */
+	default com.top_logic.basic.io.binary.BinaryDataSource getImage() {
+		return (com.top_logic.basic.io.binary.BinaryDataSource) tValueByName(IMAGE_ATTR);
+	}
+
+	/**
+	 * Setter for part {@link #IMAGE_ATTR}.
+	 */
+	default void setImage(com.top_logic.basic.io.binary.BinaryDataSource newValue) {
+		tUpdateByName(IMAGE_ATTR, newValue);
 	}
 
 	/**
