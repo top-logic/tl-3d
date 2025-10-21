@@ -27,6 +27,15 @@ public interface NodeBase extends com.top_logic.threed.demo.model.ScenePart {
 	String ASSET_ATTR = "asset";
 
 	/**
+	 * Part <code>color</code> of <code>Node</code>
+	 * 
+	 * <p>
+	 * Declared as <code>tl.util:Color</code> in configuration.
+	 * </p>
+	 */
+	String COLOR_ATTR = "color";
+
+	/**
 	 * Part <code>immutable</code> of <code>Node</code>
 	 * 
 	 * <p>
@@ -92,6 +101,20 @@ public interface NodeBase extends com.top_logic.threed.demo.model.ScenePart {
 	 */
 	default void setAsset(com.top_logic.threed.demo.model.Asset3D newValue) {
 		tUpdateByName(ASSET_ATTR, newValue);
+	}
+
+	/**
+	 * Getter for part {@link #COLOR_ATTR}.
+	 */
+	default java.awt.Color getColor() {
+		return (java.awt.Color) tValueByName(COLOR_ATTR);
+	}
+
+	/**
+	 * Setter for part {@link #COLOR_ATTR}.
+	 */
+	default void setColor(java.awt.Color newValue) {
+		tUpdateByName(COLOR_ATTR, newValue);
 	}
 
 	/**
