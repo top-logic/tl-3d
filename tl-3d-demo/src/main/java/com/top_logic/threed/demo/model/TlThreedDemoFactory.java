@@ -153,6 +153,13 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 	}
 
 	/**
+	 * Lookup {@link Node#COLOR_ATTR} of {@link Node}.
+	 */
+	public static com.top_logic.model.TLProperty getColorNodeAttr() {
+		return (com.top_logic.model.TLProperty) getNodeType().getPart(Node.COLOR_ATTR);
+	}
+
+	/**
 	 * Lookup {@link Node#IMMUTABLE_ATTR} of {@link Node}.
 	 */
 	public static com.top_logic.model.TLProperty getImmutableNodeAttr() {

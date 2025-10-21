@@ -27,15 +27,6 @@ public interface TextBase extends com.top_logic.threed.demo.model.Node {
 	String BACKGROUND_ATTR = "background";
 
 	/**
-	 * Part <code>color</code> of <code>Text</code>
-	 * 
-	 * <p>
-	 * Declared as <code>tl.util:Color</code> in configuration.
-	 * </p>
-	 */
-	String COLOR_ATTR = "color";
-
-	/**
 	 * Part <code>fontSize</code> of <code>Text</code>
 	 * 
 	 * <p>
@@ -61,15 +52,9 @@ public interface TextBase extends com.top_logic.threed.demo.model.Node {
 	/**
 	 * Getter for part {@link #COLOR_ATTR}.
 	 */
+	@Override
 	default java.awt.Color getColor() {
 		return (java.awt.Color) tValueByName(COLOR_ATTR);
-	}
-
-	/**
-	 * Setter for part {@link #COLOR_ATTR}.
-	 */
-	default void setColor(java.awt.Color newValue) {
-		tUpdateByName(COLOR_ATTR, newValue);
 	}
 
 	/**
