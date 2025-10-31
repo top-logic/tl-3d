@@ -604,7 +604,7 @@ export class GltfAsset extends SharedObject {
     }
     this.snappingPoints?.forEach((point) => point.build(this.group, false));
     
-    if (this.url) {
+    if (this.url || this.dynamicImage) {
       const geometry = new BoxGeometry(500, 500, 500);
       const material = new MeshBasicMaterial({ wireframe: false });
       const mesh = new Mesh(geometry, material);
