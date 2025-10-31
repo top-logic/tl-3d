@@ -9,7 +9,7 @@
 	</parent>
 	
 	<artifactId>tl-3d-core</artifactId>
-	<version>1.0.0-SNAPSHOT</version>
+	<version>0.9.2</version>
 	
 	<properties>
 		<maven.compiler.source>17</maven.compiler.source>
