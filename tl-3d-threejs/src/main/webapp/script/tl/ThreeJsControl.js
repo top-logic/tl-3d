@@ -1428,9 +1428,10 @@ getScreenSpaceDistance(pos1, pos2) {
       this.skyboxManager.createFactoryFloors(null);
     }
     
-    this.scope.loadAssets(this).then(() => {
-      this.updateObjectsTransparency();
-    });
+    await this.scope.loadAssets(this)
+      .then(() => {
+        this.updateObjectsTransparency()
+      });
 
     this.camera.position.applyMatrix4(this.scene.matrix);
     this.camera.updateProjectionMatrix();

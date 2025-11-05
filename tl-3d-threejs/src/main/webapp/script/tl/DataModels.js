@@ -80,58 +80,31 @@ export class Scope {
     }
   }
 
-  async loadAssets(ctrl) {
+  loadAssets(ctrl) {
     const gltfLoader = new GLTFLoader();
     
-    // track loading progress
-    let totalAssets = 0;
-    let loadedAssets = 0;
-
-    const loadUrl = (url) =>
-      new Promise((resolve, reject) => {
-        if (url == null) {
-            resolve(null);
-            return;
+    const loadUrl = (url) => {
+      return gltfLoader.loadAsync(url).then(
+        (gltf) => {
+          // store gltf in the cache
+          this.gltfs[url] = gltf;
+        }, (reason) => {
+          const msg = "Failed to load '" + url + "': " + reason;
+          console.error(msg);
         }
-        try {
-          totalAssets++;
-          
-          // if gltf for the given url exists in the cache let's return it
-          if (this.gltfs[url]) {
-            loadedAssets++;
-
-            resolve(this.gltfs[url]);
-            return;
+      );
+    };
+      
+    const loadURLs = (urls, assetsByURL) => {
+      return Promise.all(urls.map(loadUrl))
+        .then(() => {
+          for (const url of urls) {
+            this.setGLTF(ctrl, url, assetsByURL);
           }
-
-          gltfLoader.load(url, (gltf) => {
-              loadedAssets++;
-              // store gltf in the cache
-              this.gltfs[url] = gltf;
-              resolve(gltf);
-          }, null, function (error) {
-            const msg = "Failed to load '" + url + "'.";
-            console.error(msg);
-            resolve(null);
-           });
-        } catch (err) {
-          const msg = "Failed to load '" + url + "': " + err;
-          console.log(msg);
-          reject(msg);
-        }
-      });
-    const loadURLs = async (urls, assetsByURL) => {
-
-      await Promise.all(urls.map(loadUrl));
-      for (const url of urls) {
-        const gltf = this.gltfs[url];
-        if (gltf != null) {
-          for (const asset of assetsByURL.get(url)) {
-            asset.setGLTF(gltf, ctrl);
-          }
-        }
-      }
-      ctrl.render();
+        })
+        .then(() => {
+          ctrl.render();
+        });
     };
 
     // load assets in batches to prevent overwhelming the browser
@@ -144,21 +117,42 @@ export class Scope {
         return null;
       }
     });
+    // No need to load "null" URL.
+    assetsByURL.delete(null);
+    
     const batchSize = 10;
 
+    var loaders = new Array();
     var urls = new Array(batchSize);
     var index = 0;
     for (const key of assetsByURL.keys()) {
       if (index == batchSize) {
         index = 0;
-        await loadURLs(urls, assetsByURL);
+        loaders.push(loadURLs(urls, assetsByURL));
         urls = new Array(batchSize);
+      }
+      if (this.setGLTF(ctrl, key, assetsByURL)) {
+        // URL already successfully loaded.
+        continue;
       }
       urls[index] = key;
       index++;
     }
     if (index > 0) {
-      await loadURLs(urls.slice(0, index), assetsByURL);
+      loaders.push(loadURLs(urls.slice(0, index), assetsByURL));
+    }
+    return Promise.all(loaders);
+  }
+  
+  setGLTF(ctrl, url, assetsByURL) {
+    const gltf = this.gltfs[url];
+    if (gltf != null) {
+      for (const asset of assetsByURL.get(url)) {
+        asset.setGLTF(gltf, ctrl);
+      }
+      return true; 
+    } else {
+      return false;
     }
   }
 }
