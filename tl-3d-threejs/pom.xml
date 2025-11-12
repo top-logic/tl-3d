@@ -41,7 +41,7 @@
 		<dependency>
 		    <groupId>org.webjars.npm</groupId>
 		    <artifactId>three</artifactId>
-		    <version>0.132.2</version>
+		    <version>0.181.1</version>
 		</dependency>
 
 		<!-- Tests -->

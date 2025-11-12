@@ -17,7 +17,7 @@ import {
   MeshStandardMaterial,
   RGBAFormat,
   Scene,
-  SphereBufferGeometry,
+  SphereGeometry,
   Vector3,
   WebGLRenderer,
 } from "three";
@@ -261,7 +261,7 @@ class ThreeJsControl {
     this.translateControls = new TransformControls(this.camera, this.renderer.domElement);
     this.translateControls.setMode("translate");
     this.translateControls.setSpace("local");
-    this.scene.add(this.translateControls);
+    this.scene.add(this.translateControls.getHelper());
 
     const updateRenderTransform = (function () {
       let lastMatrix = new Matrix4();
@@ -390,7 +390,7 @@ class ThreeJsControl {
             closestSnappingPoint.pointMaterial.color.set(YELLOW);
             let mesh = closestSnappingPoint.node.children[0];
             if (mesh && mesh.isMesh) {
-              const highResGeometry = new SphereBufferGeometry(C_P_RADIUS*1.5, WIDTH_SEGMENTS, HEIGHT_SEGMENTS);
+              const highResGeometry = new SphereGeometry(C_P_RADIUS*1.5, WIDTH_SEGMENTS, HEIGHT_SEGMENTS);
               if (!mesh.userData.originalGeometry) {
                 mesh.userData.originalGeometry = mesh.geometry;
               }
@@ -417,7 +417,7 @@ class ThreeJsControl {
     this.rotateControls = new TransformControls(this.camera, this.renderer.domElement);
     this.rotateControls.setMode("rotate");
     this.rotateControls.setSpace("local");
-    this.scene.add(this.rotateControls);
+    this.scene.add(this.rotateControls.getHelper());
     this.rotateControls.addEventListener("dragging-changed", updateRenderTransform);
     this.rotateControls.addEventListener("objectChange", (event) => {
       if (event.target.dragging) {
@@ -453,7 +453,7 @@ class ThreeJsControl {
   updateTransformControls() {
     // hides transform controls
     this.deactivateControl();
-    // restores original object positions in the scheneGraph (zUpRoot group)
+    // restores original object positions in the sceneGraph (zUpRoot group)
     this.restoreMultiGroup();
 
 
@@ -462,7 +462,6 @@ class ThreeJsControl {
       if (this.selection.length === 1) { 
         const object = this.selection[0].node;
         if (object) {
-          this.transformControls.position.set(0, 0, 0);
           this.activateControl(object);
         } else {
           console.warn("Single object not found in selection[0]");

@@ -19,7 +19,7 @@ import {
 import { 
   LOD,
   Group, 
-  SphereBufferGeometry, 
+  SphereGeometry, 
   MeshBasicMaterial, 
   Mesh, 
   BoxGeometry 
@@ -351,7 +351,7 @@ export class ConnectionPoint extends SharedObject {
     transform(group, this.transform);
 
     this.pointMaterial = new MeshBasicMaterial({ color: layoutPoint ? RED : GREEN });
-    this.pointGeometry = new SphereBufferGeometry(C_P_RADIUS, WIDTH_SEGMENTS, HEIGHT_SEGMENTS);
+    this.pointGeometry = new SphereGeometry(C_P_RADIUS, WIDTH_SEGMENTS, HEIGHT_SEGMENTS);
     this.pointMaterial.userData.originalColor = this.pointMaterial.color.clone();
     
     const sphere = new Mesh(
