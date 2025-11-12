@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Main class for managing 3D scenes using Three.js library.
  * Provides methods for initializing and controlling a 3D scene with various functionalities+
  */
