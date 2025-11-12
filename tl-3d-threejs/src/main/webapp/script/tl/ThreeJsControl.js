@@ -1577,7 +1577,12 @@ getScreenSpaceDistance(pos1, pos2) {
   }
 
   render() {
-    requestAnimationFrame(() => {
+    if (this.reqID) {
+      // Do not render multiple times the same scene.
+      cancelAnimationFrame(this.reqID);
+	}    
+    
+    this.reqID = requestAnimationFrame(() => {
       const { renderer, scene, camera } = this;
 
       // update LOD objects if enabled
@@ -1591,6 +1596,7 @@ getScreenSpaceDistance(pos1, pos2) {
       if (this.navigationCube) {
         this.navigationCube.render();
       }
+      this.reqID = null;
     });
   }
 }
