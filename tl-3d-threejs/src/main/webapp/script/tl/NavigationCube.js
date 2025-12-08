@@ -4,7 +4,7 @@
  */
 
 import {
-  BoxBufferGeometry,
+  BoxGeometry,
   CanvasTexture,
   EdgesGeometry,
   FrontSide,
@@ -87,7 +87,7 @@ export class NavigationCube {
    */
   createAxesCube() {
     const cubeSize = 6;
-    const cubeGeometry = new BoxBufferGeometry(cubeSize, cubeSize, cubeSize);
+    const cubeGeometry = new BoxGeometry(cubeSize, cubeSize, cubeSize);
     const cubeMaterials = [
       new MeshStandardMaterial({ map: this.createTextTexture("Right"), side: FrontSide }),
       new MeshStandardMaterial({ map: this.createTextTexture("Left"), side: FrontSide }),    
