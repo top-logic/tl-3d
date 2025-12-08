@@ -7,7 +7,11 @@ package com.top_logic.threed.demo.scripting.actions;
 
 import static com.top_logic.threed.core.math.Transformation.*;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +20,9 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Functions;
 
+import com.top_logic.basic.FileManager;
+import com.top_logic.basic.Logger;
+import com.top_logic.basic.col.MutableInteger;
 import com.top_logic.basic.config.InstantiationContext;
 import com.top_logic.basic.config.annotation.Label;
 import com.top_logic.element.meta.MetaElementUtil;
@@ -64,35 +71,52 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 		 */
 		String getSceneName();
 
+		/**
+		 * Whether assets are copied to simulate many different assets.
+		 */
+		int getNumberAssetClones();
+
 	}
 	private static final String ROBOTER_PODEST_1000MM =
-		"F1/Roboter_Podest_1000mm/Roboter_Podest_1000mm.jt";
+		"F1/Roboter_Podest_1000mm/Roboter_Podest_1000mm.glb";
 
 	private static final String ROBOTER_PODEST_500MM =
-		"F1/Roboter_Podest_500mm/Roboter_Podest_500mm.jt";
+		"F1/Roboter_Podest_500mm/Roboter_Podest_500mm.glb";
 
 	private static final String KR360 =
-		"F1/KR360_R2830-4_Fortec/RB_ly000005_019_arw_2014-11-26_12_39_12.294_Default.jt";
+		"F1/KR360_R2830-4_Fortec/RB_ly000005_019_arw_2014-11-26_12_39_12.294_Default.glb";
 
 	private static final String GEOGREIFER_GROSS =
-		"F1/Geogreifer_gross/Geogreifer_gross.jt";
-
-	private static final String LASER_QUELLE =
-		"E4/Laserquelle_TruDisk4002/Laserquelle_TruDisk4002.jt";
-
-	private static final String UEBERGANG =
-		"E4/Uebergang_inkl_Treppe/Uebergang_inkl_Treppe.jt";
+		"F1/Geogreifer_gross/Geogreifer_gross.glb";
 
 	private static final String ROBOTER_ACHSE =
-		"F1/Roboter_7_Achse_12000/Roboter_7_Achse_12000.jt";
+		"F1/Roboter_7_Achse_12000/Roboter_7_Achse_12000.glb";
+
+	private static final String LASER_QUELLE =
+		"E4/Laserquelle_TruDisk4002/Laserquelle_TruDisk4002.glb";
+
+	private static final String UEBERGANG =
+		"E4/Uebergang_inkl_Treppe/Uebergang_inkl_Treppe.glb";
 
 	private static final String SCHLEPPER_GROSS =
-		"T3/Schlepper_gross/Schlepper_gross.jt";
+		"T3/Schlepper_gross/Schlepper_gross.glb";
 
-	private Asset3D _greiferGross, _kr360, _podest500, _podest1000, _laserQuelle, _uebergang, _roboterAchse,
-			_schlepperGross;
+	private static final String ASSETS_FOLDER = "/assets/";
+
+	private Asset3D _greiferGrossTmpl, _kr360Tmpl, _podest500Tmpl, _podest1000Tmpl, _laserQuelleTmpl, _uebergangTmpl,
+			_roboterAchseTmpl, _schlepperGrossTmpl;
+
+	private List<Asset3D> _greiferGross = new ArrayList<>(),
+			_kr360 = new ArrayList<>(),
+			_podest500 = new ArrayList<>(),
+			_podest1000 = new ArrayList<>(),
+			_laserQuelle = new ArrayList<>(),
+			_uebergang = new ArrayList<>(),
+			_roboterAchse = new ArrayList<>(),
+			_schlepperGross = new ArrayList<>();
 
 	private Transaction _tx;
+
 	/**
 	 * Creates a {@link CreateComplexSceneAction}.
 	 *
@@ -123,27 +147,69 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 		Map<String, Asset3D> assetsByJTFile =
 			allAssets.stream().collect(Collectors.toMap(Asset3D::getJtFile, Functions.identity(), (a1, a2) -> a1));
 
-		_greiferGross = getOrCreate(factory, assetsByJTFile, GEOGREIFER_GROSS);
-		_laserQuelle = getOrCreate(factory, assetsByJTFile, LASER_QUELLE);
-		_uebergang = getOrCreate(factory, assetsByJTFile, UEBERGANG);
-		_roboterAchse = getOrCreate(factory, assetsByJTFile, ROBOTER_ACHSE);
-		_schlepperGross = getOrCreate(factory, assetsByJTFile, SCHLEPPER_GROSS);
+		_greiferGrossTmpl = getOrCreate(factory, assetsByJTFile, GEOGREIFER_GROSS);
+		_laserQuelleTmpl = getOrCreate(factory, assetsByJTFile, LASER_QUELLE);
+		_uebergangTmpl = getOrCreate(factory, assetsByJTFile, UEBERGANG);
+		_roboterAchseTmpl = getOrCreate(factory, assetsByJTFile, ROBOTER_ACHSE);
+		_schlepperGrossTmpl = getOrCreate(factory, assetsByJTFile, SCHLEPPER_GROSS);
 
-		_kr360 = getOrCreate(factory, assetsByJTFile, KR360);
-		_kr360.getSnappingPointsModifiable()
+		_kr360Tmpl = getOrCreate(factory, assetsByJTFile, KR360);
+		_kr360Tmpl.getSnappingPointsModifiable()
 			.add(newConnectionPoint(factory,
 				translate(1826, 0, 2300)
 					.after(rotateZ(Math.PI / 2))
 					.after(rotateX(Math.PI / 2))));
 
-		_podest500 = getOrCreate(factory, assetsByJTFile, ROBOTER_PODEST_500MM);
-		_podest500.getSnappingPointsModifiable()
+		_podest500Tmpl = getOrCreate(factory, assetsByJTFile, ROBOTER_PODEST_500MM);
+		_podest500Tmpl.getSnappingPointsModifiable()
 			.add(newConnectionPoint(factory, translate(0, 0, 500)));
 
-		_podest1000 = getOrCreate(factory, assetsByJTFile, ROBOTER_PODEST_1000MM);
-		_podest1000.getSnappingPointsModifiable()
+		_podest1000Tmpl = getOrCreate(factory, assetsByJTFile, ROBOTER_PODEST_1000MM);
+		_podest1000Tmpl.getSnappingPointsModifiable()
 			.add(newConnectionPoint(factory, translate(0, 0, 1000)));
 
+		cloneAssets(factory, assetsByJTFile);
+	}
+
+	private void cloneAssets(TlThreedDemoFactory factory, Map<String, Asset3D> assetsByJTFile) {
+		cloneAsset(factory, assetsByJTFile, _greiferGross, _greiferGrossTmpl);
+		cloneAsset(factory, assetsByJTFile, _laserQuelle, _laserQuelleTmpl);
+		cloneAsset(factory, assetsByJTFile, _uebergang, _uebergangTmpl);
+		cloneAsset(factory, assetsByJTFile, _roboterAchse, _roboterAchseTmpl);
+		cloneAsset(factory, assetsByJTFile, _schlepperGross, _schlepperGrossTmpl);
+		cloneAsset(factory, assetsByJTFile, _kr360, _kr360Tmpl);
+		cloneAsset(factory, assetsByJTFile, _podest500, _podest500Tmpl);
+		cloneAsset(factory, assetsByJTFile, _podest1000, _podest1000Tmpl);
+	}
+
+	private void cloneAsset(TlThreedDemoFactory factory, Map<String, Asset3D> assetsByJTFile, List<Asset3D> assets,
+			Asset3D template) {
+		assets.add(template);
+		for (int i = 0; i < getConfig().getNumberAssetClones(); i++) {
+			String jtFile = template.getJtFile();
+			String newName = jtFile.substring(0, jtFile.length() - ".glb".length()) + "." + i + ".glb";
+			Asset3D assetClone = getOrCreate(factory, assetsByJTFile, newName);
+			template.getSnappingPoints()
+				.stream()
+				.map(cp -> copySnappingPoint(factory, cp))
+				.forEach(assetClone.getSnappingPointsModifiable()::add);
+			assets.add(assetClone);
+			
+			File imageFile = FileManager.getInstance().getIDEFile(ASSETS_FOLDER + newName);
+			if (!imageFile.exists()) {
+				File origFile = FileManager.getInstance().getIDEFile(ASSETS_FOLDER + jtFile);
+				if (origFile.exists()) {
+					try {
+						Files.copy(origFile.toPath(), imageFile.toPath());
+					} catch (IOException ex) {
+						Logger.error(
+							"Unable to copy " + origFile.getPath() + " to " + imageFile.getPath(), ex,
+							CreateComplexSceneAction.class);
+					}
+				}
+
+			}
+		}
 	}
 
 	private Asset3D getOrCreate(TlThreedDemoFactory factory, Map<String, Asset3D> assetsByJTFile, String jt) {
@@ -164,6 +230,10 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 		return point;
 	}
 
+	private ConnectionPoint copySnappingPoint(TlThreedDemoFactory factory, ConnectionPoint p) {
+		return newConnectionPoint(factory, p.getTx(), p.getClassifiers().toArray(String[]::new));
+	}
+
 	private void createScene(TlThreedDemoFactory factory) {
 		Scene scene = factory.createScene();
 		scene.setName(sceneName());
@@ -175,8 +245,9 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 
 		intermediateCommit();
 
+		MutableInteger assetNr = new MutableInteger();
 		for (int i = 0; i < getConfig().getNumberFloors(); i++) {
-			Assembly floor = addFloor(factory, rootNode, "Floor " + i);
+			Assembly floor = addFloor(factory, rootNode, "Floor " + i, assetNr);
 			floor.setTx(translate(0, 0, i * 15000));
 
 			intermediateCommit();
@@ -185,7 +256,7 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 
 	}
 
-	private Assembly addFloor(TlThreedDemoFactory factory, Assembly parent, String name) {
+	private Assembly addFloor(TlThreedDemoFactory factory, Assembly parent, String name, MutableInteger assetNr) {
 		Assembly floor = factory.createAssembly();
 		floor.setName(name);
 		parent.addChild(floor);
@@ -195,7 +266,7 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 		int cnt = 0;
 		int row = 0, column = 0;
 		while (cnt < numberStations) {
-			Assembly station = addStation(factory, floor, "Station " + cnt);
+			Assembly station = addStation(factory, floor, "Station " + cnt, assetNr.inc());
 			station.setTx(translate(column * 20000, row * 10000, 0));
 
 			if (column == columns) {
@@ -213,51 +284,52 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 		return floor;
 	}
 
-	private Assembly addStation(TlThreedDemoFactory factory, Assembly parent, String name) {
+	private Assembly addStation(TlThreedDemoFactory factory, Assembly parent, String name, int assetNr) {
+		assetNr = assetNr % (getConfig().getNumberAssetClones() + 1);
 		Assembly station = factory.createAssembly();
 		station.setName(name);
 		parent.addChild(station);
 
-		addPart(factory, station, "Achse", _roboterAchse);
+		addPart(factory, station, "Achse", _roboterAchse.get(assetNr));
 
-		Assembly robotSystem1 = addRobotSystem(factory, station, 1);
+		Assembly robotSystem1 = addRobotSystem(factory, station, 1, assetNr);
 		robotSystem1.setTx(translate(2000, 3500, 0).after(rotateZ(-Math.PI / 2)));
-		Assembly robotSystem2 = addRobotSystem(factory, station, 2);
+		Assembly robotSystem2 = addRobotSystem(factory, station, 2, assetNr);
 		robotSystem2.setTx(translate(8000, 3500, 0).after(rotateZ(-Math.PI / 2)));
-		Assembly robotSystem3 = addRobotSystem(factory, station, 3);
+		Assembly robotSystem3 = addRobotSystem(factory, station, 3, assetNr);
 		robotSystem3.setTx(translate(11000, 3500, 0).after(rotateZ(-Math.PI / 2)));
-		Assembly robotSystem4 = addRobotSystem(factory, station, 4);
+		Assembly robotSystem4 = addRobotSystem(factory, station, 4, assetNr);
 		robotSystem4.setTx(translate(2000, -3500, 0).after(rotateZ(Math.PI / 2)));
-		Assembly robotSystem5 = addRobotSystem(factory, station, 5);
+		Assembly robotSystem5 = addRobotSystem(factory, station, 5, assetNr);
 		robotSystem5.setTx(translate(8000, -3500, 0).after(rotateZ(Math.PI / 2)));
-		Assembly robotSystem6 = addRobotSystem(factory, station, 6);
+		Assembly robotSystem6 = addRobotSystem(factory, station, 6, assetNr);
 		robotSystem6.setTx(translate(11000, -3500, 0).after(rotateZ(Math.PI / 2)));
 
-		Part uebergang = addPart(factory, station, "Übergang", _uebergang);
+		Part uebergang = addPart(factory, station, "Übergang", _uebergang.get(assetNr));
 		uebergang.setTx(translate(4000, 0, 0).after(rotateZ(Math.PI / 2)));
 
-		Part laserQuelle = addPart(factory, station, "Laser-Quelle", _laserQuelle);
+		Part laserQuelle = addPart(factory, station, "Laser-Quelle", _laserQuelle.get(assetNr));
 		laserQuelle.setTx(translate(0, -5000, 0).after(rotateZ(Math.PI / 4)));
 
-		Part schlepper = addPart(factory, station, "Schlepper", _schlepperGross);
+		Part schlepper = addPart(factory, station, "Schlepper", _schlepperGross.get(assetNr));
 		schlepper.setTx(translate(-1500, 2000, 0).after(rotateZ(Math.PI)));
 
 		return station;
 	}
 
-	private Assembly addRobotSystem(TlThreedDemoFactory factory, Assembly parent, int number) {
+	private Assembly addRobotSystem(TlThreedDemoFactory factory, Assembly parent, int number, int assetNr) {
 		Assembly robotSystem = factory.createAssembly();
 		robotSystem.setName("RS " + number);
 		parent.addChild(robotSystem);
 
-		Part robot = addPart(factory, robotSystem, "KR360", _kr360);
+		Part robot = addPart(factory, robotSystem, "KR360", _kr360.get(assetNr));
 
-		Part greifer = addPart(factory, robotSystem, "Greifer", _greiferGross);
+		Part greifer = addPart(factory, robotSystem, "Greifer", _greiferGross.get(assetNr));
 
 		Part podest = factory.createPart();
 		robotSystem.addChild(podest);
 		if (number % 3 == 0) {
-			podest.setAsset(_podest1000);
+			podest.setAsset(_podest1000.get(assetNr));
 			robot.setTx(translate(0, 0, 1000));
 			greifer.setTx(
 				translate(0, 0, 1000)
@@ -265,7 +337,7 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 					.after(rotateZ(Math.PI / 2))
 					.after(rotateX(Math.PI / 2)));
 		} else {
-			podest.setAsset(_podest500);
+			podest.setAsset(_podest500.get(assetNr));
 			robot.setTx(translate(0, 0, 500));
 			greifer.setTx(
 				translate(0, 0, 500)

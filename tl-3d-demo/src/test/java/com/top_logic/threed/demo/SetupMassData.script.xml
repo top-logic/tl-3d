@@ -5,8 +5,9 @@
 >
 	<actions>
 		<action class="com.top_logic.threed.demo.scripting.actions.CreateComplexSceneAction"
-			number-stations="25"
+			number-asset-clones="3"
 			number-floors="3"
+			number-stations="25"
 		/>
 	</actions>
 </action>
