@@ -1220,7 +1220,7 @@ getScreenSpaceDistance(pos1, pos2) {
         }
 
         // Only allow known safe incremental properties
-        const safeIncrementalProperties = ['selection', 'parent', 'hidden', 'color', 'selectable', 'contents'];
+        const safeIncrementalProperties = ['selection', 'parent', 'hidden', 'color', 'selectable'];
         
         if (!safeIncrementalProperties.includes(cmdProps["p"])) {
           needsFullReload = true;
