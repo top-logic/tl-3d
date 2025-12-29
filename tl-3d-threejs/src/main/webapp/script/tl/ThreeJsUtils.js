@@ -5,36 +5,36 @@
 
 import {
   AmbientLight,
+  BufferGeometry,
   Color,
   DirectionalLight,
   Group,
   Line,
   LineBasicMaterial,
-  BufferGeometry,
-  Vector3,
+  Matrix4,
   PerspectiveCamera,
   Raycaster,
   Vector2,
-  Matrix4
+  Vector3,
 } from "three";
 
 import {
-  WHITE,
+  CUBE_CAMERA_FAR,
+  DARK_BLUE,
+  GRID_SMALL_CELL,
   LIGHT_BLUE,
   MIDDLE_BLUE,
-  DARK_BLUE,
-  CUBE_CAMERA_FAR,
-  GRID_SMALL_CELL
-} from './Constants.js';
+  WHITE,
+} from "./Constants.js";
 
 export function applyColorToObject(object, colorString) {
   const color = new Color(colorString);
-  
+
   object.traverse((child) => {
     if (child.isMesh && child.material) {
       // Handle array of materials
       if (Array.isArray(child.material)) {
-        child.material.forEach(material => {
+        child.material.forEach((material) => {
           material.color.copy(color);
         });
       } else {
@@ -49,17 +49,17 @@ export function applyColorToObject(object, colorString) {
 export const throttle = (func, limit) => {
   let inThrottle = false;
   let lastResult = null;
-  
-  return function(...args) {
+
+  return function (...args) {
     if (!inThrottle) {
       inThrottle = true;
       lastResult = func.apply(this, args);
-      
+
       setTimeout(() => {
         inThrottle = false;
       }, limit);
     }
-    
+
     return lastResult;
   };
 };
@@ -84,7 +84,10 @@ export function getRaycaster(event, camera, canvas) {
 export function getLocalMatrix(objectMatrixWorld, parentMatrixWorld) {
   const worldMatrix = objectMatrixWorld.clone();
   const parentInverse = new Matrix4().copy(parentMatrixWorld).invert();
-  const localMatrix = new Matrix4().multiplyMatrices(parentInverse, worldMatrix);
+  const localMatrix = new Matrix4().multiplyMatrices(
+    parentInverse,
+    worldMatrix,
+  );
 
   return localMatrix;
 }
@@ -96,48 +99,73 @@ export function getMatrixDiff(m1, m2) {
   return diffMatrix;
 }
 
-export function matrix(
-	a, b, c, d,
-	e, f, g, h,
-	i, j, k, l,
-	m, n, o, p
-) {
+export function matrix(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) {
   const result = new Matrix4();
-	result.set(
-		a, b, c, d,
-		e, f, g, h,
-		i, j, k, l,
-		m, n, o, p
-	);
+  result.set(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p);
   return result;
 }
 
 export function toMatrix(tx) {
   switch (tx.length) {
     case 3:
-		return matrix(
-			1, 0, 0, tx[0],
-			0, 1, 0, tx[1],
-			0, 0, 1, tx[2],
-			0, 0, 0, 1);
+      return matrix(1, 0, 0, tx[0], 0, 1, 0, tx[1], 0, 0, 1, tx[2], 0, 0, 0, 1);
     case 9:
       return matrix(
-			tx[0], tx[1], tx[2], 0,
-			tx[3], tx[4], tx[5], 0,
-			tx[6], tx[7], tx[8], 0,
-			0,     0,     0,     1);
+        tx[0],
+        tx[1],
+        tx[2],
+        0,
+        tx[3],
+        tx[4],
+        tx[5],
+        0,
+        tx[6],
+        tx[7],
+        tx[8],
+        0,
+        0,
+        0,
+        0,
+        1,
+      );
     case 12:
       return matrix(
-			tx[0], tx[1], tx[2], tx[9],
-			tx[3], tx[4], tx[5], tx[10],
-			tx[6], tx[7], tx[8], tx[11],
-			0,     0,     0,     1);
+        tx[0],
+        tx[1],
+        tx[2],
+        tx[9],
+        tx[3],
+        tx[4],
+        tx[5],
+        tx[10],
+        tx[6],
+        tx[7],
+        tx[8],
+        tx[11],
+        0,
+        0,
+        0,
+        1,
+      );
     case 16:
       return matrix(
-			tx[0],  tx[1],  tx[2],  tx[3],
-			tx[4],  tx[5],  tx[6],  tx[7],
-			tx[8],  tx[9],  tx[10], tx[11],
-			tx[12], tx[13], tx[14], tx[15]);
+        tx[0],
+        tx[1],
+        tx[2],
+        tx[3],
+        tx[4],
+        tx[5],
+        tx[6],
+        tx[7],
+        tx[8],
+        tx[9],
+        tx[10],
+        tx[11],
+        tx[12],
+        tx[13],
+        tx[14],
+        tx[15],
+      );
     default:
       throw new Error("Invalid transform array: " + tx);
   }
@@ -145,7 +173,20 @@ export function toMatrix(tx) {
 
 export function toTX(matrix4) {
   const el = matrix4.elements;
-  return [ el[0], el[4], el[8], el[1], el[5], el[9], el[2],  el[6],  el[10],  el[12],  el[13],  el[14] ];
+  return [
+    el[0],
+    el[4],
+    el[8],
+    el[1],
+    el[5],
+    el[9],
+    el[2],
+    el[6],
+    el[10],
+    el[12],
+    el[13],
+    el[14],
+  ];
 }
 
 export function transform(group, tx) {
@@ -158,7 +199,7 @@ export function transform(group, tx) {
   }
 }
 
-export function isDescendantOfAny (node, selectedNodes) {
+export function isDescendantOfAny(node, selectedNodes) {
   let parent = node.parent;
   while (parent) {
     if (selectedNodes.includes(parent)) return true;
@@ -174,21 +215,34 @@ export function createLine(start, end, color, linewidth) {
 }
 
 export const CameraUtils = {
-  calculateCubeCameraPosition: function(cameraPosition, controlsTarget) {
-    const subAxesOffset = new Vector3().subVectors(cameraPosition, controlsTarget);
+  calculateCubeCameraPosition: function (cameraPosition, controlsTarget) {
+    const subAxesOffset = new Vector3().subVectors(
+      cameraPosition,
+      controlsTarget,
+    );
     return subAxesOffset.normalize().multiplyScalar(CUBE_CAMERA_FAR);
   },
 
-  calculateMainCameraPosition: function(cubeCameraPosition, cameraPosition, controlsTarget) {
+  calculateMainCameraPosition: function (
+    cubeCameraPosition,
+    cameraPosition,
+    controlsTarget,
+  ) {
     let subMainOffset = new Vector3(...cubeCameraPosition.toArray());
-    const cameraOffset = new Vector3().subVectors(cameraPosition, controlsTarget);
+    const cameraOffset = new Vector3().subVectors(
+      cameraPosition,
+      controlsTarget,
+    );
 
     subMainOffset.normalize().multiplyScalar(cameraOffset.length());
     subMainOffset = new Vector3().addVectors(subMainOffset, controlsTarget);
     return subMainOffset;
   },
-  
-  createMainCamera: function(container, position = new Vector3(5000, 6000, 10000)) {
+
+  createMainCamera: function (
+    container,
+    position = new Vector3(5000, 6000, 10000),
+  ) {
     const fov = 35; // AKA Field of View
     const aspect = container.clientWidth / container.clientHeight;
     const near = 10; // the near clipping plane
@@ -197,11 +251,11 @@ export const CameraUtils = {
     const camera = new PerspectiveCamera(fov, aspect, near, far);
     camera.position.copy(position);
     camera.lookAt(new Vector3());
-    
+
     return camera;
   },
-  
-  createCubeCamera: function() {
+
+  createCubeCamera: function () {
     const fov = 75;
     const aspect = 1;
     const near = 1;
@@ -210,13 +264,13 @@ export const CameraUtils = {
     const camera = new PerspectiveCamera(fov, aspect, near, far);
     camera.position.set(0, 0, CUBE_CAMERA_FAR);
     camera.lookAt(new Vector3(0, 0, 0));
-    
+
     return camera;
-  }
+  },
 };
 
 export const SceneUtils = {
-  createDetailedGrid: function(size) {
+  createDetailedGrid: function (size) {
     const z = 0;
     const edge = size / 2;
     const gridGroup = new Group();
@@ -227,23 +281,79 @@ export const SceneUtils = {
     const gridSmall = new Group();
     // vertical lines
     for (let i = 0; i <= edge; i += smallCell) {
-      gridSmall.add(createLine(new Vector3(-i, -edge, z), new Vector3(-i, edge, z), LIGHT_BLUE, 1));
-      gridSmall.add(createLine(new Vector3(i, -edge, z), new Vector3(i, edge, z), LIGHT_BLUE, 1));
+      gridSmall.add(
+        createLine(
+          new Vector3(-i, -edge, z),
+          new Vector3(-i, edge, z),
+          LIGHT_BLUE,
+          1,
+        ),
+      );
+      gridSmall.add(
+        createLine(
+          new Vector3(i, -edge, z),
+          new Vector3(i, edge, z),
+          LIGHT_BLUE,
+          1,
+        ),
+      );
     }
     // horizontal lines
     for (let i = z; i <= edge; i += smallCell) {
-      gridSmall.add(createLine(new Vector3(-edge, -i, z), new Vector3(edge, -i, z), LIGHT_BLUE, 1));
-      gridSmall.add(createLine(new Vector3(-edge, i, z), new Vector3(edge, i, z), LIGHT_BLUE, 1));
+      gridSmall.add(
+        createLine(
+          new Vector3(-edge, -i, z),
+          new Vector3(edge, -i, z),
+          LIGHT_BLUE,
+          1,
+        ),
+      );
+      gridSmall.add(
+        createLine(
+          new Vector3(-edge, i, z),
+          new Vector3(edge, i, z),
+          LIGHT_BLUE,
+          1,
+        ),
+      );
     }
 
     const gridBig = new Group();
     for (let i = bigCell; i <= edge; i += bigCell) {
       // vertical lines
-      gridBig.add(createLine(new Vector3(-i, -edge, z), new Vector3(-i, edge, z), MIDDLE_BLUE, 2));
-      gridBig.add(createLine(new Vector3(i, -edge, z), new Vector3(i, edge, z), MIDDLE_BLUE, 2));
+      gridBig.add(
+        createLine(
+          new Vector3(-i, -edge, z),
+          new Vector3(-i, edge, z),
+          MIDDLE_BLUE,
+          2,
+        ),
+      );
+      gridBig.add(
+        createLine(
+          new Vector3(i, -edge, z),
+          new Vector3(i, edge, z),
+          MIDDLE_BLUE,
+          2,
+        ),
+      );
       // horizontal lines
-      gridBig.add(createLine(new Vector3(-edge, -i, z), new Vector3(edge, -i, z), MIDDLE_BLUE, 2));
-      gridBig.add(createLine(new Vector3(-edge, i, z), new Vector3(edge, i, z), MIDDLE_BLUE, 2));
+      gridBig.add(
+        createLine(
+          new Vector3(-edge, -i, z),
+          new Vector3(edge, -i, z),
+          MIDDLE_BLUE,
+          2,
+        ),
+      );
+      gridBig.add(
+        createLine(
+          new Vector3(-edge, i, z),
+          new Vector3(edge, i, z),
+          MIDDLE_BLUE,
+          2,
+        ),
+      );
     }
 
     const gridEdgeCenter = new Group();
@@ -256,7 +366,7 @@ export const SceneUtils = {
       [new Vector3(-edge, edge, z), new Vector3(edge, edge, z)],
       // central lines
       [new Vector3(0, -edge, z), new Vector3(0, edge, z)],
-      [new Vector3(-edge, 0, z), new Vector3(edge, 0, z)]
+      [new Vector3(-edge, 0, z), new Vector3(edge, 0, z)],
     ];
     thickestLines.forEach(([start, end]) => {
       gridEdgeCenter.add(createLine(start, end, DARK_BLUE, 3));
@@ -268,8 +378,8 @@ export const SceneUtils = {
 
     return gridGroup;
   },
-  
-  addStandardLights: function(scene) {
+
+  addStandardLights: function (scene) {
     const light1 = new DirectionalLight(WHITE, 8);
     light1.position.set(0, 5000, 1000);
     scene.add(light1);
@@ -277,23 +387,27 @@ export const SceneUtils = {
     const light2 = new DirectionalLight(WHITE, 3);
     light2.position.set(200, -3000, -3000);
     scene.add(light2);
-    
+
     return { mainLight: light1, secondaryLight: light2 };
   },
-  
-  addCubeSceneLights: function(scene) {
+
+  addCubeSceneLights: function (scene) {
     scene.add(new AmbientLight(WHITE, 0.7));
-    
+
     const light = new DirectionalLight(WHITE, 0.5);
     light.position.set(3, 5, 8);
     light.castShadow = true;
     scene.add(light);
-    
+
     const light2 = new DirectionalLight(WHITE, 0.5);
     light2.position.set(-3, -5, 0);
     light2.castShadow = true;
     scene.add(light2);
-    
-    return { ambientLight: scene.children[0], mainLight: light, secondaryLight: light2 };
-  }
+
+    return {
+      ambientLight: scene.children[0],
+      mainLight: light,
+      secondaryLight: light2,
+    };
+  },
 };

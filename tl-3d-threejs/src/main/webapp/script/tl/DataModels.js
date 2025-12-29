@@ -4,36 +4,36 @@
  */
 
 import {
-  LOD_HIGH, 
-  LOD_MEDIUM, 
-  LOD_LOW, 
-  LOD_MEDIUM_DISTANCE, 
-  LOD_LOW_DISTANCE, 
-  C_P_RADIUS, 
-  WIDTH_SEGMENTS, 
-  HEIGHT_SEGMENTS, 
-  RED, 
-  GREEN
-} from './Constants.js';
+  C_P_RADIUS,
+  GREEN,
+  HEIGHT_SEGMENTS,
+  LOD_HIGH,
+  LOD_LOW,
+  LOD_LOW_DISTANCE,
+  LOD_MEDIUM,
+  LOD_MEDIUM_DISTANCE,
+  RED,
+  WIDTH_SEGMENTS,
+} from "./Constants.js";
 
-import { 
+import {
+  BoxGeometry,
+  Group,
   LOD,
-  Group, 
-  SphereGeometry, 
-  MeshBasicMaterial, 
-  Mesh, 
-  BoxGeometry 
+  Mesh,
+  MeshBasicMaterial,
+  SphereGeometry,
 } from "three";
 
-import { 
-  toMatrix, 
-  toTX, 
-  transform, 
+import {
   applyColorToObject,
-} from './ThreeJsUtils.js';
+  toMatrix,
+  toTX,
+  transform,
+} from "./ThreeJsUtils.js";
 
-import { InsertElement, RemoveElement, SetProperty } from './Commands.js';
 import { GLTFLoader } from "GLTFLoader";
+import { InsertElement, RemoveElement, SetProperty } from "./Commands.js";
 
 export class Scope {
   constructor() {
@@ -43,7 +43,9 @@ export class Scope {
   }
 
   get assets() {
-    return Object.values(this.objects).filter((obj) => obj instanceof GltfAsset);
+    return Object.values(this.objects).filter(
+      (obj) => obj instanceof GltfAsset,
+    );
   }
 
   getNode(id) {
@@ -62,12 +64,24 @@ export class Scope {
       const id = json[1];
       var obj;
       switch (json[0]) {
-        case 'SceneGraph': obj = new SceneGraph(id); break;
-        case 'GroupNode': obj = new GroupNode(id); break;
-        case 'PartNode': obj = new PartNode(id); break;
-        case 'GltfAsset': obj = new GltfAsset(id); break;
-        case 'ImageData': obj = new ImageData(id); break;
-        case 'ConnectionPoint': obj = new ConnectionPoint(id); break;
+        case "SceneGraph":
+          obj = new SceneGraph(id);
+          break;
+        case "GroupNode":
+          obj = new GroupNode(id);
+          break;
+        case "PartNode":
+          obj = new PartNode(id);
+          break;
+        case "GltfAsset":
+          obj = new GltfAsset(id);
+          break;
+        case "ImageData":
+          obj = new ImageData(id);
+          break;
+        case "ConnectionPoint":
+          obj = new ConnectionPoint(id);
+          break;
       }
       this.objects[id] = obj;
       obj.loadJson(this, json[2]);
@@ -82,19 +96,20 @@ export class Scope {
 
   loadAssets(ctrl) {
     const gltfLoader = new GLTFLoader();
-    
+
     const loadUrl = (url) => {
       return gltfLoader.loadAsync(url).then(
         (gltf) => {
           // store gltf in the cache
           this.gltfs[url] = gltf;
-        }, (reason) => {
+        },
+        (reason) => {
           const msg = "Failed to load '" + url + "': " + reason;
           console.error(msg);
-        }
+        },
       );
     };
-      
+
     const loadURLs = (urls, assetsByURL) => {
       return Promise.all(urls.map(loadUrl))
         .then(() => {
@@ -108,7 +123,7 @@ export class Scope {
     };
 
     // load assets in batches to prevent overwhelming the browser
-    const assetsByURL = Map.groupBy(this.assets, asset => {
+    const assetsByURL = Map.groupBy(this.assets, (asset) => {
       if (asset.dynamicImage) {
         return ctrl.imageUrl + "/" + asset.dynamicImage.imageID;
       } else if (asset.url) {
@@ -119,7 +134,7 @@ export class Scope {
     });
     // No need to load "null" URL.
     assetsByURL.delete(null);
-    
+
     const batchSize = 10;
 
     var loaders = new Array();
@@ -143,14 +158,14 @@ export class Scope {
     }
     return Promise.all(loaders);
   }
-  
+
   setGLTF(ctrl, url, assetsByURL) {
     const gltf = this.gltfs[url];
     if (gltf != null) {
       for (const asset of assetsByURL.get(url)) {
         asset.setGLTF(gltf, ctrl);
       }
-      return true; 
+      return true;
     } else {
       return false;
     }
@@ -161,18 +176,18 @@ export class SharedObject {
   constructor(id) {
     this.id = id;
   }
-  
+
   notifyTransform(diffMatrix) {
     const currentTransformation = toMatrix(this.transform);
     const newTransformation = currentTransformation.multiply(diffMatrix);
     this.transform = toTX(newTransformation);
-    return SetProperty.prototype.create(this.id, 'transform', this.transform);
+    return SetProperty.prototype.create(this.id, "transform", this.transform);
   }
-  
+
   setProperty(scope, property, value) {
     switch (property) {
-      case 'parent': 
-        this.parent = scope.loadJson(value); 
+      case "parent":
+        this.parent = scope.loadJson(value);
         break;
       default:
         break;
@@ -184,9 +199,9 @@ export class SceneGraph extends SharedObject {
   constructor(id) {
     super(id);
   }
-  
-  buildGraph(ctrl) {  	
-    this.ctrl = ctrl; 
+
+  buildGraph(ctrl) {
+    this.ctrl = ctrl;
 
     this.build(ctrl.zUpRoot);
     this.ctrl.applySelection(this.selection);
@@ -198,66 +213,71 @@ export class SceneGraph extends SharedObject {
   }
 
   loadJson(scope, json) {
-    this.setProperty(scope, 'root', json.root);
-    this.setProperty(scope, 'selection', json.selection);
-    this.setProperty(scope, 'coordinateSystem', json.coordinateSystem);
-    this.setProperty(scope, 'translateStepSize', json.translateStepSize);
-    this.setProperty(scope, 'rotateStepSize', json.rotateStepSize);
-    this.setProperty(scope, 'numberOfFloors', json.numberOfFloors);
+    this.setProperty(scope, "root", json.root);
+    this.setProperty(scope, "selection", json.selection);
+    this.setProperty(scope, "coordinateSystem", json.coordinateSystem);
+    this.setProperty(scope, "translateStepSize", json.translateStepSize);
+    this.setProperty(scope, "rotateStepSize", json.rotateStepSize);
+    this.setProperty(scope, "numberOfFloors", json.numberOfFloors);
   }
-  
+
   removeSelected(node) {
     var idx = this.selection.indexOf(node);
     if (idx < 0) {
       return null;
     }
     this.selection.splice(idx, 1);
-    return RemoveElement.prototype.create(this.id, 'selection', idx);
+    return RemoveElement.prototype.create(this.id, "selection", idx);
   }
-  
+
   addSelected(node) {
     var idx = this.selection.indexOf(node);
     if (idx >= 0) {
       return null;
     }
-    
+
     this.selection.push(node);
-  return InsertElement.prototype.create(this.id, 'selection', this.selection.length - 1, node.id);
+    return InsertElement.prototype.create(
+      this.id,
+      "selection",
+      this.selection.length - 1,
+      node.id,
+    );
   }
-  
+
   clearSelection() {
     if (this.selection.length == 0) {
       return null;
     }
     this.selection.length = 0;
-    return SetProperty.prototype.create(this.id, 'selection', []);
-  } 
+    return SetProperty.prototype.create(this.id, "selection", []);
+  }
 
   setProperty(scope, property, value) {
     switch (property) {
-      case 'root': {
+      case "root": {
         if (this.root != null) {
           this.root.parent = null;
         }
-        this.root = scope.loadJson(value); 
+        this.root = scope.loadJson(value);
         if (this.root != null) {
           this.root.parent = this;
         }
         break;
       }
-      case 'selection': 
+      case "selection":
         this.selection = scope.loadAll(value);
-        break; 
-      case 'coordinateSystem': 
+        break;
+      case "coordinateSystem":
         this.coordinateSystem = value;
-        break; 
-      case 'translateStepSize': 
+        break;
+      case "translateStepSize":
         this.translateStepSize = value;
-        break; 
-      case 'rotateStepSize': 
+        break;
+      case "rotateStepSize":
         this.rotateStepSize = value;
-        break; 
-      case 'numberOfFloors':
+        break;
+      case "numberOfFloors":
         this.numberOfFloors = value;
         break;
       default:
@@ -265,27 +285,27 @@ export class SceneGraph extends SharedObject {
         break;
     }
   }
-  
+
   insertElementAt(scope, property, idx, value) {
     switch (property) {
-      case 'selection': 
+      case "selection":
         const sharedObject = scope.loadJson(value);
-        this.selection.splice(idx, 0, sharedObject); 
-        break; 
-      case 'coordinateSystem': 
-        this.coordinateSystem.splice(idx, 0, value); 
-        break; 
+        this.selection.splice(idx, 0, sharedObject);
+        break;
+      case "coordinateSystem":
+        this.coordinateSystem.splice(idx, 0, value);
+        break;
     }
   }
-  
+
   removeElementAt(scope, property, idx) {
     switch (property) {
-      case 'selection': 
+      case "selection":
         this.selection.splice(idx, 1);
-        break; 
-      case 'coordinateSystem': 
+        break;
+      case "coordinateSystem":
         this.coordinateSystem.splice(idx, 1);
-        break; 
+        break;
     }
   }
 
@@ -299,7 +319,7 @@ export class SceneGraph extends SharedObject {
       this.ctrl.updateTransformControls();
       this.ctrl.render();
     });
-    
+
     this.ctrl.toggleWorkplane(this.ctrl.isWorkplaneVisible);
   }
 }
@@ -310,28 +330,29 @@ export class ImageData extends SharedObject {
   }
 
   loadJson(scope, json) {
-    this.setProperty(scope, 'imageID', json.imageID);
+    this.setProperty(scope, "imageID", json.imageID);
   }
-  
+
   setProperty(scope, property, value) {
     switch (property) {
-      case 'imageID': this.imageID = value; break;
+      case "imageID":
+        this.imageID = value;
+        break;
       default:
         super.setProperty(scope, property, value);
         break;
     }
   }
-  
+
   insertElementAt(scope, property, idx, value) {
     switch (property) {
     }
   }
-  
+
   removeElementAt(scope, property, idx) {
     switch (property) {
     }
   }
-  
 }
 
 export class ConnectionPoint extends SharedObject {
@@ -340,25 +361,29 @@ export class ConnectionPoint extends SharedObject {
   }
 
   loadJson(scope, json) {
-    this.setProperty(scope, 'transform', json.transform);
-    this.setProperty(scope, 'classifiers', json.classifiers);
+    this.setProperty(scope, "transform", json.transform);
+    this.setProperty(scope, "classifiers", json.classifiers);
   }
-  
+
   build(parentGroup, layoutPoint) {
     const group = new Group();
     parentGroup.add(group);
 
     transform(group, this.transform);
 
-    this.pointMaterial = new MeshBasicMaterial({ color: layoutPoint ? RED : GREEN });
-    this.pointGeometry = new SphereGeometry(C_P_RADIUS, WIDTH_SEGMENTS, HEIGHT_SEGMENTS);
-    this.pointMaterial.userData.originalColor = this.pointMaterial.color.clone();
-    
-    const sphere = new Mesh(
-      this.pointGeometry, 
-      this.pointMaterial
+    this.pointMaterial = new MeshBasicMaterial({
+      color: layoutPoint ? RED : GREEN,
+    });
+    this.pointGeometry = new SphereGeometry(
+      C_P_RADIUS,
+      WIDTH_SEGMENTS,
+      HEIGHT_SEGMENTS,
     );
-    
+    this.pointMaterial.userData.originalColor =
+      this.pointMaterial.color.clone();
+
+    const sphere = new Mesh(this.pointGeometry, this.pointMaterial);
+
     if (layoutPoint) {
       // mark this as a layout point sphere
       sphere.userData.isLayoutPoint = true;
@@ -367,37 +392,48 @@ export class ConnectionPoint extends SharedObject {
       sphere.userData.isConnectionPoint = true;
     }
     sphere.visible = false;
-    
+
     group.add(sphere);
 
     this.node = group;
     return group;
   }
-  
+
   setProperty(scope, property, value) {
     switch (property) {
-      case 'transform': this.transform = value; break;
-      case 'classifiers': this.classifiers = value; break;
+      case "transform":
+        this.transform = value;
+        break;
+      case "classifiers":
+        this.classifiers = value;
+        break;
       default:
         super.setProperty(scope, property, value);
         break;
     }
   }
-  
+
   insertElementAt(scope, property, idx, value) {
     switch (property) {
-      case 'transform': this.transform.splice(idx, 0, value); break;
-      case 'classifiers': this.classifiers.splice(idx, 0, value); break;
+      case "transform":
+        this.transform.splice(idx, 0, value);
+        break;
+      case "classifiers":
+        this.classifiers.splice(idx, 0, value);
+        break;
     }
   }
-  
+
   removeElementAt(scope, property, idx) {
     switch (property) {
-      case 'transform': this.transform.splice(idx, 1); break;
-      case 'classifiers': this.classifiers.splice(idx, 1); break;
+      case "transform":
+        this.transform.splice(idx, 1);
+        break;
+      case "classifiers":
+        this.classifiers.splice(idx, 1);
+        break;
     }
   }
-  
 }
 
 export class GroupNode extends SharedObject {
@@ -414,7 +450,7 @@ export class GroupNode extends SharedObject {
     parentGroup.add(group);
 
     const context = {
-      color: this.color || parentContext?.color
+      color: this.color || parentContext?.color,
     };
 
     transform(group, this.transform);
@@ -429,73 +465,81 @@ export class GroupNode extends SharedObject {
     group.userData = {
       ...group.userData,
       nodeRef: this,
-      color: this.color || null
+      color: this.color || null,
     };
-    
+
     // Set initial visibility
     group.visible = !this.hidden;
-    
+
     this.node = group;
   }
 
   loadJson(scope, json) {
-    this.setProperty(scope, 'contents', json.contents);
-    this.setProperty(scope, 'transform', json.transform);
-    this.setProperty(scope, 'hidden', json.hidden);
-    this.setProperty(scope, 'selectable', json.selectable);
-    this.setProperty(scope, 'color', json.color);
+    this.setProperty(scope, "contents", json.contents);
+    this.setProperty(scope, "transform", json.transform);
+    this.setProperty(scope, "hidden", json.hidden);
+    this.setProperty(scope, "selectable", json.selectable);
+    this.setProperty(scope, "color", json.color);
   }
 
   setProperty(scope, property, value) {
     switch (property) {
-      case 'contents': {
+      case "contents": {
         if (this.contents) {
-        this.contents.forEach((c) => c.parent = null);
+          this.contents.forEach((c) => (c.parent = null));
         }
         this.contents = scope.loadAll(value);
-      this.contents.forEach((c) => c.parent = this);
+        this.contents.forEach((c) => (c.parent = this));
         break;
-      } 
-      case 'transform': this.transform = value; break;
-      case 'color': 
-        this.color = value; 
+      }
+      case "transform":
+        this.transform = value;
+        break;
+      case "color":
+        this.color = value;
         if (this.node && value) {
           applyColorToObject(this.node, value);
         }
         break;
-      case 'hidden': 
-        this.hidden = value; 
+      case "hidden":
+        this.hidden = value;
         if (this.node) {
           this.node.visible = !value;
         }
         break;
-      case 'selectable': this.selectable = value; break;
+      case "selectable":
+        this.selectable = value;
+        break;
       default:
         super.setProperty(scope, property, value);
         break;
-   }
+    }
   }
 
   insertElementAt(scope, property, idx, value) {
     switch (property) {
-      case 'contents': {
+      case "contents": {
         const newContent = scope.loadJson(value);
         newContent.parent = this;
         this.contents.splice(idx, 0, newContent);
         break;
-      } 
-      case 'transform': this.transform.splice(idx, 0, value); break;
+      }
+      case "transform":
+        this.transform.splice(idx, 0, value);
+        break;
     }
   }
 
   removeElementAt(scope, property, idx) {
     switch (property) {
-      case 'contents': {
+      case "contents": {
         this.contents[idx].parent = null;
         this.contents.splice(idx, 1);
         break;
-      } 
-      case 'transform': this.transform.splice(idx, 1); break;
+      }
+      case "transform":
+        this.transform.splice(idx, 1);
+        break;
     }
   }
 }
@@ -527,43 +571,49 @@ export class PartNode extends SharedObject {
     group.userData = {
       ...group.userData,
       nodeRef: this,
-      color: this.color || null
+      color: this.color || null,
     };
-    
+
     // Set initial visibility
     group.visible = !this.hidden;
-    
+
     this.node = group;
   }
 
   loadJson(scope, json) {
-    this.setProperty(scope, 'asset', json.asset);
-    this.setProperty(scope, 'transform', json.transform);
-    this.setProperty(scope, 'hidden', json.hidden);
-    this.setProperty(scope, 'selectable', json.selectable);
-    this.setProperty(scope, 'color', json.color);
+    this.setProperty(scope, "asset", json.asset);
+    this.setProperty(scope, "transform", json.transform);
+    this.setProperty(scope, "hidden", json.hidden);
+    this.setProperty(scope, "selectable", json.selectable);
+    this.setProperty(scope, "color", json.color);
   }
 
   setProperty(scope, property, value) {
     switch (property) {
-      case 'asset': this.asset = scope.loadJson(value); break; 
-      case 'transform': this.transform = value; break;
-      case 'color': 
-        this.color = value; 
+      case "asset":
+        this.asset = scope.loadJson(value);
+        break;
+      case "transform":
+        this.transform = value;
+        break;
+      case "color":
+        this.color = value;
         // Update 3D object color
         if (this.node && value) {
           applyColorToObject(this.node, value);
         }
         break;
-      case 'hidden': {
-        this.hidden = value; 
+      case "hidden": {
+        this.hidden = value;
         // Update 3D object visibility
         if (this.node) {
           this.node.visible = !value;
         }
         break;
-      } 
-      case 'selectable': this.selectable = value; break;
+      }
+      case "selectable":
+        this.selectable = value;
+        break;
       default:
         super.setProperty(scope, property, value);
         break;
@@ -572,13 +622,17 @@ export class PartNode extends SharedObject {
 
   insertElementAt(scope, property, idx, value) {
     switch (property) {
-      case 'transform': this.transform.splice(idx, 0, value); break;
+      case "transform":
+        this.transform.splice(idx, 0, value);
+        break;
     }
   }
-  
+
   removeElementAt(scope, property, idx) {
     switch (property) {
-      case 'transform': this.transform.splice(idx, 1); break;
+      case "transform":
+        this.transform.splice(idx, 1);
+        break;
     }
   }
 }
@@ -594,10 +648,10 @@ export class GltfAsset extends SharedObject {
 
     this.layoutPoint?.build(this.group, true);
     if (this.layoutPoint?.transform) {
-       this.group.applyMatrix4(toMatrix(this.layoutPoint.transform).invert());
+      this.group.applyMatrix4(toMatrix(this.layoutPoint.transform).invert());
     }
     this.snappingPoints?.forEach((point) => point.build(this.group, false));
-    
+
     if (this.url || this.dynamicImage) {
       const geometry = new BoxGeometry(500, 500, 500);
       const material = new MeshBasicMaterial({ wireframe: false });
@@ -609,15 +663,15 @@ export class GltfAsset extends SharedObject {
       this.placeholder = mesh;
       this.group.add(this.placeholder);
     }
-    
+
     return this.group;
   }
-  
+
   setGLTF(newGLTF, ctrl) {
     if (!newGLTF) {
       return;
     }
-  
+
     this.gltf = newGLTF;
 
     // Ensure group is initialized before trying to use it
@@ -628,24 +682,26 @@ export class GltfAsset extends SharedObject {
     this.group.remove(this.placeholder);
 
     const useLOD = true;
-    
+
     if (useLOD) {
       // create LOD object
       const lod = new LOD();
       this.group.add(lod);
-      
+
       // create high detail model (original)
       const highDetailModel = this.createDetailLevel(this.gltf.scene, LOD_HIGH);
-      lod.addLevel(highDetailModel, 0);  // visible from distance 0 to medium distance
-      
+      lod.addLevel(highDetailModel, 0); // visible from distance 0 to medium distance
+
       // create medium detail model (simplified)
-      const mediumDetailModel = this.createDetailLevel(this.gltf.scene, LOD_MEDIUM);
-      lod.addLevel(mediumDetailModel, LOD_MEDIUM_DISTANCE);  // visible from medium to low distance
-      
+      const mediumDetailModel = this.createDetailLevel(
+        this.gltf.scene,
+        LOD_MEDIUM,
+      );
+      lod.addLevel(mediumDetailModel, LOD_MEDIUM_DISTANCE); // visible from medium to low distance
+
       // create low detail model (very simplified)
       const lowDetailModel = this.createDetailLevel(this.gltf.scene, LOD_LOW);
-      lod.addLevel(lowDetailModel, LOD_LOW_DISTANCE);  // visible from low distance and beyond
-      
+      lod.addLevel(lowDetailModel, LOD_LOW_DISTANCE); // visible from low distance and beyond
     } else {
       // standard non-LOD rendering
       const model = this.gltf.scene.clone();
@@ -662,7 +718,7 @@ export class GltfAsset extends SharedObject {
     const currentColor = this.placeholder.material.color;
     ctrl.setColor(this.group, currentColor);
   }
-  
+
   // create a model with specific level of detail
   createDetailLevel(originalScene, detailLevel) {
     const model = originalScene.clone();
@@ -678,12 +734,12 @@ export class GltfAsset extends SharedObject {
           case LOD_HIGH:
             // high detail - keep original quality
             break;
-            
+
           case LOD_MEDIUM:
             // medium detail - reduce material complexity
             this.simplifyMaterial(obj.material, LOD_MEDIUM);
             break;
-            
+
           case LOD_LOW:
             // low detail - maximum simplification
             this.simplifyMaterial(obj.material, LOD_LOW);
@@ -695,11 +751,11 @@ export class GltfAsset extends SharedObject {
     // return group;
     return model;
   }
-      
-      // simplify material based on detail level
+
+  // simplify material based on detail level
   simplifyMaterial(material, detailLevel) {
     if (Array.isArray(material)) {
-      material.forEach(mat => this.applySimplerMaterial(mat, detailLevel));
+      material.forEach((mat) => this.applySimplerMaterial(mat, detailLevel));
     } else {
       const result = this.applySimplerMaterial(material, detailLevel);
       if (result && detailLevel === LOD_LOW) {
@@ -707,7 +763,7 @@ export class GltfAsset extends SharedObject {
       }
     }
   }
-  
+
   // apply simpler material properties based on detail level
   applySimplerMaterial(material, detailLevel) {
     // for medium detail
@@ -717,11 +773,11 @@ export class GltfAsset extends SharedObject {
         material.map.anisotropy = 1;
         material.map.minFilter = LinearFilter;
       }
-      
+
       // simplify material properties
       material.fog = false;
       material.flatShading = true;
-      
+
       // reduce shadow quality
       material.shadowSide = null;
       return material;
@@ -729,33 +785,43 @@ export class GltfAsset extends SharedObject {
     // for low detail
     else if (detailLevel === LOD_LOW) {
       // replace with basic material for maximum performance
-      const color = material.color ? material.color.clone() : new Color(0xcccccc);
-      
+      const color = material.color
+        ? material.color.clone()
+        : new Color(0xcccccc);
+
       // create a new basic material
       const basicMaterial = new MeshBasicMaterial({
         color: color,
         wireframe: false,
         transparent: material.transparent,
-        opacity: material.opacity
+        opacity: material.opacity,
       });
-      
+
       return basicMaterial;
     }
   }
 
   loadJson(scope, json) {
-    this.setProperty(scope, 'url', json.url);
-    this.setProperty(scope, 'dynamicImage', json.dynamicImage);
-    this.setProperty(scope, 'layoutPoint', json.layoutPoint);
-    this.setProperty(scope, 'snappingPoints', json.snappingPoints);
+    this.setProperty(scope, "url", json.url);
+    this.setProperty(scope, "dynamicImage", json.dynamicImage);
+    this.setProperty(scope, "layoutPoint", json.layoutPoint);
+    this.setProperty(scope, "snappingPoints", json.snappingPoints);
   }
 
   setProperty(scope, property, value) {
     switch (property) {
-      case 'url': this.url = value; break;
-      case 'dynamicImage': this.dynamicImage = scope.loadJson(value); break;
-      case 'layoutPoint': this.layoutPoint = scope.loadJson(value); break; 
-      case 'snappingPoints': this.snappingPoints = scope.loadAll(value); break; 
+      case "url":
+        this.url = value;
+        break;
+      case "dynamicImage":
+        this.dynamicImage = scope.loadJson(value);
+        break;
+      case "layoutPoint":
+        this.layoutPoint = scope.loadJson(value);
+        break;
+      case "snappingPoints":
+        this.snappingPoints = scope.loadAll(value);
+        break;
       default:
         super.setProperty(scope, property, value);
         break;
@@ -763,13 +829,17 @@ export class GltfAsset extends SharedObject {
   }
   insertElementAt(scope, property, idx, value) {
     switch (property) {
-      case 'snappingPoints': this.snappingPoints.splice(idx, 0, scope.loadJson(value)); break; 
+      case "snappingPoints":
+        this.snappingPoints.splice(idx, 0, scope.loadJson(value));
+        break;
     }
   }
 
   removeElementAt(scope, property, idx) {
     switch (property) {
-      case 'snappingPoints': this.snappingPoints.splice(idx, 1); break; 
+      case "snappingPoints":
+        this.snappingPoints.splice(idx, 1);
+        break;
     }
   }
 }

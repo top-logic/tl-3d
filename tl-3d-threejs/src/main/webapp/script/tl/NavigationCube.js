@@ -19,8 +19,18 @@ import {
 
 import { OrbitControls } from "OrbitControls";
 import { gsap } from "gsap";
-import { CameraUtils, SceneUtils, getRaycaster, throttle } from "./ThreeJsUtils.js";
-import { CAMERA_MOVE_DURATION, DARK_GREY, LIGHT_GREY, _90_DEGREE } from './Constants.js';
+import {
+  CAMERA_MOVE_DURATION,
+  DARK_GREY,
+  LIGHT_GREY,
+  _90_DEGREE,
+} from "./Constants.js";
+import {
+  CameraUtils,
+  SceneUtils,
+  getRaycaster,
+  throttle,
+} from "./ThreeJsUtils.js";
 
 /**
  * NavigationCube class handles the 3D navigation cube functionality.
@@ -43,21 +53,21 @@ export class NavigationCube {
     this.onRender = onRender;
     this.mainCamera = mainCamera;
     this.mainControls = mainControls;
-    
+
     // Configuration options
     this.options = {
-      position: options.position || 'top-left',
+      position: options.position || "top-left",
       size: options.size || 100,
-      padding: options.padding || 10
+      padding: options.padding || 10,
     };
-    
+
     // Internal state
     this.controlsIsUpdating = false;
     this.cubeControlsIsUpdating = false;
     this.originalMaterials = [];
     this._throttledCubeHover = null;
     this.clickStart = 0;
-    
+
     this.init();
   }
 
@@ -89,12 +99,30 @@ export class NavigationCube {
     const cubeSize = 6;
     const cubeGeometry = new BoxGeometry(cubeSize, cubeSize, cubeSize);
     const cubeMaterials = [
-      new MeshStandardMaterial({ map: this.createTextTexture("Right"), side: FrontSide }),
-      new MeshStandardMaterial({ map: this.createTextTexture("Left"), side: FrontSide }),    
-      new MeshStandardMaterial({ map: this.createTextTexture("Back"), side: FrontSide }),
-      new MeshStandardMaterial({ map: this.createTextTexture("Front"), side: FrontSide }),
-      new MeshStandardMaterial({ map: this.createTextTexture("Top"), side: FrontSide }), 
-      new MeshStandardMaterial({ map: this.createTextTexture("Bottom"), side: FrontSide }),    
+      new MeshStandardMaterial({
+        map: this.createTextTexture("Right"),
+        side: FrontSide,
+      }),
+      new MeshStandardMaterial({
+        map: this.createTextTexture("Left"),
+        side: FrontSide,
+      }),
+      new MeshStandardMaterial({
+        map: this.createTextTexture("Back"),
+        side: FrontSide,
+      }),
+      new MeshStandardMaterial({
+        map: this.createTextTexture("Front"),
+        side: FrontSide,
+      }),
+      new MeshStandardMaterial({
+        map: this.createTextTexture("Top"),
+        side: FrontSide,
+      }),
+      new MeshStandardMaterial({
+        map: this.createTextTexture("Bottom"),
+        side: FrontSide,
+      }),
     ];
 
     const cube = new Mesh(cubeGeometry, cubeMaterials);
@@ -136,13 +164,17 @@ export class NavigationCube {
     context.translate(size / 2, size / 2);
 
     switch (text) {
-      case "Right": context.rotate(-_90_DEGREE);
+      case "Right":
+        context.rotate(-_90_DEGREE);
         break;
-      case "Left": context.rotate(_90_DEGREE);
+      case "Left":
+        context.rotate(_90_DEGREE);
         break;
-      case "Back": context.rotate(Math.PI);
+      case "Back":
+        context.rotate(Math.PI);
         break;
-      case "Bottom": context.rotate(Math.PI);
+      case "Bottom":
+        context.rotate(Math.PI);
         break;
     }
     context.fillText(text, 0, 0);
@@ -155,21 +187,33 @@ export class NavigationCube {
     this.cubeRenderer.shadowMap.enabled = true;
     this.cubeRenderer.setSize(this.options.size, this.options.size);
     this.cubeRenderer.setPixelRatio(window.devicePixelRatio);
-    
+
     this.cubeCanvas = this.cubeRenderer.domElement;
     this.cubeCanvas.style.position = "absolute";
     this.cubeCanvas.style.zIndex = "1000"; // Ensure cube is always on top
-    
+
     this.updateCubePosition();
     this.container.append(this.cubeCanvas);
-    
+
     this.setupEventListeners();
   }
 
   setupEventListeners() {
-    this.cubeCanvas.addEventListener("mousemove", (event) => this.onCubeHover(event), false);
-    this.cubeCanvas.addEventListener("mousedown", (event) => this.onCubeMouseDown(event), false);
-    this.cubeCanvas.addEventListener("click", (event) => this.onCubeClick(event), false);
+    this.cubeCanvas.addEventListener(
+      "mousemove",
+      (event) => this.onCubeHover(event),
+      false,
+    );
+    this.cubeCanvas.addEventListener(
+      "mousedown",
+      (event) => this.onCubeMouseDown(event),
+      false,
+    );
+    this.cubeCanvas.addEventListener(
+      "click",
+      (event) => this.onCubeClick(event),
+      false,
+    );
   }
 
   initControls() {
@@ -183,7 +227,11 @@ export class NavigationCube {
         this.cubeControlsIsUpdating = true;
         this.mainCamera.quaternion.copy(this.cubeCamera.quaternion);
         this.mainCamera.position.copy(
-          CameraUtils.calculateMainCameraPosition(this.cubeCamera.position, this.mainCamera.position, this.mainControls.target)
+          CameraUtils.calculateMainCameraPosition(
+            this.cubeCamera.position,
+            this.mainCamera.position,
+            this.mainControls.target,
+          ),
         );
         this.mainControls.update();
         this.cubeControlsIsUpdating = false;
@@ -194,10 +242,13 @@ export class NavigationCube {
 
   updateFromMainCamera() {
     if (!this.cubeControlsIsUpdating) {
-      this.controlsIsUpdating = true;        
+      this.controlsIsUpdating = true;
       this.cubeCamera.quaternion.copy(this.mainCamera.quaternion);
       this.cubeCamera.position.copy(
-        CameraUtils.calculateCubeCameraPosition(this.mainCamera.position, this.mainControls.target)
+        CameraUtils.calculateCubeCameraPosition(
+          this.mainCamera.position,
+          this.mainControls.target,
+        ),
       );
       this.cubeControls.update();
       this.controlsIsUpdating = false;
@@ -210,30 +261,30 @@ export class NavigationCube {
     const { position, padding } = this.options;
 
     switch (position) {
-      case 'top-right':
+      case "top-right":
         this.cubeCanvas.style.right = `${padding}px`;
         this.cubeCanvas.style.top = `${padding}px`;
-        this.cubeCanvas.style.left = 'auto';
-        this.cubeCanvas.style.bottom = 'auto';
+        this.cubeCanvas.style.left = "auto";
+        this.cubeCanvas.style.bottom = "auto";
         break;
-      case 'bottom-left':
+      case "bottom-left":
         this.cubeCanvas.style.left = `${padding}px`;
         this.cubeCanvas.style.bottom = `${padding}px`;
-        this.cubeCanvas.style.right = 'auto';
-        this.cubeCanvas.style.top = 'auto';
+        this.cubeCanvas.style.right = "auto";
+        this.cubeCanvas.style.top = "auto";
         break;
-      case 'bottom-right':
+      case "bottom-right":
         this.cubeCanvas.style.right = `${padding}px`;
         this.cubeCanvas.style.bottom = `${padding}px`;
-        this.cubeCanvas.style.left = 'auto';
-        this.cubeCanvas.style.top = 'auto';
+        this.cubeCanvas.style.left = "auto";
+        this.cubeCanvas.style.top = "auto";
         break;
-      case 'top-left':
+      case "top-left":
       default:
         this.cubeCanvas.style.left = `${padding}px`;
         this.cubeCanvas.style.top = `${padding}px`;
-        this.cubeCanvas.style.right = 'auto';
-        this.cubeCanvas.style.bottom = 'auto';
+        this.cubeCanvas.style.right = "auto";
+        this.cubeCanvas.style.bottom = "auto";
         break;
     }
   }
@@ -243,7 +294,7 @@ export class NavigationCube {
 
     // Update cube position in case container moved
     this.updateCubePosition();
-    
+
     // Update pixel ratio if device pixel ratio changed
     const newPixelRatio = window.devicePixelRatio;
     if (this.cubeRenderer.getPixelRatio() !== newPixelRatio) {
@@ -267,7 +318,10 @@ export class NavigationCube {
     if (!this._throttledCubeHover) {
       this._throttledCubeHover = throttle((event) => {
         const raycaster = getRaycaster(event, this.cubeCamera, this.cubeCanvas);
-        const intersects = raycaster.intersectObject(this.axesCube.children[0], true);
+        const intersects = raycaster.intersectObject(
+          this.axesCube.children[0],
+          true,
+        );
 
         const materials = this.axesCube.children[0].material;
         materials.forEach((material, index) => {
@@ -281,7 +335,7 @@ export class NavigationCube {
         }
 
         this.onRender();
-      }, 100); 
+      }, 100);
     }
     this._throttledCubeHover(event);
   }
@@ -294,11 +348,11 @@ export class NavigationCube {
     if (Date.now() - this.clickStart > 500) {
       return; // Not a click
     }
-    
+
     const raycaster = getRaycaster(event, this.cubeCamera, this.cubeCanvas);
     const intersects = raycaster.intersectObjects(
       this.cubeScene.children,
-      true
+      true,
     );
     const intersectedFace = intersects.find((i) => !!i.face)?.face;
 

@@ -4,9 +4,9 @@
 
 export const LOD_MEDIUM_DISTANCE = 500;
 export const LOD_LOW_DISTANCE = 2000;
-export const LOD_HIGH = 'high';
-export const LOD_MEDIUM = 'medium';
-export const LOD_LOW = 'low';   
+export const LOD_HIGH = "high";
+export const LOD_MEDIUM = "medium";
+export const LOD_LOW = "low";
 export const WHITE = 0xffffff;
 export const LIGHT_GREY = "#cccccc";
 export const DARK_GREY = "#333333";

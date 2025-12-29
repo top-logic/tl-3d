@@ -7,14 +7,10 @@ import {
   AxesHelper,
   Box3,
   Box3Helper,
-  BoxGeometry,
   BoxHelper,
   Color,
   Group,
   Matrix4,
-  Mesh,
-  MeshBasicMaterial,
-  MeshStandardMaterial,
   RGBAFormat,
   Scene,
   SphereGeometry,
@@ -25,29 +21,39 @@ import {
 import { OrbitControls } from "OrbitControls";
 import { TransformControls } from "TransformControls";
 import { gsap } from "gsap";
-import { Scope, SharedObject} from "./DataModels.js";
 import { InsertElement, RemoveElement, SetProperty } from "./Commands.js";
-import { CameraUtils, SceneUtils, applyColorToObject, getLocalMatrix, getMatrixDiff, toMatrix, getRaycaster, isDescendantOfAny, throttle  } from "./ThreeJsUtils.js";
+import { Scope, SharedObject } from "./DataModels.js";
 import { NavigationCube } from "./NavigationCube.js";
 import { SkyboxManager } from "./SkyboxManager.js";
+import {
+  CameraUtils,
+  SceneUtils,
+  applyColorToObject,
+  getLocalMatrix,
+  getMatrixDiff,
+  getRaycaster,
+  isDescendantOfAny,
+  throttle,
+  toMatrix,
+} from "./ThreeJsUtils.js";
 
-import { 
+import {
   CAMERA_MOVE_DURATION,
   C_P_RADIUS,
   GREEN,
   GRID_SMALL_CELL,
+  GRID_SNAP_THRESHOLD,
   HEIGHT_SEGMENTS,
   INTERACTIVE_PIXEL_RATIO,
   OPTIMIZED_PIXEL_RATIO,
   SELECTION_COLOR,
   SNAP_THRESHOLD,
   TRANSPARENCY_LEVEL,
-  GRID_SNAP_THRESHOLD,
   WHITE,
   WIDTH_SEGMENTS,
   YELLOW,
-  _90_DEGREE
-} from './Constants.js';
+  _90_DEGREE,
+} from "./Constants.js";
 
 /**
  * Initial state configuration for ThreeJsControl.
@@ -75,7 +81,7 @@ class ThreeJsControl {
     this.dataUrl = initialState.dataUrl;
     this.imageUrl = initialState.imageUrl;
     this.scope = new Scope();
-    
+
     this.lastLODLevel = -1;
     this.useLOD = true;
     this.zUpRoot = new Group();
@@ -83,7 +89,7 @@ class ThreeJsControl {
     this.multiTransformGroup = new Group();
     this.areObjectsTransparent = initialState.areObjectsTransparent;
     this.useScreenSpaceSnapping = true;
-    
+
     this.skyboxManager = new SkyboxManager(this);
     this.skyboxManager.setEnabled(initialState.skyboxEnabled !== false);
     this.initScene();
@@ -93,19 +99,25 @@ class ThreeJsControl {
     this.initTransformControls();
     this.render();
     this.isEditMode = false;
-    this.loadScene().then(() => setTimeout(() => {
-      this.createBoundingBox();
-      this.toggleWorkplane(initialState.isWorkplaneVisible);
-      this.updateWorkplanePosition();
-      this.toggleEditMode(initialState.isInEditMode);
-      this.toggleRotateMode(initialState.isRotateMode);
-      this.zoomOut();
-      this.updateLODObjects();
+    this.loadScene().then(() =>
+      setTimeout(() => {
+        this.createBoundingBox();
+        this.toggleWorkplane(initialState.isWorkplaneVisible);
+        this.updateWorkplanePosition();
+        this.toggleEditMode(initialState.isInEditMode);
+        this.toggleRotateMode(initialState.isRotateMode);
+        this.zoomOut();
+        this.updateLODObjects();
 
-      this.skyboxManager.initSkybox().then(() => this.skyboxManager.toggleSkybox(initialState.isSkyboxVisible));
+        this.skyboxManager
+          .initSkybox()
+          .then(() =>
+            this.skyboxManager.toggleSkybox(initialState.isSkyboxVisible),
+          );
 
-      // Recreate floors after scene is loaded - moved to loadScene()
-    }, 100));
+        // Recreate floors after scene is loaded - moved to loadScene()
+      }, 100),
+    );
   }
 
   initScene() {
@@ -130,16 +142,16 @@ class ThreeJsControl {
   initRenderer() {
     const container = this.container;
     this.renderer = new WebGLRenderer({
-      powerPreference: "high-performance"
+      powerPreference: "high-performance",
     });
 
     this.renderer.setSize(container.clientWidth, container.clientHeight);
-    
+
     // Adjust pixel ratio for performance (limit to 1.7 for high-DPI screens)
     const pixelRatio = Math.min(window.devicePixelRatio, OPTIMIZED_PIXEL_RATIO);
     this.renderer.setPixelRatio(pixelRatio);
     this.renderer.shadowMap.autoUpdate = false;
-    
+
     this.canvas = this.renderer.domElement;
     this.canvas.style.maxWidth = "100%";
     this.canvas.style.maxHeight = "100%";
@@ -147,21 +159,33 @@ class ThreeJsControl {
     // update objects' size when the size of the canvas changes
     const resizeObserver = this.createResizeObserver(this.canvas);
     resizeObserver.observe(this.canvas);
-    this.canvas.addEventListener("mousedown", (event) => this.onMouseDown(event));
+    this.canvas.addEventListener("mousedown", (event) =>
+      this.onMouseDown(event),
+    );
     this.canvas.addEventListener("mouseup", (event) => this.onMouseUp(event));
-    this.container.addEventListener("wheel", (event) => this.onMouseWheel(event), {
-      passive: false,
-    });
-    
+    this.container.addEventListener(
+      "wheel",
+      (event) => this.onMouseWheel(event),
+      {
+        passive: false,
+      },
+    );
+
     // Create a MutationObserver to detect DOM changes that might affect layout
     const mutationObserver = new MutationObserver(() => {
-        this.updateRendererSize();
+      this.updateRendererSize();
     });
-    
+
     // Observe the container and its parent for attribute changes
-      mutationObserver.observe(container, { attributes: true, attributeFilter: ['style', 'class'] });
-      if (container.parentNode) {
-        mutationObserver.observe(container.parentNode, { attributes: true, attributeFilter: ['style', 'class'] });
+    mutationObserver.observe(container, {
+      attributes: true,
+      attributeFilter: ["style", "class"],
+    });
+    if (container.parentNode) {
+      mutationObserver.observe(container.parentNode, {
+        attributes: true,
+        attributeFilter: ["style", "class"],
+      });
     }
   }
 
@@ -189,7 +213,7 @@ class ThreeJsControl {
       this.container,
       () => this.render(),
       this.camera,
-      this.controls
+      this.controls,
     );
   }
 
@@ -234,15 +258,17 @@ class ThreeJsControl {
   }
 
   updateWorkplanePosition() {
-      if (!this.workplane || !this.isWorkplaneVisible) {
-        return;
-      }
-      if (this.sceneGraph && this.sceneGraph.coordinateSystem) {
-        const matrixValues = toMatrix(this.sceneGraph.coordinateSystem);
-        this.workplane.applyMatrix4(matrixValues.multiply(this.workplane.matrix.clone().invert()));
-      }
-      this.workplane.updateMatrixWorld(true);
-      this.render();
+    if (!this.workplane || !this.isWorkplaneVisible) {
+      return;
+    }
+    if (this.sceneGraph && this.sceneGraph.coordinateSystem) {
+      const matrixValues = toMatrix(this.sceneGraph.coordinateSystem);
+      this.workplane.applyMatrix4(
+        matrixValues.multiply(this.workplane.matrix.clone().invert()),
+      );
+    }
+    this.workplane.updateMatrixWorld(true);
+    this.render();
   }
 
   toggleSkybox(visible) {
@@ -251,7 +277,10 @@ class ThreeJsControl {
 
   updateFactoryFloors() {
     // Update floors when scene changes
-    if (this.skyboxManager.isEnabled() && this.skyboxManager.getEnvironmentBackground()) {
+    if (
+      this.skyboxManager.isEnabled() &&
+      this.skyboxManager.getEnvironmentBackground()
+    ) {
       this.skyboxManager.createFactoryFloors(null);
       this.render();
     }
@@ -259,7 +288,10 @@ class ThreeJsControl {
 
   initTransformControls() {
     const outer = this;
-    this.translateControls = new TransformControls(this.camera, this.renderer.domElement);
+    this.translateControls = new TransformControls(
+      this.camera,
+      this.renderer.domElement,
+    );
     this.translateControls.setMode("translate");
     this.translateControls.setSpace("local");
     this.scene.add(this.translateControls.getHelper());
@@ -294,19 +326,24 @@ class ThreeJsControl {
           }
 
           // Apply step snapping to each object in multi-select
-          outer.multiTransformGroup.children.forEach(node => {
+          outer.multiTransformGroup.children.forEach((node) => {
             outer.snapToStepSize(node);
           });
-          
+
           // Apply grid snapping to each object in multi-select if both workplane and edit mode are enabled
-          if (outer.isWorkplaneVisible && outer.isEditMode && outer.snapToWorkplaneEnabled) {
-            outer.multiTransformGroup.children.forEach(node => {
+          if (
+            outer.isWorkplaneVisible &&
+            outer.isEditMode &&
+            outer.snapToWorkplaneEnabled
+          ) {
+            outer.multiTransformGroup.children.forEach((node) => {
               outer.snapObjectToWorkplane(node);
             });
           }
 
           // re-map multiTransformGroup children to array of commands
-        const commands = outer.multiTransformGroup.children.map(node => {
+          const commands = outer.multiTransformGroup.children
+            .map((node) => {
               // find the shared node in selection that corresponds to this Three.js node
               const sharedNode = outer.selection.find((s) => s.node === node);
               if (!sharedNode) return;
@@ -331,7 +368,8 @@ class ThreeJsControl {
 
               return sharedNode.notifyTransform(diff);
               // delete undefined if sharedNode is not found
-        }).filter(Boolean);        
+            })
+            .filter(Boolean);
 
           outer.sendSceneChanges(commands);
         } else {
@@ -364,8 +402,11 @@ class ThreeJsControl {
       };
     })();
 
-    this.translateControls.addEventListener("dragging-changed", updateRenderTransform);
-    
+    this.translateControls.addEventListener(
+      "dragging-changed",
+      updateRenderTransform,
+    );
+
     this.translateControls.addEventListener("objectChange", (event) => {
       if (event.target.dragging) {
         const selectedObject = event.target.object;
@@ -373,16 +414,17 @@ class ThreeJsControl {
         if (selectedObject !== this.multiTransformGroup) {
           this.snapToStepSize(selectedObject);
         }
-                        
+
         this.snapObjectToWorkplane(selectedObject);
-                        
+
         if (selectedObject === this.multiTransformGroup) {
           this.render();
           return;
         }
-        
-        const { closestSnappingPoint } = this.throttledFindClosestSnappingPoint(selectedObject);
-        
+
+        const { closestSnappingPoint } =
+          this.throttledFindClosestSnappingPoint(selectedObject);
+
         if (this.prevClosestSnappingPoint !== closestSnappingPoint) {
           if (this.prevClosestSnappingPoint) {
             this.restoreSnappingPointColor(this.prevClosestSnappingPoint);
@@ -391,35 +433,45 @@ class ThreeJsControl {
             closestSnappingPoint.pointMaterial.color.set(YELLOW);
             let mesh = closestSnappingPoint.node.children[0];
             if (mesh && mesh.isMesh) {
-              const highResGeometry = new SphereGeometry(C_P_RADIUS*1.5, WIDTH_SEGMENTS, HEIGHT_SEGMENTS);
+              const highResGeometry = new SphereGeometry(
+                C_P_RADIUS * 1.5,
+                WIDTH_SEGMENTS,
+                HEIGHT_SEGMENTS,
+              );
               if (!mesh.userData.originalGeometry) {
                 mesh.userData.originalGeometry = mesh.geometry;
               }
               mesh.geometry = highResGeometry;
             }
-            this.render(); 
+            this.render();
           }
           this.prevClosestSnappingPoint = closestSnappingPoint;
         }
-      } 
-      
+      }
+
       // throttle render calls during dragging
       if (event.target.dragging) {
         if (!this._throttledRender) {
           this._throttledRender = throttle(() => {
             this.render();
-          }, 50); 
+          }, 50);
         }
         this._throttledRender();
       } else {
         this.render();
       }
     });
-    this.rotateControls = new TransformControls(this.camera, this.renderer.domElement);
+    this.rotateControls = new TransformControls(
+      this.camera,
+      this.renderer.domElement,
+    );
     this.rotateControls.setMode("rotate");
     this.rotateControls.setSpace("local");
     this.scene.add(this.rotateControls.getHelper());
-    this.rotateControls.addEventListener("dragging-changed", updateRenderTransform);
+    this.rotateControls.addEventListener(
+      "dragging-changed",
+      updateRenderTransform,
+    );
     this.rotateControls.addEventListener("objectChange", (event) => {
       if (event.target.dragging) {
         const selectedObject = event.target.object;
@@ -432,14 +484,14 @@ class ThreeJsControl {
           this.render();
           return;
         }
-      } 
+      }
 
       // throttle render calls during dragging
       if (event.target.dragging) {
         if (!this._throttledRender) {
           this._throttledRender = throttle(() => {
             this.render();
-          }, 50); 
+          }, 50);
         }
         this._throttledRender();
       } else {
@@ -457,10 +509,9 @@ class ThreeJsControl {
     // restores original object positions in the sceneGraph (zUpRoot group)
     this.restoreMultiGroup();
 
-
     if (this.isEditMode && this.selection.length) {
-    // ONE OBJECT SELECTED
-      if (this.selection.length === 1) { 
+      // ONE OBJECT SELECTED
+      if (this.selection.length === 1) {
         const object = this.selection[0].node;
         if (object) {
           this.activateControl(object);
@@ -470,7 +521,7 @@ class ThreeJsControl {
       }
       // MULTIPLE OBJECTS SELECTED
       else {
-        this.prepareMultiGroup(); 
+        this.prepareMultiGroup();
         if (this.multiTransformGroup) {
           this.activateControl(this.multiTransformGroup);
         } else {
@@ -492,24 +543,24 @@ class ThreeJsControl {
 
     // update matrixWorld for all nodes in the sceneGraph including selected ones
     this.zUpRoot.updateMatrixWorld(true);
-  
+
     // get actual Three.js nodes from selection
-    const selectedNodes = this.selection.map(s => s.node);
+    const selectedNodes = this.selection.map((s) => s.node);
 
     // filter out nodes that are descendants of others to avoid duplicates in the transform group
-    const topLevelNodes = selectedNodes.filter(node =>
-      !isDescendantOfAny(node, selectedNodes)
+    const topLevelNodes = selectedNodes.filter(
+      (node) => !isDescendantOfAny(node, selectedNodes),
     );
 
     const firstNode = topLevelNodes[0];
-    
+
     const multiGroupMatrix = new Matrix4()
       .copy(firstNode.matrixWorld)
       .multiply(this.multiTransformGroup.matrix.clone().invert());
 
     this.multiTransformGroup.applyMatrix4(multiGroupMatrix);
     this.multiTransformGroup.updateMatrixWorld(true);
-    
+
     for (const node of topLevelNodes) {
       // save the current parent to be able to restore the node in zUpRoot later
       node.previousParent = node.parent;
@@ -517,9 +568,11 @@ class ThreeJsControl {
 
       // add the object to multiTransformGroup
       this.multiTransformGroup.add(node);
-  
+
       // calculate the local matrix of the node relative to the new group so that it does not move visually
-      const inverseGroupMatrix = new Matrix4().copy(this.multiTransformGroup.matrixWorld).invert();
+      const inverseGroupMatrix = new Matrix4()
+        .copy(this.multiTransformGroup.matrixWorld)
+        .invert();
       const localMatrix = new Matrix4()
         .multiplyMatrices(inverseGroupMatrix, worldMatrix)
         .multiply(node.matrix.clone().invert());
@@ -527,27 +580,29 @@ class ThreeJsControl {
       node.applyMatrix4(localMatrix);
       box.expandByObject(node);
     }
-  }  
+  }
 
   restoreMultiGroup() {
     this.multiTransformGroup.updateMatrixWorld(true);
 
     for (const node of this.multiTransformGroup.children.slice()) {
-      // if node was moved from zUpRoot to multiTransformGroup 
+      // if node was moved from zUpRoot to multiTransformGroup
       // then .previousParent should be defined and point to the previous parent node in zUpRoot
       if (node.previousParent) {
         const worldMatrix = node.matrixWorld.clone();
-  
+
         node.previousParent.add(node);
         node.updateMatrixWorld(true);
-  
-        const parentInverse = new Matrix4().copy(node.parent.matrixWorld).invert();
+
+        const parentInverse = new Matrix4()
+          .copy(node.parent.matrixWorld)
+          .invert();
         const localMatrix = new Matrix4()
           .multiplyMatrices(parentInverse, worldMatrix)
           .multiply(node.matrix.clone().invert());
-  
+
         node.applyMatrix4(localMatrix);
-  
+
         delete node.previousParent;
       } else {
         console.error(`Node ${node.name} has no previousParent`);
@@ -579,45 +634,48 @@ class ThreeJsControl {
   toggleEditMode(editing) {
     this.isEditMode = editing;
     if (editing) {
-        this.enableEditing(); 
+      this.enableEditing();
     } else {
-      this.disableEditing(); 
+      this.disableEditing();
     }
-    
+
     this.updateConnectionPointsVisibility();
 
-    this.render(); 
+    this.render();
   }
-  
+
   updateConnectionPointsVisibility() {
-        // Get the currently selected objects
-        const selectedNodes = this.selection.map(s => s.node);
-        
-        const updateVisibility = (object) => {
-          if (object.userData.isConnectionPoint) {
-            object.visible = this.isEditMode;
-          }
-          if (object.userData.isLayoutPoint) {
-            // object.visible = false; // always hide layout points
-            // only show layout points for selected objects
-            const parentObject = findParentObject(object);
-            object.visible = this.isEditMode && selectedNodes.includes(parentObject);
-          }
-        };
-        
-        function findParentObject(layoutPoint) {
-          let current = layoutPoint;
-          while (current && current.parent) {
-            // Check for asset either directly or through nodeRef
-            const parentAsset = current.parent?.userData?.asset || current.parent?.userData?.nodeRef?.asset;
-            if (current.parent.userData && parentAsset) {
-              return current.parent;
-            }
-            current = current.parent;
-          }
-          return null;
+    // Get the currently selected objects
+    const selectedNodes = this.selection.map((s) => s.node);
+
+    const updateVisibility = (object) => {
+      if (object.userData.isConnectionPoint) {
+        object.visible = this.isEditMode;
+      }
+      if (object.userData.isLayoutPoint) {
+        // object.visible = false; // always hide layout points
+        // only show layout points for selected objects
+        const parentObject = findParentObject(object);
+        object.visible =
+          this.isEditMode && selectedNodes.includes(parentObject);
+      }
+    };
+
+    function findParentObject(layoutPoint) {
+      let current = layoutPoint;
+      while (current && current.parent) {
+        // Check for asset either directly or through nodeRef
+        const parentAsset =
+          current.parent?.userData?.asset ||
+          current.parent?.userData?.nodeRef?.asset;
+        if (current.parent.userData && parentAsset) {
+          return current.parent;
         }
-    
+        current = current.parent;
+      }
+      return null;
+    }
+
     this.zUpRoot.traverse(updateVisibility);
     this.multiTransformGroup.traverse(updateVisibility);
   }
@@ -625,13 +683,13 @@ class ThreeJsControl {
   enableEditing() {
     this.updateTransformControls();
   }
-  
+
   disableEditing() {
     if (this.translateControls) {
       this.translateControls.detach();
       this.translateControls.enabled = false;
     }
-  
+
     if (this.rotateControls) {
       this.rotateControls.detach();
       this.rotateControls.enabled = false;
@@ -655,32 +713,31 @@ class ThreeJsControl {
 
     this.isRotateMode = enable;
     this.updateTransformControls();
-    this.render(); 
+    this.render();
   }
 
-getScreenSpaceDistance(pos1, pos2) {
-  const screen1 = pos1.clone().project(this.camera);
-  const screen2 = pos2.clone().project(this.camera);
-  const canvas = this.renderer.domElement;
-  
-  const x1 = (screen1.x + 1) * canvas.width / 2;
-  const y1 = (-screen1.y + 1) * canvas.height / 2;
-  const x2 = (screen2.x + 1) * canvas.width / 2;
-  const y2 = (-screen2.y + 1) * canvas.height / 2;
-  
-  return Math.hypot(x2 - x1, y2 - y1);
-}
+  getScreenSpaceDistance(pos1, pos2) {
+    const screen1 = pos1.clone().project(this.camera);
+    const screen2 = pos2.clone().project(this.camera);
+    const canvas = this.renderer.domElement;
+
+    const x1 = ((screen1.x + 1) * canvas.width) / 2;
+    const y1 = ((-screen1.y + 1) * canvas.height) / 2;
+    const x2 = ((screen2.x + 1) * canvas.width) / 2;
+    const y2 = ((-screen2.y + 1) * canvas.height) / 2;
+
+    return Math.hypot(x2 - x1, y2 - y1);
+  }
 
   findClosestSnappingPoint(selectedObj) {
     // Check if selectedObj has snapping points either directly or through nodeRef
-    const selectedObjAsset = selectedObj?.userData?.asset || selectedObj?.userData?.nodeRef?.asset;
-    
-    if (
-      !selectedObj 
-    ) {
+    const selectedObjAsset =
+      selectedObj?.userData?.asset || selectedObj?.userData?.nodeRef?.asset;
+
+    if (!selectedObj) {
       return { closestSnappingPoint: null, closestSnappingPointObject: null };
     }
-  
+
     // find all other objects in the scene that have snapping points
     const snappableObjects = [];
     // const snappableObjectsPoints = [];
@@ -688,7 +745,7 @@ getScreenSpaceDistance(pos1, pos2) {
     this.zUpRoot.traverse((node) => {
       // Check for snapping points either directly or through nodeRef
       const nodeAsset = node?.userData?.asset || node?.userData?.nodeRef?.asset;
-      
+
       if (
         node !== selectedObj &&
         nodeAsset &&
@@ -699,37 +756,37 @@ getScreenSpaceDistance(pos1, pos2) {
         // snappableObjectsPoints.push(node.matrixWorld.clone());
       }
     });
-    
+
     if (snappableObjects.length === 0) {
       return { closestSnappingPoint: null, closestSnappingPointObject: null };
     }
-    
+
     selectedObj.updateMatrixWorld(true);
-    
+
     // find the closest pair of snapping points
     let closestDistance = SNAP_THRESHOLD;
     let closestSnappingPoint = null;
     let closestSnappingPointObject = null;
-    
+
     const selectedWorldPosition = new Vector3();
     selectedObj.getWorldPosition(selectedWorldPosition);
-    
+
     for (const otherObject of snappableObjects) {
       otherObject.updateMatrixWorld(true);
-      
+
       // Get asset either directly or through nodeRef
-      const otherObjectAsset = otherObject?.userData?.asset || otherObject?.userData?.nodeRef?.asset;
-      
+      const otherObjectAsset =
+        otherObject?.userData?.asset || otherObject?.userData?.nodeRef?.asset;
+
       for (const otherPoint of otherObjectAsset.snappingPoints) {
         const position = new Vector3();
         otherPoint.node.getWorldPosition(position);
-        
-        const distance = this.useScreenSpaceSnapping 
+
+        const distance = this.useScreenSpaceSnapping
           ? this.getScreenSpaceDistance(selectedWorldPosition, position)
           : selectedWorldPosition.distanceTo(position);
-        
-        if (distance < closestDistance) {   
-          
+
+        if (distance < closestDistance) {
           if (this.isConnectionPointOccupied(otherPoint, selectedObj)) {
             continue;
           }
@@ -740,10 +797,10 @@ getScreenSpaceDistance(pos1, pos2) {
         }
       }
     }
-    
+
     const threshold = SNAP_THRESHOLD;
-    return closestDistance < threshold 
-      ? { closestSnappingPoint, closestSnappingPointObject } 
+    return closestDistance < threshold
+      ? { closestSnappingPoint, closestSnappingPointObject }
       : { closestSnappingPoint: null, closestSnappingPointObject: null };
   }
 
@@ -754,17 +811,19 @@ getScreenSpaceDistance(pos1, pos2) {
 
   restoreSnappingPointColor(snappingPoint) {
     if (!snappingPoint) return;
-    
+
     if (snappingPoint.pointMaterial) {
       if (snappingPoint.pointMaterial.userData.originalColor) {
-        snappingPoint.pointMaterial.color.copy(snappingPoint.pointMaterial.userData.originalColor);
+        snappingPoint.pointMaterial.color.copy(
+          snappingPoint.pointMaterial.userData.originalColor,
+        );
       } else {
         snappingPoint.pointMaterial.color.set(GREEN);
       }
     }
     const mesh = snappingPoint.node.children[0];
     if (mesh && mesh.isMesh && mesh.userData.originalGeometry) {
-      mesh.geometry.dispose(); 
+      mesh.geometry.dispose();
       mesh.geometry = mesh.userData.originalGeometry;
       delete mesh.userData.originalGeometry;
     }
@@ -775,29 +834,35 @@ getScreenSpaceDistance(pos1, pos2) {
     const rotateStepSize = this.sceneGraph.rotateStepSize;
     const startPos = obj.userData.dragStartPosition;
     const startRot = obj.userData.dragStartRotation;
-    
+
     if (startPos && translateStepSize > 0) {
-      const stepsX = Math.round((obj.position.x - startPos.x) / translateStepSize);
-      const stepsY = Math.round((obj.position.y - startPos.y) / translateStepSize);
-      const stepsZ = Math.round((obj.position.z - startPos.z) / translateStepSize);
-      
+      const stepsX = Math.round(
+        (obj.position.x - startPos.x) / translateStepSize,
+      );
+      const stepsY = Math.round(
+        (obj.position.y - startPos.y) / translateStepSize,
+      );
+      const stepsZ = Math.round(
+        (obj.position.z - startPos.z) / translateStepSize,
+      );
+
       obj.position.set(
-        startPos.x + (stepsX * translateStepSize),
-        startPos.y + (stepsY * translateStepSize),
-        startPos.z + (stepsZ * translateStepSize)
+        startPos.x + stepsX * translateStepSize,
+        startPos.y + stepsY * translateStepSize,
+        startPos.z + stepsZ * translateStepSize,
       );
     }
-    
+
     if (startRot && rotateStepSize > 0) {
-      const stepRad = rotateStepSize * Math.PI / 180;
+      const stepRad = (rotateStepSize * Math.PI) / 180;
       const stepsX = Math.round((obj.rotation.x - startRot.x) / stepRad);
       const stepsY = Math.round((obj.rotation.y - startRot.y) / stepRad);
       const stepsZ = Math.round((obj.rotation.z - startRot.z) / stepRad);
-      
+
       obj.rotation.set(
-        startRot.x + (stepsX * stepRad),
-        startRot.y + (stepsY * stepRad),
-        startRot.z + (stepsZ * stepRad)
+        startRot.x + stepsX * stepRad,
+        startRot.y + stepsY * stepRad,
+        startRot.z + stepsZ * stepRad,
       );
     }
   }
@@ -806,73 +871,79 @@ getScreenSpaceDistance(pos1, pos2) {
     if (!this.snapToWorkplaneEnabled) {
       return false;
     }
-    
+
     object.updateMatrixWorld(true);
-    
+
     const worldPosition = new Vector3();
     object.getWorldPosition(worldPosition);
-    
+
     const distanceToWorkplane = Math.abs(worldPosition.y);
     const MAX_SNAP_DISTANCE = 200;
-    
+
     if (distanceToWorkplane <= MAX_SNAP_DISTANCE) {
       let snapMatrix = new Matrix4();
       const isOnWorkplane = Math.abs(worldPosition.y);
-      
+
       if (this.isWorkplaneVisible && this.isEditMode && isOnWorkplane) {
         // Object is already on workplane, apply grid snapping
-        const snappedPosition = this.calculateGridSnappedPosition(worldPosition);
-        
+        const snappedPosition =
+          this.calculateGridSnappedPosition(worldPosition);
+
         // Create translation to snap to grid and workplane
         snapMatrix.makeTranslation(
           snappedPosition.x - worldPosition.x,
           snappedPosition.y - worldPosition.y,
-          snappedPosition.z - worldPosition.z
+          snappedPosition.z - worldPosition.z,
         );
       } else {
         //  Object is not on workplane yet, just snap to workplane at current X,Z
         snapMatrix.makeTranslation(0, -worldPosition.y, 0);
       }
-      
+
       // Apply the translation in world space
       if (object.parent) {
         object.parent.updateMatrixWorld(true);
-        
+
         // Convert world space translation to object's local space
-        const parentWorldInverse = new Matrix4().copy(object.parent.matrixWorld).invert();
+        const parentWorldInverse = new Matrix4()
+          .copy(object.parent.matrixWorld)
+          .invert();
         const localSnapMatrix = new Matrix4()
           .copy(parentWorldInverse)
           .multiply(snapMatrix)
           .multiply(object.parent.matrixWorld);
-        
+
         object.applyMatrix4(localSnapMatrix);
       }
-      
+
       object.updateMatrixWorld(true);
       return true;
     }
-    
+
     return false;
   }
 
   calculateGridSnappedPosition(worldPosition) {
-
     // Calculate nearest grid positions
-    const nearestGridX = Math.round(worldPosition.x / GRID_SMALL_CELL) * GRID_SMALL_CELL;
-    const nearestGridZ = Math.round(worldPosition.z / GRID_SMALL_CELL) * GRID_SMALL_CELL;
-    
+    const nearestGridX =
+      Math.round(worldPosition.x / GRID_SMALL_CELL) * GRID_SMALL_CELL;
+    const nearestGridZ =
+      Math.round(worldPosition.z / GRID_SMALL_CELL) * GRID_SMALL_CELL;
+
     // Check if position is close enough to grid lines to snap
     const distanceToGridX = Math.abs(worldPosition.x - nearestGridX);
     const distanceToGridZ = Math.abs(worldPosition.z - nearestGridZ);
-    
+
     // Only snap if within threshold distance
-    const snappedX = distanceToGridX <= GRID_SNAP_THRESHOLD ? nearestGridX : worldPosition.x;
-    const snappedZ = distanceToGridZ <= GRID_SNAP_THRESHOLD ? nearestGridZ : worldPosition.z;
-    
+    const snappedX =
+      distanceToGridX <= GRID_SNAP_THRESHOLD ? nearestGridX : worldPosition.x;
+    const snappedZ =
+      distanceToGridZ <= GRID_SNAP_THRESHOLD ? nearestGridZ : worldPosition.z;
+
     return {
       x: snappedX,
       y: 0, // Always snap to workplane
-      z: snappedZ
+      z: snappedZ,
     };
   }
 
@@ -881,76 +952,83 @@ getScreenSpaceDistance(pos1, pos2) {
     const position = new Vector3();
     connectionPoint.node.getWorldPosition(position);
     const checkRadius = 50;
-    
+
     // Find all objects near this connection point
     const nearbyObjects = [];
     let totalObjectsChecked = 0;
     let objectsWithAssets = 0;
-    
+
     this.zUpRoot.traverse((node) => {
       totalObjectsChecked++;
-      
+
       // Skip the object being moved
       if (node === excludeObject) {
         return;
       }
-      
+
       // Check if has asset
       if (node.userData?.asset) {
         objectsWithAssets++;
       } else if (node.userData?.nodeRef?.asset) {
         objectsWithAssets++;
       }
-      
+
       // Skip spheres and other non-snappable objects
-      if (node.userData?.isSphere || 
-          node.userData?.isGrid || 
-          node.userData?.isHelper ||
-          (!node.userData?.asset && !node.userData?.nodeRef?.asset)) {
+      if (
+        node.userData?.isSphere ||
+        node.userData?.isGrid ||
+        node.userData?.isHelper ||
+        (!node.userData?.asset && !node.userData?.nodeRef?.asset)
+      ) {
         return;
       }
-      
+
       // Check if this object is close to the connection point
       const nodePosition = new Vector3();
       node.getWorldPosition(nodePosition);
-      
+
       // Use 3D distance for proximity check
       const distance = position.distanceTo(nodePosition);
-      
+
       if (distance < checkRadius) {
         nearbyObjects.push(node);
       }
     });
-    
+
     const isOccupied = nearbyObjects.length > 0;
     return isOccupied;
   }
 
   snapObject(selectedObj) {
-    const { closestSnappingPoint, closestSnappingPointObject } = this.throttledFindClosestSnappingPoint(selectedObj);
-  
+    const { closestSnappingPoint, closestSnappingPointObject } =
+      this.throttledFindClosestSnappingPoint(selectedObj);
+
     if (closestSnappingPoint && closestSnappingPointObject) {
       closestSnappingPointObject.updateMatrixWorld(true);
       closestSnappingPoint.node.updateMatrixWorld(true);
       selectedObj.updateMatrixWorld(true);
-      
-      const snappingPointWorldMatrix = closestSnappingPoint.node.matrixWorld.clone();
-      
+
+      const snappingPointWorldMatrix =
+        closestSnappingPoint.node.matrixWorld.clone();
+
       // convert the world matrix to a local matrix
       if (selectedObj.parent) {
         selectedObj.parent.updateMatrixWorld(true);
-        
+
         // get the inverse of the parent's world matrix
-        const parentWorldInverse = new Matrix4().copy(selectedObj.parent.matrixWorld).invert();
+        const parentWorldInverse = new Matrix4()
+          .copy(selectedObj.parent.matrixWorld)
+          .invert();
         snappingPointWorldMatrix.premultiply(parentWorldInverse);
-      } 
-      selectedObj.applyMatrix4(snappingPointWorldMatrix.multiply(selectedObj.matrix.clone().invert()));
+      }
+      selectedObj.applyMatrix4(
+        snappingPointWorldMatrix.multiply(selectedObj.matrix.clone().invert()),
+      );
       selectedObj.updateMatrixWorld(true);
-    }
-    else if (this.snapToWorkplaneEnabled) {
+    } else if (this.snapToWorkplaneEnabled) {
       this.snapObjectToWorkplane(selectedObj);
     }
-  
+
     this.render();
   }
 
@@ -961,7 +1039,6 @@ getScreenSpaceDistance(pos1, pos2) {
   }
 
   addBoxHelpers() {
-
     // show bounding box around all objects
     this.boundingBoxHelper = new Box3Helper(this.boundingBox, YELLOW);
     this.scene.add(this.boundingBoxHelper);
@@ -971,10 +1048,13 @@ getScreenSpaceDistance(pos1, pos2) {
     if (this.selection.length === 0) {
       return;
     }
-    
+
     this.boxHelpers = [];
-    
-    if (this.selection.length > 1 && this.multiTransformGroup.children.length > 0) {
+
+    if (
+      this.selection.length > 1 &&
+      this.multiTransformGroup.children.length > 0
+    ) {
       // create a box helper for the entire multigroup
       const multiGroupHelper = new BoxHelper(this.multiTransformGroup, YELLOW);
       this.scene.add(multiGroupHelper);
@@ -999,7 +1079,7 @@ getScreenSpaceDistance(pos1, pos2) {
       }
       this.boxHelpers = [];
     }
-    
+
     if (this.lastSelectedBoxHelper) {
       this.scene.remove(this.lastSelectedBoxHelper);
       this.lastSelectedBoxHelper = null;
@@ -1017,29 +1097,35 @@ getScreenSpaceDistance(pos1, pos2) {
   }
 
   createResizeObserver() {
-    return new ResizeObserver(throttle(() => {
+    return new ResizeObserver(
+      throttle(() => {
         this.updateRendererSize();
-    }, 100));
+      }, 100),
+    );
   }
 
   updateRendererSize() {
     if (!this.container) return;
-    
-    this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
-    this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
+
+    this.renderer.setSize(
+      this.container.clientWidth,
+      this.container.clientHeight,
+    );
+    this.camera.aspect =
+      this.container.clientWidth / this.container.clientHeight;
     this.camera.updateProjectionMatrix();
-    
+
     // Update navigation cube size if it exists
     if (this.navigationCube) {
       this.navigationCube.updateSize();
     }
-    
+
     this.render();
   }
 
   onMouseDown(event) {
     this.clickStart = Date.now();
-    this.clickButton = event.button; 
+    this.clickButton = event.button;
   }
 
   onMouseUp(event) {
@@ -1050,7 +1136,7 @@ getScreenSpaceDistance(pos1, pos2) {
       return; // Not a click.
     }
     const raycaster = getRaycaster(event, this.camera, this.canvas);
-    const visibleObjects = this.scene.children.filter(obj => obj.visible);
+    const visibleObjects = this.scene.children.filter((obj) => obj.visible);
     const intersects = raycaster.intersectObjects(visibleObjects, true);
 
     this.updateSelection(intersects, event.ctrlKey);
@@ -1059,30 +1145,29 @@ getScreenSpaceDistance(pos1, pos2) {
 
   onMouseWheel(event) {
     event.preventDefault();
-  
+
     if (!this._throttledMouseWheel) {
       this._throttledMouseWheel = throttle((event) => {
         const target = this.controls.target;
         this.renderer.setPixelRatio(INTERACTIVE_PIXEL_RATIO);
         const position = this.camera.position;
-  
+
         const offset = new Vector3();
         offset.copy(position);
         offset.sub(target);
-  
+
         const factor = event.deltaY < 0 ? 0.888888889 : 1.125;
         offset.multiplyScalar(factor);
         offset.add(target);
-  
+
         this.camera.position.copy(offset);
-  
+
         this.render();
         this.renderer.setPixelRatio(OPTIMIZED_PIXEL_RATIO);
-      }, 50); 
+      }, 50);
     }
     this._throttledMouseWheel(event);
   }
-
 
   zoomToSelection() {
     const selectedObject = this.selection[0]?.node;
@@ -1099,7 +1184,7 @@ getScreenSpaceDistance(pos1, pos2) {
 
     const maxSize = Math.max(size.x, size.y);
     const fov = this.camera.fov * (Math.PI / 180);
-    let targetDistance = (maxSize / 2) / Math.tan(fov / 2);
+    let targetDistance = maxSize / 2 / Math.tan(fov / 2);
 
     const targetPositionZ = targetDistance + objectPosition.z;
     const offset = new Vector3(0, 0, 0);
@@ -1163,12 +1248,12 @@ getScreenSpaceDistance(pos1, pos2) {
 
     const maxSize = Math.max(size.x, size.y, size.z);
     const fov = this.camera.fov * (Math.PI / 180);
-    const distance = (maxSize / 2) / Math.tan(fov / 2);
+    const distance = maxSize / 2 / Math.tan(fov / 2);
 
     const targetZoomOutPosition = new Vector3(
       center.x + 12000, // for looking a bit at the right side
       center.y + 12000, // for looking a bit from the top
-      center.z + distance
+      center.z + distance,
     );
 
     gsap.to(this.controls.object.position, {
@@ -1207,21 +1292,33 @@ getScreenSpaceDistance(pos1, pos2) {
     try {
       const changes = JSON.parse(changesString);
       let needsFullReload = false;
-      
+
       for (const change of changes) {
         var command = change[0];
         var cmdProps = command[1];
 
         var cmd;
         switch (command[0]) {
-          case 'R': cmd = new RemoveElement(cmdProps["id"]); break;
-          case 'I': cmd = new InsertElement(cmdProps["id"]); break;
-          case 'S': cmd = new SetProperty(cmdProps["id"]); break;
+          case "R":
+            cmd = new RemoveElement(cmdProps["id"]);
+            break;
+          case "I":
+            cmd = new InsertElement(cmdProps["id"]);
+            break;
+          case "S":
+            cmd = new SetProperty(cmdProps["id"]);
+            break;
         }
 
         // Only allow known safe incremental properties
-        const safeIncrementalProperties = ['selection', 'parent', 'hidden', 'color', 'selectable'];
-        
+        const safeIncrementalProperties = [
+          "selection",
+          "parent",
+          "hidden",
+          "color",
+          "selectable",
+        ];
+
         if (!safeIncrementalProperties.includes(cmdProps["p"])) {
           needsFullReload = true;
         }
@@ -1238,7 +1335,7 @@ getScreenSpaceDistance(pos1, pos2) {
         this.applyColors();
         this.render();
       }
-    } catch (ex) { 
+    } catch (ex) {
       console.error(ex);
       throw ex;
     }
@@ -1248,7 +1345,7 @@ getScreenSpaceDistance(pos1, pos2) {
   setSelected(sharedNode, value) {
     const index = this.selection.indexOf(sharedNode);
     let command;
-    
+
     if (index >= 0) {
       // Currently selected
       if (value) {
@@ -1257,7 +1354,7 @@ getScreenSpaceDistance(pos1, pos2) {
       }
       this.setColor(sharedNode.node, WHITE);
       this.selection.splice(index, 1);
-      
+
       command = this.sceneGraph.removeSelected(sharedNode);
     } else {
       // Currently not selected
@@ -1267,16 +1364,16 @@ getScreenSpaceDistance(pos1, pos2) {
       }
       this.setColor(sharedNode.node, SELECTION_COLOR);
       this.selection.push(sharedNode);
-      
+
       command = this.sceneGraph.addSelected(sharedNode);
     }
-    
+
     this.updateObjectsTransparency();
     this.updateTransformControls();
     if (this.isEditMode) {
       this.updateConnectionPointsVisibility();
     }
-    
+
     return command;
   }
 
@@ -1300,7 +1397,7 @@ getScreenSpaceDistance(pos1, pos2) {
   // Apply colors to all objects that have color and 3D node
   applyColors() {
     for (const [id, obj] of Object.entries(this.scope.objects)) {
-      if (obj.color && obj.node && obj.color.trim() !== '') {
+      if (obj.color && obj.node && obj.color.trim() !== "") {
         applyColorToObject(obj.node, obj.color);
       }
     }
@@ -1312,19 +1409,19 @@ getScreenSpaceDistance(pos1, pos2) {
     }
 
     if (color === WHITE) {
-        let rootNode = node;
-        while (rootNode?.parent) {
-          const c = rootNode.userData?.color;
-          if (typeof c === 'string') {
-            applyColorToObject(node, c);
-            break;
-          }
-          rootNode = rootNode.parent;
+      let rootNode = node;
+      while (rootNode?.parent) {
+        const c = rootNode.userData?.color;
+        if (typeof c === "string") {
+          applyColorToObject(node, c);
+          break;
         }
-    
-        if (!rootNode?.userData?.color) {
-          if (node.material?.userData?.originalColor) {
-            node.material.color.copy(node.material.userData.originalColor);
+        rootNode = rootNode.parent;
+      }
+
+      if (!rootNode?.userData?.color) {
+        if (node.material?.userData?.originalColor) {
+          node.material.color.copy(node.material.userData.originalColor);
         }
       }
     } else {
@@ -1332,12 +1429,11 @@ getScreenSpaceDistance(pos1, pos2) {
         node.material.color.set(color);
       }
     }
-  
+
     for (const child of node.children) {
-        this.setColor(child, color);
+      this.setColor(child, color);
     }
   }
-  
 
   /** Updates the selection from a click on the canvas. */
   updateSelection(intersects, toggleMode) {
@@ -1363,7 +1459,7 @@ getScreenSpaceDistance(pos1, pos2) {
             ? !this.selection.includes(sharedNode)
             : true;
           const setCmd = this.setSelected(sharedNode, doSelect);
-	      if (setCmd != null) {
+          if (setCmd != null) {
             changes.push(setCmd);
           }
           // this.addBoxHelpers();
@@ -1389,7 +1485,7 @@ getScreenSpaceDistance(pos1, pos2) {
     }
     this.selection.length = 0;
     if (this.areObjectsTransparent) {
-	    this.clearObjectsTransparency();
+      this.clearObjectsTransparency();
     }
 
     if (this.isEditMode) {
@@ -1422,16 +1518,15 @@ getScreenSpaceDistance(pos1, pos2) {
 
     this.sceneGraph = this.scope.loadJson(dataJson);
     this.sceneGraph.buildGraph(this);
-    
+
     // Create floors after sceneGraph is loaded with numberOfFloors
     if (this.skyboxManager.isEnabled()) {
       this.skyboxManager.createFactoryFloors(null);
     }
-    
-    await this.scope.loadAssets(this)
-      .then(() => {
-        this.updateObjectsTransparency()
-      });
+
+    await this.scope.loadAssets(this).then(() => {
+      this.updateObjectsTransparency();
+    });
 
     this.camera.position.applyMatrix4(this.scene.matrix);
     this.camera.updateProjectionMatrix();
@@ -1439,17 +1534,17 @@ getScreenSpaceDistance(pos1, pos2) {
 
     this.render();
   }
-  
+
   sendSceneChanges(commands) {
-  	const cmds = [];
-  	for (let i = 0; i < commands.length; i++) {
-  		cmds.push(commands[i].extract());
-  	}
-  
+    const cmds = [];
+    for (let i = 0; i < commands.length; i++) {
+      cmds.push(commands[i].extract());
+    }
+
     const message = {
       controlCommand: "sceneChanged",
       controlID: this.controlId,
-      json: JSON.stringify(cmds), 
+      json: JSON.stringify(cmds),
     };
 
     services.ajax.execute("dispatchControlCommand", message);
@@ -1459,13 +1554,13 @@ getScreenSpaceDistance(pos1, pos2) {
     if (!this._throttledUpdateLOD) {
       this._throttledUpdateLOD = throttle(() => {
         if (!this.camera || !this.zUpRoot) return;
-        this.zUpRoot.traverse(node => {
+        this.zUpRoot.traverse((node) => {
           if (node.isLOD) {
             // LOD objects automatically update based on camera distance
             node.update(this.camera);
           }
         });
-      }, 100); 
+      }, 100);
     }
     this._throttledUpdateLOD();
   }
@@ -1481,10 +1576,10 @@ getScreenSpaceDistance(pos1, pos2) {
         transparent: material.transparent,
         opacity: material.opacity,
         depthWrite: material.depthWrite,
-        format: material.format
+        format: material.format,
       };
     }
-    
+
     if (opacity === null) {
       // Restore original properties
       const orig = material.userData.originalProperties;
@@ -1513,22 +1608,27 @@ getScreenSpaceDistance(pos1, pos2) {
       }
     });
   }
-  
+
   setObjectsTransparency() {
     if (this.selection.length > 0) {
-      const selectedIds = new Set()
-      this.selection.forEach(sharedNode => {
+      const selectedIds = new Set();
+      this.selection.forEach((sharedNode) => {
         if (sharedNode.node) {
-          sharedNode.node.traverse(child => {
+          sharedNode.node.traverse((child) => {
             selectedIds.add(child.id);
           });
         }
       });
 
       this.scene.traverse((object) => {
-        if (object.material && !selectedIds.has(object.id) && object !== this.workplane && !this.isWorkplaneChild(object)) {
+        if (
+          object.material &&
+          !selectedIds.has(object.id) &&
+          object !== this.workplane &&
+          !this.isWorkplaneChild(object)
+        ) {
           this.getMaterials(object).forEach((material) => {
-            this.setObjectTransparency(material, TRANSPARENCY_LEVEL); 
+            this.setObjectTransparency(material, TRANSPARENCY_LEVEL);
           });
         }
       });
@@ -1539,7 +1639,7 @@ getScreenSpaceDistance(pos1, pos2) {
     if (this.areObjectsTransparent == shouldBeTransparent) {
       return;
     }
-    
+
     this.areObjectsTransparent = shouldBeTransparent;
     if (this.areObjectsTransparent) {
       this.setObjectsTransparency();
@@ -1552,7 +1652,7 @@ getScreenSpaceDistance(pos1, pos2) {
 
   isWorkplaneChild(object) {
     if (!this.workplane) return false;
-    
+
     let parent = object.parent;
     while (parent) {
       if (parent === this.workplane) {
@@ -1570,7 +1670,7 @@ getScreenSpaceDistance(pos1, pos2) {
 
     // Clear transparency first
     this.clearObjectsTransparency();
-    
+
     // Make objects transparent
     this.setObjectsTransparency();
 
@@ -1581,8 +1681,8 @@ getScreenSpaceDistance(pos1, pos2) {
     if (this.reqID) {
       // Do not render multiple times the same scene.
       cancelAnimationFrame(this.reqID);
-	}    
-    
+    }
+
     this.reqID = requestAnimationFrame(() => {
       const { renderer, scene, camera } = this;
 
@@ -1592,7 +1692,7 @@ getScreenSpaceDistance(pos1, pos2) {
       }
 
       renderer.render(scene, camera);
-      
+
       // Render navigation cube
       if (this.navigationCube) {
         this.navigationCube.render();
@@ -1671,5 +1771,5 @@ window.services.threejs = {
 
   rotate: function (container, axis, direction, stepSize) {
     ThreeJsControl.control(container)?.rotate(axis, direction, stepSize);
-  }
+  },
 };
