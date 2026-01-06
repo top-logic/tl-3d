@@ -132,31 +132,33 @@ export class Scope {
         return null;
       }
     });
+
     // No need to load "null" URL.
     assetsByURL.delete(null);
-
     const batchSize = 10;
+    const batches = [];
+    let urls = [];
 
-    var loaders = new Array();
-    var urls = new Array(batchSize);
-    var index = 0;
     for (const key of assetsByURL.keys()) {
-      if (index == batchSize) {
-        index = 0;
-        loaders.push(loadURLs(urls, assetsByURL));
-        urls = new Array(batchSize);
+      if (urls.length === batchSize) {
+        batches.push(urls);
+        urls = [];
       }
       if (this.setGLTF(ctrl, key, assetsByURL)) {
         // URL already successfully loaded.
         continue;
       }
-      urls[index] = key;
-      index++;
+      urls.push(key);
     }
-    if (index > 0) {
-      loaders.push(loadURLs(urls.slice(0, index), assetsByURL));
+
+    if (urls.length > 0) {
+      batches.push(urls);
     }
-    return Promise.all(loaders);
+
+    // Load batches sequentially
+    return batches.reduce((promise, batch) => {
+      return promise.then(() => loadURLs(batch, assetsByURL));
+    }, Promise.resolve());
   }
 
   setGLTF(ctrl, url, assetsByURL) {
