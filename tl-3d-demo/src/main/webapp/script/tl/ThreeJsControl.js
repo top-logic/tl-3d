@@ -82,8 +82,6 @@ class ThreeJsControl {
     this.imageUrl = initialState.imageUrl;
     this.scope = new Scope();
 
-    this.lastLODLevel = -1;
-    this.useLOD = true;
     this.zUpRoot = new Group();
     this.zUpEnvironment = new Group();
     this.multiTransformGroup = new Group();
@@ -107,7 +105,6 @@ class ThreeJsControl {
         this.toggleEditMode(initialState.isInEditMode);
         this.toggleRotateMode(initialState.isRotateMode);
         this.zoomOut();
-        this.updateLODObjects();
 
         this.skyboxManager
           .initSkybox()
@@ -1550,21 +1547,6 @@ class ThreeJsControl {
     services.ajax.execute("dispatchControlCommand", message);
   }
 
-  updateLODObjects() {
-    if (!this._throttledUpdateLOD) {
-      this._throttledUpdateLOD = throttle(() => {
-        if (!this.camera || !this.zUpRoot) return;
-        this.zUpRoot.traverse((node) => {
-          if (node.isLOD) {
-            // LOD objects automatically update based on camera distance
-            node.update(this.camera);
-          }
-        });
-      }, 100);
-    }
-    this._throttledUpdateLOD();
-  }
-
   getMaterials(object) {
     return Array.isArray(object.material) ? object.material : [object.material];
   }
@@ -1685,11 +1667,6 @@ class ThreeJsControl {
 
     this.reqID = requestAnimationFrame(() => {
       const { renderer, scene, camera } = this;
-
-      // update LOD objects if enabled
-      if (this.useLOD) {
-        this.updateLODObjects();
-      }
 
       renderer.render(scene, camera);
 

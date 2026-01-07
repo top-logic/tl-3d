@@ -7,11 +7,6 @@ import {
   C_P_RADIUS,
   GREEN,
   HEIGHT_SEGMENTS,
-  LOD_HIGH,
-  LOD_LOW,
-  LOD_LOW_DISTANCE,
-  LOD_MEDIUM,
-  LOD_MEDIUM_DISTANCE,
   RED,
   WIDTH_SEGMENTS,
 } from "./Constants.js";
@@ -19,7 +14,6 @@ import {
 import {
   BoxGeometry,
   Group,
-  LOD,
   Mesh,
   MeshBasicMaterial,
   SphereGeometry,
@@ -683,124 +677,18 @@ export class GltfAsset extends SharedObject {
 
     this.group.remove(this.placeholder);
 
-    const useLOD = true;
-
-    if (useLOD) {
-      // create LOD object
-      const lod = new LOD();
-      this.group.add(lod);
-
-      // create high detail model (original)
-      const highDetailModel = this.createDetailLevel(this.gltf.scene, LOD_HIGH);
-      lod.addLevel(highDetailModel, 0); // visible from distance 0 to medium distance
-
-      // create medium detail model (simplified)
-      const mediumDetailModel = this.createDetailLevel(
-        this.gltf.scene,
-        LOD_MEDIUM,
-      );
-      lod.addLevel(mediumDetailModel, LOD_MEDIUM_DISTANCE); // visible from medium to low distance
-
-      // create low detail model (very simplified)
-      const lowDetailModel = this.createDetailLevel(this.gltf.scene, LOD_LOW);
-      lod.addLevel(lowDetailModel, LOD_LOW_DISTANCE); // visible from low distance and beyond
-    } else {
-      // standard non-LOD rendering
-      const model = this.gltf.scene.clone();
-      model.traverse((obj) => {
-        if (obj.isMesh && obj.material) {
-          obj.userData.originalMaterial = obj.material;
-          obj.material = obj.material.clone();
-          obj.material.userData.originalColor = obj.material.color.clone();
-        }
-      });
-      this.group.add(model);
-    }
-
-    const currentColor = this.placeholder.material.color;
-    ctrl.setColor(this.group, currentColor);
-  }
-
-  // create a model with specific level of detail
-  createDetailLevel(originalScene, detailLevel) {
-    const model = originalScene.clone();
-
+    const model = this.gltf.scene.clone();
     model.traverse((obj) => {
       if (obj.isMesh && obj.material) {
         obj.userData.originalMaterial = obj.material;
         obj.material = obj.material.clone();
         obj.material.userData.originalColor = obj.material.color.clone();
-
-        // apply detail level specific optimizations
-        switch (detailLevel) {
-          case LOD_HIGH:
-            // high detail - keep original quality
-            break;
-
-          case LOD_MEDIUM:
-            // medium detail - reduce material complexity
-            this.simplifyMaterial(obj.material, LOD_MEDIUM);
-            break;
-
-          case LOD_LOW:
-            // low detail - maximum simplification
-            this.simplifyMaterial(obj.material, LOD_LOW);
-            break;
-        }
       }
     });
-    //   group.add(model);
-    // return group;
-    return model;
-  }
+    this.group.add(model);
 
-  // simplify material based on detail level
-  simplifyMaterial(material, detailLevel) {
-    if (Array.isArray(material)) {
-      material.forEach((mat) => this.applySimplerMaterial(mat, detailLevel));
-    } else {
-      const result = this.applySimplerMaterial(material, detailLevel);
-      if (result && detailLevel === LOD_LOW) {
-        return result;
-      }
-    }
-  }
-
-  // apply simpler material properties based on detail level
-  applySimplerMaterial(material, detailLevel) {
-    // for medium detail
-    if (detailLevel === LOD_MEDIUM) {
-      // reduce texture quality
-      if (material.map) {
-        material.map.anisotropy = 1;
-        material.map.minFilter = LinearFilter;
-      }
-
-      // simplify material properties
-      material.fog = false;
-      material.flatShading = true;
-
-      // reduce shadow quality
-      material.shadowSide = null;
-      return material;
-    }
-    // for low detail
-    else if (detailLevel === LOD_LOW) {
-      // replace with basic material for maximum performance
-      const color = material.color
-        ? material.color.clone()
-        : new Color(0xcccccc);
-
-      // create a new basic material
-      const basicMaterial = new MeshBasicMaterial({
-        color: color,
-        wireframe: false,
-        transparent: material.transparent,
-        opacity: material.opacity,
-      });
-
-      return basicMaterial;
-    }
+    const currentColor = this.placeholder.material.color;
+    ctrl.setColor(this.group, currentColor);
   }
 
   loadJson(scope, json) {
