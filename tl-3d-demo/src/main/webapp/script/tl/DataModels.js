@@ -14,6 +14,8 @@ import {
 import {
   BoxGeometry,
   Group,
+  InstancedMesh,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   SphereGeometry,
@@ -40,6 +42,188 @@ export class Scope {
     return Object.values(this.objects).filter(
       (obj) => obj instanceof GltfAsset,
     );
+  }
+
+  analyzeForInstancing() {
+    const instanceGroups = new Map();
+
+    const collectPartNodes = (node, parentTransform = new Matrix4()) => {
+      if (!node) return;
+
+      let worldTransform = parentTransform.clone();
+      if (node.transform) {
+        worldTransform.multiply(toMatrix(node.transform));
+      }
+
+      if (node instanceof PartNode) {
+        const asset = node.asset;
+        const assetKey =
+          asset.url || (asset.dynamicImage ? asset.dynamicImage.imageID : null);
+
+        if (!assetKey) return;
+
+        if (!instanceGroups.has(assetKey)) {
+          instanceGroups.set(assetKey, {
+            asset: asset,
+            instances: [],
+          });
+        }
+
+        instanceGroups.get(assetKey).instances.push({
+          partNode: node,
+          worldTransform: worldTransform.clone(),
+          color: node.color,
+          hidden: node.hidden,
+        });
+      }
+
+      if (node instanceof GroupNode && node.contents) {
+        for (const child of node.contents) {
+          collectPartNodes(child, worldTransform);
+        }
+      }
+    };
+
+    const sceneGraph = Object.values(this.objects).find(
+      (obj) => obj instanceof SceneGraph,
+    );
+
+    if (sceneGraph && sceneGraph.root) {
+      collectPartNodes(sceneGraph.root);
+    }
+
+    // Filter to only assets with 2+ instances
+    const result = new Map();
+    for (const [assetKey, group] of instanceGroups) {
+      if (group.instances.length >= 2) {
+        result.set(assetKey, group);
+      }
+    }
+
+    // Mark all PartNodes that will be instanced
+    for (const [_assetKey, group] of result) {
+      for (const instance of group.instances) {
+        instance.partNode.willBeInstanced = true;
+      }
+    }
+
+    // Store the instance groups
+    this.instanceGroups = result;
+
+    return result;
+  }
+
+  createInstancedMeshes(ctrl) {
+    if (!this.instanceGroups || this.instanceGroups.size === 0) {
+      return;
+    }
+
+    for (const [assetKey, group] of this.instanceGroups) {
+      const { asset, instances } = group;
+
+      // Create placeholder InstancedMesh for now
+      const geometry = new BoxGeometry(500, 500, 500);
+      const material = new MeshBasicMaterial({ wireframe: false });
+      const instancedMesh = new InstancedMesh(
+        geometry,
+        material,
+        instances.length,
+      );
+
+      // Set the matrix for each instance
+      instances.forEach((instance, index) => {
+        const matrix = instance.worldTransform;
+        instancedMesh.setMatrixAt(index, matrix);
+
+        // Store reference back to PartNode for later interaction
+        if (!instancedMesh.userData.instances) {
+          instancedMesh.userData.instances = [];
+        }
+        instancedMesh.userData.instances[index] = instance.partNode;
+      });
+
+      // Mark this mesh as instanced for later identification
+      instancedMesh.userData.isInstancedMesh = true;
+      instancedMesh.userData.assetKey = assetKey;
+
+      // Add to scene
+      ctrl.zUpRoot.add(instancedMesh);
+
+      // Store reference to the instanced mesh
+      if (!this.instancedMeshes) {
+        this.instancedMeshes = new Map();
+      }
+      this.instancedMeshes.set(assetKey, instancedMesh);
+    }
+
+    ctrl.render();
+  }
+
+  updateInstancedMeshesWithGLTF(ctrl) {
+    if (!this.instancedMeshes || this.instancedMeshes.size === 0) {
+      return;
+    }
+
+    for (const [assetKey, instancedMesh] of this.instancedMeshes) {
+      const group = this.instanceGroups.get(assetKey);
+      if (!group) {
+        continue;
+      }
+
+      const asset = group.asset;
+
+      let gltfUrl;
+      if (asset.url) {
+        gltfUrl = ctrl.contextPath + asset.url;
+      } else if (asset.dynamicImage) {
+        gltfUrl = ctrl.imageUrl + "/" + asset.dynamicImage.imageID;
+      } else {
+        continue;
+      }
+
+      const gltf = this.gltfs[gltfUrl];
+
+      if (!gltf) {
+        continue;
+      }
+
+      // Get the first mesh from the GLTF to use as template
+      let templateMesh = null;
+      gltf.scene.traverse((obj) => {
+        if (obj.isMesh && !templateMesh) {
+          templateMesh = obj;
+        }
+      });
+
+      if (!templateMesh) continue;
+
+      // Remove old placeholder
+      ctrl.zUpRoot.remove(instancedMesh);
+
+      // Create new InstancedMesh with real geometry
+      const newInstancedMesh = new InstancedMesh(
+        templateMesh.geometry,
+        templateMesh.material.clone(),
+        group.instances.length,
+      );
+
+      // Copy over matrices and userData
+      group.instances.forEach((instance, index) => {
+        const matrix = instance.worldTransform;
+        newInstancedMesh.setMatrixAt(index, matrix);
+      });
+
+      newInstancedMesh.userData = instancedMesh.userData;
+
+      // Add to scene
+      ctrl.zUpRoot.add(newInstancedMesh);
+
+      // Update reference
+      this.instancedMeshes.set(assetKey, newInstancedMesh);
+    }
+
+    console.log(this.instancedMeshes.size);
+    ctrl.render();
   }
 
   getNode(id) {
@@ -547,6 +731,11 @@ export class PartNode extends SharedObject {
 
   build(parentGroup, parentContext) {
     if (this.hidden) {
+      return;
+    }
+
+    // Skip building if this node will be instanced
+    if (this.willBeInstanced) {
       return;
     }
 

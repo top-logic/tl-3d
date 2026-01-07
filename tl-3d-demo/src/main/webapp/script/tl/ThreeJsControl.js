@@ -1514,7 +1514,13 @@ class ThreeJsControl {
     const dataJson = await dataResponse.json();
 
     this.sceneGraph = this.scope.loadJson(dataJson);
+
+    this.scope.analyzeForInstancing();
+
     this.sceneGraph.buildGraph(this);
+
+    // Create placeholder instanced meshes
+    this.scope.createInstancedMeshes(this);
 
     // Create floors after sceneGraph is loaded with numberOfFloors
     if (this.skyboxManager.isEnabled()) {
@@ -1522,6 +1528,8 @@ class ThreeJsControl {
     }
 
     await this.scope.loadAssets(this).then(() => {
+      // Update instanced meshes with real geometry
+      this.scope.updateInstancedMeshesWithGLTF(this);
       this.updateObjectsTransparency();
     });
 
