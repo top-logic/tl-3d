@@ -7,11 +7,6 @@ import {
   C_P_RADIUS,
   GREEN,
   HEIGHT_SEGMENTS,
-  LOD_HIGH,
-  LOD_LOW,
-  LOD_LOW_DISTANCE,
-  LOD_MEDIUM,
-  LOD_MEDIUM_DISTANCE,
   RED,
   WIDTH_SEGMENTS,
 } from "./Constants.js";
@@ -19,7 +14,8 @@ import {
 import {
   BoxGeometry,
   Group,
-  LOD,
+  InstancedMesh,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   SphereGeometry,
@@ -46,6 +42,188 @@ export class Scope {
     return Object.values(this.objects).filter(
       (obj) => obj instanceof GltfAsset,
     );
+  }
+
+  analyzeForInstancing() {
+    const instanceGroups = new Map();
+
+    const collectPartNodes = (node, parentTransform = new Matrix4()) => {
+      if (!node) return;
+
+      let worldTransform = parentTransform.clone();
+      if (node.transform) {
+        worldTransform.multiply(toMatrix(node.transform));
+      }
+
+      if (node instanceof PartNode) {
+        const asset = node.asset;
+        const assetKey =
+          asset.url || (asset.dynamicImage ? asset.dynamicImage.imageID : null);
+
+        if (!assetKey) return;
+
+        if (!instanceGroups.has(assetKey)) {
+          instanceGroups.set(assetKey, {
+            asset: asset,
+            instances: [],
+          });
+        }
+
+        instanceGroups.get(assetKey).instances.push({
+          partNode: node,
+          worldTransform: worldTransform.clone(),
+          color: node.color,
+          hidden: node.hidden,
+        });
+      }
+
+      if (node instanceof GroupNode && node.contents) {
+        for (const child of node.contents) {
+          collectPartNodes(child, worldTransform);
+        }
+      }
+    };
+
+    const sceneGraph = Object.values(this.objects).find(
+      (obj) => obj instanceof SceneGraph,
+    );
+
+    if (sceneGraph && sceneGraph.root) {
+      collectPartNodes(sceneGraph.root);
+    }
+
+    // Filter to only assets with 2+ instances
+    const result = new Map();
+    for (const [assetKey, group] of instanceGroups) {
+      if (group.instances.length >= 2) {
+        result.set(assetKey, group);
+      }
+    }
+
+    // Mark all PartNodes that will be instanced
+    for (const [_assetKey, group] of result) {
+      for (const instance of group.instances) {
+        instance.partNode.willBeInstanced = true;
+      }
+    }
+
+    // Store the instance groups
+    this.instanceGroups = result;
+
+    return result;
+  }
+
+  createInstancedMeshes(ctrl) {
+    if (!this.instanceGroups || this.instanceGroups.size === 0) {
+      return;
+    }
+
+    for (const [assetKey, group] of this.instanceGroups) {
+      const { asset, instances } = group;
+
+      // Create placeholder InstancedMesh for now
+      const geometry = new BoxGeometry(500, 500, 500);
+      const material = new MeshBasicMaterial({ wireframe: false });
+      const instancedMesh = new InstancedMesh(
+        geometry,
+        material,
+        instances.length,
+      );
+
+      // Set the matrix for each instance
+      instances.forEach((instance, index) => {
+        const matrix = instance.worldTransform;
+        instancedMesh.setMatrixAt(index, matrix);
+
+        // Store reference back to PartNode for later interaction
+        if (!instancedMesh.userData.instances) {
+          instancedMesh.userData.instances = [];
+        }
+        instancedMesh.userData.instances[index] = instance.partNode;
+      });
+
+      // Mark this mesh as instanced for later identification
+      instancedMesh.userData.isInstancedMesh = true;
+      instancedMesh.userData.assetKey = assetKey;
+
+      // Add to scene
+      ctrl.zUpRoot.add(instancedMesh);
+
+      // Store reference to the instanced mesh
+      if (!this.instancedMeshes) {
+        this.instancedMeshes = new Map();
+      }
+      this.instancedMeshes.set(assetKey, instancedMesh);
+    }
+
+    ctrl.render();
+  }
+
+  updateInstancedMeshesWithGLTF(ctrl) {
+    if (!this.instancedMeshes || this.instancedMeshes.size === 0) {
+      return;
+    }
+
+    for (const [assetKey, instancedMesh] of this.instancedMeshes) {
+      const group = this.instanceGroups.get(assetKey);
+      if (!group) {
+        continue;
+      }
+
+      const asset = group.asset;
+
+      let gltfUrl;
+      if (asset.url) {
+        gltfUrl = ctrl.contextPath + asset.url;
+      } else if (asset.dynamicImage) {
+        gltfUrl = ctrl.imageUrl + "/" + asset.dynamicImage.imageID;
+      } else {
+        continue;
+      }
+
+      const gltf = this.gltfs[gltfUrl];
+
+      if (!gltf) {
+        continue;
+      }
+
+      // Get the first mesh from the GLTF to use as template
+      let templateMesh = null;
+      gltf.scene.traverse((obj) => {
+        if (obj.isMesh && !templateMesh) {
+          templateMesh = obj;
+        }
+      });
+
+      if (!templateMesh) continue;
+
+      // Remove old placeholder
+      ctrl.zUpRoot.remove(instancedMesh);
+
+      // Create new InstancedMesh with real geometry
+      const newInstancedMesh = new InstancedMesh(
+        templateMesh.geometry,
+        templateMesh.material.clone(),
+        group.instances.length,
+      );
+
+      // Copy over matrices and userData
+      group.instances.forEach((instance, index) => {
+        const matrix = instance.worldTransform;
+        newInstancedMesh.setMatrixAt(index, matrix);
+      });
+
+      newInstancedMesh.userData = instancedMesh.userData;
+
+      // Add to scene
+      ctrl.zUpRoot.add(newInstancedMesh);
+
+      // Update reference
+      this.instancedMeshes.set(assetKey, newInstancedMesh);
+    }
+
+    console.log(this.instancedMeshes.size);
+    ctrl.render();
   }
 
   getNode(id) {
@@ -132,31 +310,33 @@ export class Scope {
         return null;
       }
     });
+
     // No need to load "null" URL.
     assetsByURL.delete(null);
-
     const batchSize = 10;
+    const batches = [];
+    let urls = [];
 
-    var loaders = new Array();
-    var urls = new Array(batchSize);
-    var index = 0;
     for (const key of assetsByURL.keys()) {
-      if (index == batchSize) {
-        index = 0;
-        loaders.push(loadURLs(urls, assetsByURL));
-        urls = new Array(batchSize);
+      if (urls.length === batchSize) {
+        batches.push(urls);
+        urls = [];
       }
       if (this.setGLTF(ctrl, key, assetsByURL)) {
         // URL already successfully loaded.
         continue;
       }
-      urls[index] = key;
-      index++;
+      urls.push(key);
     }
-    if (index > 0) {
-      loaders.push(loadURLs(urls.slice(0, index), assetsByURL));
+
+    if (urls.length > 0) {
+      batches.push(urls);
     }
-    return Promise.all(loaders);
+
+    // Load batches sequentially
+    return batches.reduce((promise, batch) => {
+      return promise.then(() => loadURLs(batch, assetsByURL));
+    }, Promise.resolve());
   }
 
   setGLTF(ctrl, url, assetsByURL) {
@@ -554,6 +734,11 @@ export class PartNode extends SharedObject {
       return;
     }
 
+    // Skip building if this node will be instanced
+    if (this.willBeInstanced) {
+      return;
+    }
+
     const group = new Group();
     parentGroup.add(group);
 
@@ -681,124 +866,18 @@ export class GltfAsset extends SharedObject {
 
     this.group.remove(this.placeholder);
 
-    const useLOD = true;
-
-    if (useLOD) {
-      // create LOD object
-      const lod = new LOD();
-      this.group.add(lod);
-
-      // create high detail model (original)
-      const highDetailModel = this.createDetailLevel(this.gltf.scene, LOD_HIGH);
-      lod.addLevel(highDetailModel, 0); // visible from distance 0 to medium distance
-
-      // create medium detail model (simplified)
-      const mediumDetailModel = this.createDetailLevel(
-        this.gltf.scene,
-        LOD_MEDIUM,
-      );
-      lod.addLevel(mediumDetailModel, LOD_MEDIUM_DISTANCE); // visible from medium to low distance
-
-      // create low detail model (very simplified)
-      const lowDetailModel = this.createDetailLevel(this.gltf.scene, LOD_LOW);
-      lod.addLevel(lowDetailModel, LOD_LOW_DISTANCE); // visible from low distance and beyond
-    } else {
-      // standard non-LOD rendering
-      const model = this.gltf.scene.clone();
-      model.traverse((obj) => {
-        if (obj.isMesh && obj.material) {
-          obj.userData.originalMaterial = obj.material;
-          obj.material = obj.material.clone();
-          obj.material.userData.originalColor = obj.material.color.clone();
-        }
-      });
-      this.group.add(model);
-    }
-
-    const currentColor = this.placeholder.material.color;
-    ctrl.setColor(this.group, currentColor);
-  }
-
-  // create a model with specific level of detail
-  createDetailLevel(originalScene, detailLevel) {
-    const model = originalScene.clone();
-
+    const model = this.gltf.scene.clone();
     model.traverse((obj) => {
       if (obj.isMesh && obj.material) {
         obj.userData.originalMaterial = obj.material;
         obj.material = obj.material.clone();
         obj.material.userData.originalColor = obj.material.color.clone();
-
-        // apply detail level specific optimizations
-        switch (detailLevel) {
-          case LOD_HIGH:
-            // high detail - keep original quality
-            break;
-
-          case LOD_MEDIUM:
-            // medium detail - reduce material complexity
-            this.simplifyMaterial(obj.material, LOD_MEDIUM);
-            break;
-
-          case LOD_LOW:
-            // low detail - maximum simplification
-            this.simplifyMaterial(obj.material, LOD_LOW);
-            break;
-        }
       }
     });
-    //   group.add(model);
-    // return group;
-    return model;
-  }
+    this.group.add(model);
 
-  // simplify material based on detail level
-  simplifyMaterial(material, detailLevel) {
-    if (Array.isArray(material)) {
-      material.forEach((mat) => this.applySimplerMaterial(mat, detailLevel));
-    } else {
-      const result = this.applySimplerMaterial(material, detailLevel);
-      if (result && detailLevel === LOD_LOW) {
-        return result;
-      }
-    }
-  }
-
-  // apply simpler material properties based on detail level
-  applySimplerMaterial(material, detailLevel) {
-    // for medium detail
-    if (detailLevel === LOD_MEDIUM) {
-      // reduce texture quality
-      if (material.map) {
-        material.map.anisotropy = 1;
-        material.map.minFilter = LinearFilter;
-      }
-
-      // simplify material properties
-      material.fog = false;
-      material.flatShading = true;
-
-      // reduce shadow quality
-      material.shadowSide = null;
-      return material;
-    }
-    // for low detail
-    else if (detailLevel === LOD_LOW) {
-      // replace with basic material for maximum performance
-      const color = material.color
-        ? material.color.clone()
-        : new Color(0xcccccc);
-
-      // create a new basic material
-      const basicMaterial = new MeshBasicMaterial({
-        color: color,
-        wireframe: false,
-        transparent: material.transparent,
-        opacity: material.opacity,
-      });
-
-      return basicMaterial;
-    }
+    const currentColor = this.placeholder.material.color;
+    ctrl.setColor(this.group, currentColor);
   }
 
   loadJson(scope, json) {

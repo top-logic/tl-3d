@@ -82,8 +82,6 @@ class ThreeJsControl {
     this.imageUrl = initialState.imageUrl;
     this.scope = new Scope();
 
-    this.lastLODLevel = -1;
-    this.useLOD = true;
     this.zUpRoot = new Group();
     this.zUpEnvironment = new Group();
     this.multiTransformGroup = new Group();
@@ -107,7 +105,6 @@ class ThreeJsControl {
         this.toggleEditMode(initialState.isInEditMode);
         this.toggleRotateMode(initialState.isRotateMode);
         this.zoomOut();
-        this.updateLODObjects();
 
         this.skyboxManager
           .initSkybox()
@@ -1517,7 +1514,13 @@ class ThreeJsControl {
     const dataJson = await dataResponse.json();
 
     this.sceneGraph = this.scope.loadJson(dataJson);
+
+    this.scope.analyzeForInstancing();
+
     this.sceneGraph.buildGraph(this);
+
+    // Create placeholder instanced meshes
+    this.scope.createInstancedMeshes(this);
 
     // Create floors after sceneGraph is loaded with numberOfFloors
     if (this.skyboxManager.isEnabled()) {
@@ -1525,6 +1528,8 @@ class ThreeJsControl {
     }
 
     await this.scope.loadAssets(this).then(() => {
+      // Update instanced meshes with real geometry
+      this.scope.updateInstancedMeshesWithGLTF(this);
       this.updateObjectsTransparency();
     });
 
@@ -1548,21 +1553,6 @@ class ThreeJsControl {
     };
 
     services.ajax.execute("dispatchControlCommand", message);
-  }
-
-  updateLODObjects() {
-    if (!this._throttledUpdateLOD) {
-      this._throttledUpdateLOD = throttle(() => {
-        if (!this.camera || !this.zUpRoot) return;
-        this.zUpRoot.traverse((node) => {
-          if (node.isLOD) {
-            // LOD objects automatically update based on camera distance
-            node.update(this.camera);
-          }
-        });
-      }, 100);
-    }
-    this._throttledUpdateLOD();
   }
 
   getMaterials(object) {
@@ -1685,11 +1675,6 @@ class ThreeJsControl {
 
     this.reqID = requestAnimationFrame(() => {
       const { renderer, scene, camera } = this;
-
-      // update LOD objects if enabled
-      if (this.useLOD) {
-        this.updateLODObjects();
-      }
 
       renderer.render(scene, camera);
 
