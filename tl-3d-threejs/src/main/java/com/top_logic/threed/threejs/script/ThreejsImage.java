@@ -10,6 +10,9 @@ import java.util.List;
 import com.top_logic.basic.StringServices;
 import com.top_logic.basic.config.ConfigurationException;
 import com.top_logic.basic.config.InstantiationContext;
+import com.top_logic.knowledge.service.KnowledgeBase;
+import com.top_logic.knowledge.service.PersistencyLayer;
+import com.top_logic.model.TLModel;
 import com.top_logic.model.TLType;
 import com.top_logic.model.search.expr.EvalContext;
 import com.top_logic.model.search.expr.GenericMethod;
@@ -19,6 +22,7 @@ import com.top_logic.model.search.expr.config.operations.AbstractSimpleMethodBui
 import com.top_logic.model.search.expr.config.operations.ArgumentDescriptor;
 import com.top_logic.model.search.expr.query.QueryExecutor;
 import com.top_logic.threed.threejs.scene.ImageData;
+import com.top_logic.util.model.ModelService;
 
 /**
  * TL-Script constructor function for an {@link ImageData}.
@@ -46,9 +50,15 @@ public class ThreejsImage extends GenericMethod {
 	protected Object eval(Object[] arguments, EvalContext definitions) {
 		ImageData imageData = ImageData.create();
 		imageData.setUserData(arguments[0]);
-		imageData.setData(QueryExecutor.compile((SearchExpression) arguments[1]));
+		imageData.setData(executor((SearchExpression) arguments[1]));
 		imageData.setImageID(asString(arguments[2]));
 		return imageData;
+	}
+
+	private static QueryExecutor executor(SearchExpression search) {
+		KnowledgeBase kb = PersistencyLayer.getKnowledgeBase();
+		TLModel model = ModelService.getApplicationModel();
+		return QueryExecutor.executor(kb, model, search);
 	}
 
 	/**
