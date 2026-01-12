@@ -25,12 +25,7 @@ import {
   LIGHT_GREY,
   _90_DEGREE,
 } from "./Constants.js";
-import {
-  CameraUtils,
-  SceneUtils,
-  getRaycaster,
-  throttle,
-} from "./ThreeJsUtils.js";
+import { CameraUtils, SceneUtils, getRaycaster } from "./ThreeJsUtils.js";
 
 /**
  * NavigationCube class handles the 3D navigation cube functionality.
@@ -40,7 +35,7 @@ export class NavigationCube {
   /**
    * Creates a new NavigationCube instance.
    * @param {HTMLElement} container - The container element to attach the cube canvas to
-   * @param {Function} onRender - Callback function to trigger main scene re-render
+   * @param {Object} renderManager - Reference to the render manager for triggering main scene re-render
    * @param {Object} mainCamera - Reference to the main camera for synchronization
    * @param {Object} mainControls - Reference to the main camera controls for synchronization
    * @param {Object} options - Optional configuration object
@@ -48,9 +43,15 @@ export class NavigationCube {
    * @param {number} options.size - Size of the cube canvas (default: 100)
    * @param {number} options.padding - Padding from container edge (default: 10)
    */
-  constructor(container, onRender, mainCamera, mainControls, options = {}) {
+  constructor(
+    container,
+    renderManager,
+    mainCamera,
+    mainControls,
+    options = {},
+  ) {
     this.container = container;
-    this.onRender = onRender;
+    this.renderManager = renderManager;
     this.mainCamera = mainCamera;
     this.mainControls = mainControls;
 
@@ -65,10 +66,10 @@ export class NavigationCube {
     this.controlsIsUpdating = false;
     this.cubeControlsIsUpdating = false;
     this.originalMaterials = [];
-    this._throttledCubeHover = null;
     this.clickStart = 0;
 
     this.init();
+    this.renderManager.registerRenderTarget(this);
   }
 
   init() {
@@ -201,7 +202,7 @@ export class NavigationCube {
   setupEventListeners() {
     this.cubeCanvas.addEventListener(
       "mousemove",
-      (event) => this.onCubeHover(event),
+      (event) => this.handleCubeHover(event),
       false,
     );
     this.cubeCanvas.addEventListener(
@@ -235,7 +236,7 @@ export class NavigationCube {
         );
         this.mainControls.update();
         this.cubeControlsIsUpdating = false;
-        this.onRender();
+        this.renderManager.invalidate();
       }
     });
   }
@@ -314,30 +315,32 @@ export class NavigationCube {
    * Handles mouse hover events on the cube for face highlighting.
    * @param {MouseEvent} event - The mouse event
    */
-  onCubeHover(event) {
-    if (!this._throttledCubeHover) {
-      this._throttledCubeHover = throttle((event) => {
-        const raycaster = getRaycaster(event, this.cubeCamera, this.cubeCanvas);
-        const intersects = raycaster.intersectObject(
-          this.axesCube.children[0],
-          true,
-        );
+  handleCubeHover(event) {
+    if (!this.axesCube?.children[0]?.material) return;
 
-        const materials = this.axesCube.children[0].material;
-        materials.forEach((material, index) => {
-          material.color.copy(this.originalMaterials[index].color);
-          material.map = this.originalMaterials[index].map;
-        });
+    const raycaster = getRaycaster(event, this.cubeCamera, this.cubeCanvas);
+    const cubeMesh = this.axesCube.children[0];
+    const intersects = raycaster.intersectObject(cubeMesh, true);
 
-        if (intersects.length > 0) {
-          const intersectedFace = intersects[0].face;
-          materials[intersectedFace.materialIndex].color.set("#66bbff");
-        }
+    const materials = Array.isArray(cubeMesh.material)
+      ? cubeMesh.material
+      : [cubeMesh.material];
 
-        this.onRender();
-      }, 100);
+    materials.forEach((material, index) => {
+      if (this.originalMaterials[index]) {
+        material.color.copy(this.originalMaterials[index].color);
+        material.map = this.originalMaterials[index].map;
+      }
+    });
+
+    if (intersects.length > 0) {
+      const intersectedFace = intersects[0].face;
+      if (intersectedFace && materials[intersectedFace.materialIndex]) {
+        materials[intersectedFace.materialIndex].color.set("#66bbff");
+      }
     }
-    this._throttledCubeHover(event);
+
+    this.renderManager.invalidate();
   }
 
   /**
@@ -379,10 +382,10 @@ export class NavigationCube {
       ease: "power2.out",
       onUpdate: () => {
         this.cubeControls.update();
-        this.onRender();
+        this.renderManager.invalidate();
       },
       onComplete: () => {
-        this.onRender();
+        this.renderManager.invalidate();
       },
     });
   }
@@ -407,7 +410,17 @@ export class NavigationCube {
     }
   }
 
+  shouldRender() {
+    // Always render when main scene renders
+    return true;
+  }
+
   render() {
     this.cubeRenderer.render(this.cubeScene, this.cubeCamera);
+  }
+
+  dispose() {
+    // Unregister from render manager
+    this.renderManager.unregisterRenderTarget(this);
   }
 }

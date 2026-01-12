@@ -24,6 +24,7 @@ import { gsap } from "gsap";
 import { InsertElement, RemoveElement, SetProperty } from "./Commands.js";
 import { Scope, SharedObject } from "./DataModels.js";
 import { NavigationCube } from "./NavigationCube.js";
+import { RenderManager } from "./RenderManager.js";
 import { SkyboxManager } from "./SkyboxManager.js";
 import {
   CameraUtils,
@@ -44,7 +45,6 @@ import {
   GRID_SMALL_CELL,
   GRID_SNAP_THRESHOLD,
   HEIGHT_SEGMENTS,
-  INTERACTIVE_PIXEL_RATIO,
   OPTIMIZED_PIXEL_RATIO,
   SELECTION_COLOR,
   SNAP_THRESHOLD,
@@ -93,10 +93,21 @@ class ThreeJsControl {
     this.initScene();
     this.initRenderer();
     this.initControls();
-    this.initNavigationCube();
+
+    this.renderManager = new RenderManager(
+      this.renderer,
+      this.scene,
+      this.camera,
+    );
+
     this.initTransformControls();
-    this.render();
+    this.initNavigationCube();
+
+    // Initial render
+    this.renderManager.forceRender();
+
     this.isEditMode = false;
+
     this.loadScene().then(() =>
       setTimeout(() => {
         this.createBoundingBox();
@@ -201,14 +212,14 @@ class ThreeJsControl {
       if (this.navigationCube) {
         this.navigationCube.updateFromMainCamera();
       }
-      this.render();
+      this.invalidate();
     });
   }
 
   initNavigationCube() {
     this.navigationCube = new NavigationCube(
       this.container,
-      () => this.render(),
+      this.renderManager,
       this.camera,
       this.controls,
     );
@@ -251,7 +262,7 @@ class ThreeJsControl {
     }
 
     this.isWorkplaneVisible = visible;
-    this.render();
+    this.invalidate();
   }
 
   updateWorkplanePosition() {
@@ -265,7 +276,7 @@ class ThreeJsControl {
       );
     }
     this.workplane.updateMatrixWorld(true);
-    this.render();
+    this.invalidate();
   }
 
   toggleSkybox(visible) {
@@ -279,7 +290,7 @@ class ThreeJsControl {
       this.skyboxManager.getEnvironmentBackground()
     ) {
       this.skyboxManager.createFactoryFloors(null);
-      this.render();
+      this.invalidate();
     }
   }
 
@@ -395,7 +406,7 @@ class ThreeJsControl {
           }
         }
 
-        outer.render();
+        outer.invalidate();
       };
     })();
 
@@ -415,7 +426,7 @@ class ThreeJsControl {
         this.snapObjectToWorkplane(selectedObject);
 
         if (selectedObject === this.multiTransformGroup) {
-          this.render();
+          this.invalidate();
           return;
         }
 
@@ -440,24 +451,14 @@ class ThreeJsControl {
               }
               mesh.geometry = highResGeometry;
             }
-            this.render();
+            this.invalidate();
           }
           this.prevClosestSnappingPoint = closestSnappingPoint;
         }
       }
-
-      // throttle render calls during dragging
-      if (event.target.dragging) {
-        if (!this._throttledRender) {
-          this._throttledRender = throttle(() => {
-            this.render();
-          }, 50);
-        }
-        this._throttledRender();
-      } else {
-        this.render();
-      }
+      this.invalidate();
     });
+
     this.rotateControls = new TransformControls(
       this.camera,
       this.renderer.domElement,
@@ -478,22 +479,12 @@ class ThreeJsControl {
         }
 
         if (selectedObject === this.multiTransformGroup) {
-          this.render();
+          this.invalidate();
           return;
         }
       }
 
-      // throttle render calls during dragging
-      if (event.target.dragging) {
-        if (!this._throttledRender) {
-          this._throttledRender = throttle(() => {
-            this.render();
-          }, 50);
-        }
-        this._throttledRender();
-      } else {
-        this.render();
-      }
+      this.invalidate();
     });
 
     this.translateControls.enabled = false;
@@ -618,14 +609,14 @@ class ThreeJsControl {
     if (object) {
       this.transformControls.enabled = true;
       this.transformControls.attach(object);
-      this.render();
+      this.invalidate();
     }
   }
 
   deactivateControl() {
     this.transformControls.enabled = false;
     this.transformControls.detach();
-    this.render();
+    this.invalidate();
   }
 
   toggleEditMode(editing) {
@@ -638,7 +629,7 @@ class ThreeJsControl {
 
     this.updateConnectionPointsVisibility();
 
-    this.render();
+    this.invalidate();
   }
 
   updateConnectionPointsVisibility() {
@@ -710,7 +701,7 @@ class ThreeJsControl {
 
     this.isRotateMode = enable;
     this.updateTransformControls();
-    this.render();
+    this.invalidate();
   }
 
   getScreenSpaceDistance(pos1, pos2) {
@@ -1026,7 +1017,7 @@ class ThreeJsControl {
       this.snapObjectToWorkplane(selectedObj);
     }
 
-    this.render();
+    this.invalidate();
   }
 
   addAxesHelper(scene) {
@@ -1039,7 +1030,7 @@ class ThreeJsControl {
     // show bounding box around all objects
     this.boundingBoxHelper = new Box3Helper(this.boundingBox, YELLOW);
     this.scene.add(this.boundingBoxHelper);
-    this.render();
+    this.invalidate();
     this.removeBoxHelpers();
 
     if (this.selection.length === 0) {
@@ -1066,7 +1057,7 @@ class ThreeJsControl {
         }
       }
     }
-    this.render();
+    this.invalidate();
   }
 
   removeBoxHelpers() {
@@ -1117,7 +1108,7 @@ class ThreeJsControl {
       this.navigationCube.updateSize();
     }
 
-    this.render();
+    this.invalidate();
   }
 
   onMouseDown(event) {
@@ -1137,33 +1128,26 @@ class ThreeJsControl {
     const intersects = raycaster.intersectObjects(visibleObjects, true);
 
     this.updateSelection(intersects, event.ctrlKey);
-    this.render();
+    this.invalidate();
   }
 
   onMouseWheel(event) {
     event.preventDefault();
 
-    if (!this._throttledMouseWheel) {
-      this._throttledMouseWheel = throttle((event) => {
-        const target = this.controls.target;
-        this.renderer.setPixelRatio(INTERACTIVE_PIXEL_RATIO);
-        const position = this.camera.position;
+    const target = this.controls.target;
+    const position = this.camera.position;
 
-        const offset = new Vector3();
-        offset.copy(position);
-        offset.sub(target);
+    const offset = new Vector3();
+    offset.copy(position);
+    offset.sub(target);
 
-        const factor = event.deltaY < 0 ? 0.888888889 : 1.125;
-        offset.multiplyScalar(factor);
-        offset.add(target);
+    const factor = event.deltaY < 0 ? 0.888888889 : 1.125;
+    offset.multiplyScalar(factor);
+    offset.add(target);
 
-        this.camera.position.copy(offset);
+    this.camera.position.copy(offset);
 
-        this.render();
-        this.renderer.setPixelRatio(OPTIMIZED_PIXEL_RATIO);
-      }, 50);
-    }
-    this._throttledMouseWheel(event);
+    this.invalidate();
   }
 
   zoomToSelection() {
@@ -1206,13 +1190,13 @@ class ThreeJsControl {
         ease: "power3.inOut",
         onUpdate: () => {
           this.controls.update();
-          this.render();
+          this.invalidate();
         },
         onComplete: () => {
           this.lastSelectedObject = selectedObject;
           this.controls.enableDamping = true;
           this.controls.update();
-          this.render();
+          this.invalidate();
         },
       });
 
@@ -1224,11 +1208,11 @@ class ThreeJsControl {
         ease: "power3.inOut",
         onUpdate: () => {
           this.controls.update();
-          this.render();
+          this.invalidate();
         },
       });
     }
-    this.render();
+    this.invalidate();
   }
 
   zoomOut() {
@@ -1261,7 +1245,7 @@ class ThreeJsControl {
       ease: "power3.inOut",
       onUpdate: () => {
         this.controls.update();
-        this.render();
+        this.invalidate();
       },
     });
 
@@ -1274,12 +1258,12 @@ class ThreeJsControl {
       ease: "power3.inOut",
       onUpdate: () => {
         this.controls.update();
-        this.render();
+        this.invalidate();
       },
       onComplete: () => {
         this.lastSelectedObject = null;
         this.controls.update();
-        this.render();
+        this.invalidate();
       },
     });
   }
@@ -1330,7 +1314,7 @@ class ThreeJsControl {
         this.applySelection(this.sceneGraph.selection);
         this.updateTransformControls();
         this.applyColors();
-        this.render();
+        this.invalidate();
       }
     } catch (ex) {
       console.error(ex);
@@ -1461,7 +1445,7 @@ class ThreeJsControl {
           }
           // this.addBoxHelpers();
 
-          this.render();
+          this.invalidate();
 
           this.sendSceneChanges(changes);
           return;
@@ -1529,7 +1513,7 @@ class ThreeJsControl {
     this.camera.updateProjectionMatrix();
     this.updateTransformControls();
 
-    this.render();
+    this.invalidate();
   }
 
   sendSceneChanges(commands) {
@@ -1629,7 +1613,7 @@ class ThreeJsControl {
       this.clearObjectsTransparency();
     }
 
-    this.render();
+    this.invalidate();
   }
 
   isWorkplaneChild(object) {
@@ -1656,26 +1640,15 @@ class ThreeJsControl {
     // Make objects transparent
     this.setObjectsTransparency();
 
-    this.render();
+    this.invalidate();
   }
 
-  render() {
-    if (this.reqID) {
-      // Do not render multiple times the same scene.
-      cancelAnimationFrame(this.reqID);
-    }
-
-    this.reqID = requestAnimationFrame(() => {
-      const { renderer, scene, camera } = this;
-
-      renderer.render(scene, camera);
-
-      // Render navigation cube
-      if (this.navigationCube) {
-        this.navigationCube.render();
-      }
-      this.reqID = null;
-    });
+  /**
+   * Mark the scene as dirty and schedule a re-render.
+   * This is the ONLY method that should be called to trigger rendering.
+   */
+  invalidate() {
+    this.renderManager.invalidate();
   }
 }
 
