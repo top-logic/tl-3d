@@ -112,7 +112,7 @@ export class Scope {
           }
         })
         .then(() => {
-          ctrl.render();
+          ctrl.invalidate();
         });
     };
 
@@ -313,7 +313,7 @@ export class SceneGraph extends SharedObject {
     scope.loadAssets(this.ctrl).then(() => {
       this.ctrl.applySelection(this.selection);
       this.ctrl.updateTransformControls();
-      this.ctrl.render();
+      this.ctrl.invalidate();
     });
 
     this.ctrl.toggleWorkplane(this.ctrl.isWorkplaneVisible);

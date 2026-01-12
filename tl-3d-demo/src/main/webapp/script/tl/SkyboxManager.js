@@ -34,7 +34,7 @@ export class SkyboxManager {
     if (!this.skyboxEnabled) return;
     // Load cube texture and create skybox environment
     await this.loadCubeTexture();
-    this.control.render();
+    this.control.invalidate();
   }
 
   toggleSkybox(visible) {
@@ -63,7 +63,7 @@ export class SkyboxManager {
     }
 
     this.isSkyboxVisible = visible;
-    this.control.render();
+    this.control.invalidate();
   }
 
   createTiledTexture(image) {
@@ -328,7 +328,7 @@ export class SkyboxManager {
     // Animate camera position and target simultaneously
     const updateCallback = () => {
       this.control.controls.update();
-      this.control.render();
+      this.control.invalidate();
     };
 
     gsap.to(this.control.controls.object.position, {
