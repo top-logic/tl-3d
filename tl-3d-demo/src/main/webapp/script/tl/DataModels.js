@@ -14,7 +14,6 @@ import {
 import {
   BoxGeometry,
   Group,
-  InstancedMesh,
   Matrix4,
   Mesh,
   MeshBasicMaterial,
@@ -28,6 +27,8 @@ import {
   transform,
 } from "./ThreeJsUtils.js";
 
+import { InstancedMeshManager } from "./InstancedMeshManager.js";
+
 import { GLTFLoader } from "GLTFLoader";
 import { InsertElement, RemoveElement, SetProperty } from "./Commands.js";
 
@@ -38,7 +39,7 @@ export class Scope {
     this.gltfs = {};
     // Instancing-related data structures
     this.instanceGroups = null;
-    this.instancedMeshes = null;
+    this.instanceManager = new InstancedMeshManager();
   }
 
   get assets() {
@@ -128,43 +129,35 @@ export class Scope {
       return;
     }
 
-    this.instancedMeshes = new Map();
-
     for (const [assetKey, group] of this.instanceGroups) {
       const { asset, instances } = group;
 
-      // Create placeholder InstancedMesh
+      // Prepare instance data with IDs and matrices
+      const instanceData = instances.map((instance, index) => ({
+        id: index, // Use index as ID for now (could be partNode.id)
+        matrix: instance.worldTransform,
+        partNode: instance.partNode,
+      }));
+
+      // Create placeholder InstancedMesh using the manager
       const geometry = new BoxGeometry(500, 500, 500);
       const material = new MeshBasicMaterial({ wireframe: false });
-      const instancedMesh = new InstancedMesh(
+
+      const instancedMesh = this.instanceManager.createInstancedMesh(
+        assetKey,
         geometry,
         material,
         instances.length,
+        instanceData,
       );
 
-      // Set the matrix for each instance
-      instances.forEach((instance, index) => {
-        const matrix = instance.worldTransform;
-        instancedMesh.setMatrixAt(index, matrix);
-
-        // Store reference back to PartNode for later interaction
-        if (!instancedMesh.userData.instances) {
-          instancedMesh.userData.instances = [];
-        }
-        instancedMesh.userData.instances[index] = instance.partNode;
-      });
-
-      instancedMesh.instanceMatrix.needsUpdate = true;
-
-      // Mark this mesh as instanced for later identification
+      // Mark userData for later identification
       instancedMesh.userData.isInstancedMesh = true;
       instancedMesh.userData.assetKey = assetKey;
+      instancedMesh.userData.instances = instances.map((i) => i.partNode);
 
       // Add to scene
       ctrl.zUpRoot.add(instancedMesh);
-
-      // Store reference
-      this.instancedMeshes.set(assetKey, instancedMesh);
     }
   }
 
@@ -172,11 +165,13 @@ export class Scope {
    * Replace placeholder InstancedMesh objects with real GLTF geometry
    */
   updateInstancedMeshesWithGLTF(ctrl) {
-    if (!this.instancedMeshes || this.instancedMeshes.size === 0) {
+    if (!this.instanceGroups || this.instanceGroups.size === 0) {
       return;
     }
 
-    for (const [assetKey, instancedMesh] of this.instancedMeshes) {
+    const assetKeys = Array.from(this.instanceGroups.keys());
+
+    for (const assetKey of assetKeys) {
       const group = this.instanceGroups.get(assetKey);
       if (!group) {
         continue;
@@ -184,6 +179,7 @@ export class Scope {
 
       const asset = group.asset;
 
+      // Determine GLTF URL
       let gltfUrl;
       if (asset.url) {
         gltfUrl = ctrl.contextPath + asset.url;
@@ -213,37 +209,73 @@ export class Scope {
         continue;
       }
 
-      // Remove old placeholder
-      ctrl.zUpRoot.remove(instancedMesh);
+      // Calculate actual triangle count
+      let triangleCount = 0;
+      if (templateMesh.geometry.index) {
+        triangleCount = templateMesh.geometry.index.count / 3;
+      } else if (templateMesh.geometry.attributes.position) {
+        triangleCount = templateMesh.geometry.attributes.position.count / 3;
+      }
 
-      // Dispose old geometry and material
-      instancedMesh.geometry.dispose();
-      instancedMesh.material.dispose();
+      // Get the old placeholder mesh from the manager
+      const oldMeshData = this.instanceManager.managedMeshes.get(assetKey);
+      if (!oldMeshData) {
+        console.warn(`No managed mesh data found for ${assetKey}`);
+        continue;
+      }
 
-      // Create new InstancedMesh with real geometry
-      const newInstancedMesh = new InstancedMesh(
+      const oldMesh = oldMeshData.mesh;
+
+      // Remove old placeholder from scene
+      ctrl.zUpRoot.remove(oldMesh);
+
+      // Dispose old placeholder resources
+      oldMesh.geometry.dispose();
+      oldMesh.material.dispose();
+
+      // Prepare instance data with IDs and matrices
+      const instanceData = group.instances.map((instance, index) => ({
+        id: index,
+        matrix: instance.worldTransform,
+        partNode: instance.partNode,
+      }));
+
+      // Create new InstancedMesh with real geometry using the manager
+      const newInstancedMesh = this.instanceManager.createInstancedMesh(
+        assetKey,
         templateMesh.geometry,
         templateMesh.material.clone(),
         group.instances.length,
+        instanceData,
+        triangleCount,
       );
 
-      // Copy over matrices
-      group.instances.forEach((instance, index) => {
-        const matrix = instance.worldTransform;
-        newInstancedMesh.setMatrixAt(index, matrix);
-      });
-
-      newInstancedMesh.instanceMatrix.needsUpdate = true;
-
-      // Copy userData
-      newInstancedMesh.userData = { ...instancedMesh.userData };
+      // Copy over important userData
+      newInstancedMesh.userData.isInstancedMesh = true;
+      newInstancedMesh.userData.assetKey = assetKey;
+      newInstancedMesh.userData.instances = group.instances.map(
+        (i) => i.partNode,
+      );
 
       // Add to scene
       ctrl.zUpRoot.add(newInstancedMesh);
-
-      // Update reference
-      this.instancedMeshes.set(assetKey, newInstancedMesh);
     }
+  }
+
+  /**
+   * Update which instances are visible for a specific asset
+   * This will be called by the BVH/visibility system
+   */
+  updateVisibleInstances(assetKey, visibleInstanceIDs) {
+    this.instanceManager.updateVisibleInstances(assetKey, visibleInstanceIDs);
+  }
+
+  /**
+   * Update a specific instance's transform
+   * This will be called when an instance is moved/rotated
+   */
+  updateInstanceTransform(assetKey, instanceID, newMatrix) {
+    this.instanceManager.updateInstanceMatrix(assetKey, instanceID, newMatrix);
   }
 
   getNode(id) {

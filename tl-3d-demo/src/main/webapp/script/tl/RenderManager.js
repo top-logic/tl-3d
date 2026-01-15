@@ -2,6 +2,7 @@
  * Centralized render management with dirty flag system.
  * Ensures exactly one render per animation frame when needed.
  */
+
 export class RenderManager {
   constructor(renderer, scene, camera) {
     this.renderer = renderer;
@@ -12,23 +13,75 @@ export class RenderManager {
     this.isRendering = false;
     this.rafId = null;
 
-    // Additional render targets (like NavigationCube)
     this.renderTargets = [];
 
-    // Statistics for debugging
     this.stats = {
       frameCount: 0,
       lastFrameTime: 0,
       fps: 0,
     };
+
+    this.sceneBVH = null;
+    this.instanceManager = null;
+
+    // Camera tracking
+    this.cameraIsMoving = false;
+    this.cameraStopTimer = null;
+
+    // Progressive filling-in when camera stops
+    this.drawnInstances = new Map(); // Map<assetKey, Set<instanceID>>
+    this.isFillingIn = false;
+
+    // Background accumulation
+    this.accumulationIntervalId = null;
+    this.isAccumulating = false;
+  }
+
+  setSceneBVH(sceneBVH) {
+    this.sceneBVH = sceneBVH;
+  }
+
+  setInstanceManager(instanceManager) {
+    this.instanceManager = instanceManager;
   }
 
   /**
-   * Mark the scene as needing a re-render.
-   * This is the ONLY method that should be called from outside.
+   * Call this when the camera changes (from orbit controls, etc.)
    */
+  onCameraMove() {
+    this.cameraIsMoving = true;
+
+    // Stop progressive filling-in during camera movement
+    this.isFillingIn = false;
+
+    // Stop background accumulation during camera movement
+    this.stopBackgroundAccumulation();
+
+    // Clear any existing "stopped" timer
+    if (this.cameraStopTimer) {
+      clearTimeout(this.cameraStopTimer);
+    }
+
+    // Set timer to detect when camera stops (minimal timeout)
+    this.cameraStopTimer = setTimeout(() => {
+      this.cameraIsMoving = false;
+
+      // Reset progressive filling-in state
+      this.drawnInstances.clear();
+      this.isFillingIn = true;
+
+      // Start background accumulation when camera stops
+      this.startBackgroundAccumulation();
+
+      // Start progressive filling-in immediately
+      this.invalidate();
+    }, 50); // Minimal timeout to debounce camera movement
+
+    this.invalidate();
+  }
+
   invalidate() {
-    if (this.isDirty) return; // Already scheduled
+    if (this.isDirty) return;
 
     this.isDirty = true;
 
@@ -37,13 +90,9 @@ export class RenderManager {
     }
   }
 
-  /**
-   * Schedule a render for the next animation frame.
-   * @private
-   */
   scheduleRender() {
     if (this.rafId !== null) {
-      return; // Already scheduled
+      return;
     }
 
     this.rafId = requestAnimationFrame(() => {
@@ -51,44 +100,127 @@ export class RenderManager {
     });
   }
 
-  /**
-   * Perform the actual render if dirty.
-   * @private
-   */
   render() {
     this.rafId = null;
 
     if (!this.isDirty) {
-      return; // Nothing to render
+      return;
     }
 
     this.isDirty = false;
-    this.isRendering = true;
 
     try {
-      // Render main scene
+      if (this.instanceManager) {
+        if (this.cameraIsMoving && this.sceneBVH) {
+          this.renderer.clear(true, true);
+
+          // Camera moving: use BVH to accumulate visible instances
+          this.sceneBVH.queryVisibleInstances(
+            this.camera,
+            500, // maxRays during motion
+          );
+
+          // Get the accumulated visible instances
+          const visible = this.sceneBVH.getVisibleInstances();
+
+          for (const [assetKey, instanceIDs] of visible) {
+            this.instanceManager.updateVisibleInstances(
+              assetKey,
+              Array.from(instanceIDs),
+            );
+          }
+
+          // For any asset types not in the visible map, show none
+          for (const [assetKey, meshData] of this.instanceManager
+            .managedMeshes) {
+            if (!visible.has(assetKey)) {
+              this.instanceManager.updateVisibleInstances(assetKey, []);
+            }
+          }
+        } else if (this.isFillingIn) {
+          // Camera stopped: progressively fill in instances
+          // Draw a new batch each frame - previous batches remain visible via preserved buffers
+          let hasMoreToFill = false;
+
+          for (const [assetKey, meshData] of this.instanceManager
+            .managedMeshes) {
+            // Get or initialize drawn instances for this asset
+            if (!this.drawnInstances.has(assetKey)) {
+              this.drawnInstances.set(assetKey, new Set());
+            }
+
+            const drawnSet = this.drawnInstances.get(assetKey);
+            const totalInstances = meshData.instanceData.length;
+
+            let batchForThisFrame = [];
+
+            if (drawnSet.size < totalInstances) {
+              hasMoreToFill = true;
+
+              // Randomly select a batch of instances to draw this frame
+              const batchSize = Math.min(
+                Math.ceil((totalInstances - drawnSet.size) * 0.2),
+                250,
+              );
+
+              // Pick random undrawn instances without creating full arrays
+              const batchSet = new Set();
+              let attempts = 0;
+              const maxAttempts = batchSize * 10; // Prevent infinite loop
+
+              while (batchSet.size < batchSize && attempts < maxAttempts) {
+                const randomIndex = Math.floor(Math.random() * totalInstances);
+                const instanceID = meshData.instanceData[randomIndex].id;
+
+                if (!drawnSet.has(instanceID)) {
+                  batchSet.add(instanceID);
+                  drawnSet.add(instanceID);
+                }
+                attempts++;
+              }
+
+              batchForThisFrame = Array.from(batchSet);
+            }
+
+            // Update visible instances to draw ONLY the new batch this frame
+            // Previous batches remain visible due to preserved color/depth buffers
+            this.instanceManager.updateVisibleInstances(
+              assetKey,
+              batchForThisFrame,
+            );
+          }
+
+          // If there are still instances to fill, schedule another frame
+          if (hasMoreToFill) {
+            this.invalidate();
+          } else {
+            // All instances are drawn, stop filling-in
+            this.isFillingIn = false;
+          }
+        } else {
+          // Camera stopped and filling complete: show all instances
+          for (const [assetKey, meshData] of this.instanceManager
+            .managedMeshes) {
+            const allIDs = meshData.instanceData.map((d) => d.id);
+            this.instanceManager.updateVisibleInstances(assetKey, allIDs);
+          }
+        }
+      }
+
       this.renderer.render(this.scene, this.camera);
 
-      // Render additional targets (navigation cube, etc.)
-      this.renderTargets.forEach((target) => {
+      for (const target of this.renderTargets) {
         if (target.shouldRender && target.shouldRender()) {
           target.render();
         }
-      });
+      }
 
-      // Update stats
       this.updateStats();
     } catch (error) {
-      console.error("Render error:", error);
-    } finally {
-      this.isRendering = false;
+      console.error("RenderManager: Render error", error);
     }
   }
 
-  /**
-   * Force an immediate render (use sparingly).
-   * Useful for initial setup or screenshots.
-   */
   forceRender() {
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
@@ -98,18 +230,12 @@ export class RenderManager {
     this.render();
   }
 
-  /**
-   * Register an additional render target (like NavigationCube).
-   */
   registerRenderTarget(target) {
     if (!this.renderTargets.includes(target)) {
       this.renderTargets.push(target);
     }
   }
 
-  /**
-   * Unregister a render target.
-   */
   unregisterRenderTarget(target) {
     const index = this.renderTargets.indexOf(target);
     if (index > -1) {
@@ -117,10 +243,6 @@ export class RenderManager {
     }
   }
 
-  /**
-   * Start a continuous render loop (for animations).
-   * Returns a function to stop the loop.
-   */
   startContinuousRender() {
     let stopped = false;
 
@@ -151,13 +273,49 @@ export class RenderManager {
   }
 
   /**
-   * Clean up resources.
+   * Start background accumulation of visible instances when camera is stopped.
+   * This runs continuously to build up an accurate collection for when the camera starts moving.
    */
+  startBackgroundAccumulation() {
+    if (this.isAccumulating || !this.sceneBVH || !this.instanceManager) {
+      return;
+    }
+
+    this.isAccumulating = true;
+
+    // Use setInterval to run independently of render cycles
+    // Run at ~60fps (16ms) to accumulate visible instances continuously
+    this.accumulationIntervalId = setInterval(() => {
+      if (!this.isAccumulating) {
+        return;
+      }
+
+      // Query visible instances with fewer rays since we're not in a hurry
+      // This accumulates over time to build a comprehensive visible set
+      this.sceneBVH.queryVisibleInstances(this.camera, 500);
+    }, 16);
+  }
+
+  /**
+   * Stop background accumulation of visible instances.
+   */
+  stopBackgroundAccumulation() {
+    this.isAccumulating = false;
+    if (this.accumulationIntervalId !== null) {
+      clearInterval(this.accumulationIntervalId);
+      this.accumulationIntervalId = null;
+    }
+  }
+
   dispose() {
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
     }
+    if (this.cameraStopTimer) {
+      clearTimeout(this.cameraStopTimer);
+    }
+    this.stopBackgroundAccumulation();
     this.renderTargets = [];
   }
 }

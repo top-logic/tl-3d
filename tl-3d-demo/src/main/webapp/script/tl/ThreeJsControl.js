@@ -1,6 +1,6 @@
 /**
  * Main class for managing 3D scenes using Three.js library.
- * Provides methods for initializing and controlling a 3D scene with various functionalities+
+ * Provides methods for initializing and controlling a 3D scene with various functionalities.
  */
 
 import {
@@ -25,6 +25,7 @@ import { InsertElement, RemoveElement, SetProperty } from "./Commands.js";
 import { Scope, SharedObject } from "./DataModels.js";
 import { NavigationCube } from "./NavigationCube.js";
 import { RenderManager } from "./RenderManager.js";
+import { SceneBVH } from "./SceneBVH.js";
 import { SkyboxManager } from "./SkyboxManager.js";
 import {
   CameraUtils,
@@ -100,8 +101,13 @@ class ThreeJsControl {
       this.camera,
     );
 
+    this.sceneBVH = new SceneBVH();
+
     this.initTransformControls();
     this.initNavigationCube();
+
+    this.renderManager.setSceneBVH(this.sceneBVH);
+    this.renderManager.setInstanceManager(this.scope.instanceManager);
 
     // Initial render
     this.renderManager.forceRender();
@@ -134,7 +140,7 @@ class ThreeJsControl {
     this.selection = [];
 
     this.scene = new Scene();
-    this.scene.background = new Color("skyblue");
+    this.scene.background = new Color("black");
 
     this.createCamera();
     this.addLights();
@@ -151,7 +157,12 @@ class ThreeJsControl {
     const container = this.container;
     this.renderer = new WebGLRenderer({
       powerPreference: "high-performance",
+      preserveDrawingBuffer: true,
     });
+
+    // Disable auto clear color and depth
+    this.renderer.autoClearColor = false;
+    this.renderer.autoClearDepth = false;
 
     this.renderer.setSize(container.clientWidth, container.clientHeight);
 
@@ -203,16 +214,13 @@ class ThreeJsControl {
     this.controls.enableZoom = true;
     this.controls.screenSpacePanning = true;
 
-    // Limit camera movement to prevent going below floor level
-    // this.controls.maxPolarAngle = Math.PI * 0.5; // Limit polar angle to 90 degrees
-
     this.controlsIsUpdating = false;
 
     this.controls.addEventListener("change", () => {
       if (this.navigationCube) {
         this.navigationCube.updateFromMainCamera();
       }
-      this.invalidate();
+      this.renderManager.onCameraMove();
     });
   }
 
@@ -1147,7 +1155,7 @@ class ThreeJsControl {
 
     this.camera.position.copy(offset);
 
-    this.invalidate();
+    this.renderManager.onCameraMove();
   }
 
   zoomToSelection() {
@@ -1499,7 +1507,7 @@ class ThreeJsControl {
 
     this.sceneGraph = this.scope.loadJson(dataJson);
 
-    // Analyze for instancing before building the scene graph
+    // Analyze for instancing
     this.scope.analyzeForInstancing();
 
     this.sceneGraph.buildGraph(this);
@@ -1507,7 +1515,7 @@ class ThreeJsControl {
     // Create placeholder instanced meshes
     this.scope.createInstancedMeshes(this);
 
-    // Create floors after sceneGraph is loaded with numberOfFloors
+    // Create floors
     if (this.skyboxManager.isEnabled()) {
       this.skyboxManager.createFactoryFloors(null);
     }
@@ -1517,6 +1525,9 @@ class ThreeJsControl {
       this.scope.updateInstancedMeshesWithGLTF(this);
 
       this.updateObjectsTransparency();
+
+      // NEW: Build BVH after all instances are loaded
+      this.buildSceneBVH();
     });
 
     this.camera.position.applyMatrix4(this.scene.matrix);
@@ -1524,6 +1535,17 @@ class ThreeJsControl {
     this.updateTransformControls();
 
     this.invalidate();
+  }
+
+  buildSceneBVH() {
+    this.sceneBVH.buildFromInstanceManager(
+      this.scope.instanceManager,
+      this.scope.instanceGroups,
+    );
+
+    // Add proxy mesh to zUpRoot (so it inherits the rotation)
+    // Instead of adding to scene root
+    this.zUpRoot.add(this.sceneBVH.proxyMesh);
   }
 
   sendSceneChanges(commands) {
