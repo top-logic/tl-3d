@@ -169,7 +169,6 @@ export class Scope {
       return;
     }
 
-    // Get list of all managed asset keys
     const assetKeys = Array.from(this.instanceGroups.keys());
 
     for (const assetKey of assetKeys) {
@@ -210,6 +209,14 @@ export class Scope {
         continue;
       }
 
+      // Calculate actual triangle count
+      let triangleCount = 0;
+      if (templateMesh.geometry.index) {
+        triangleCount = templateMesh.geometry.index.count / 3;
+      } else if (templateMesh.geometry.attributes.position) {
+        triangleCount = templateMesh.geometry.attributes.position.count / 3;
+      }
+
       // Get the old placeholder mesh from the manager
       const oldMeshData = this.instanceManager.managedMeshes.get(assetKey);
       if (!oldMeshData) {
@@ -217,7 +224,7 @@ export class Scope {
         continue;
       }
 
-      const oldMesh = oldMeshData.instancedMesh;
+      const oldMesh = oldMeshData.mesh;
 
       // Remove old placeholder from scene
       ctrl.zUpRoot.remove(oldMesh);
@@ -240,6 +247,7 @@ export class Scope {
         templateMesh.material.clone(),
         group.instances.length,
         instanceData,
+        triangleCount,
       );
 
       // Copy over important userData

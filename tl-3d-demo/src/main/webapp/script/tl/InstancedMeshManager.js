@@ -2,8 +2,7 @@
  * InstancedMeshManager.js
  *
  * Manages instanced meshes using ID-based rendering with DataTexture matrix storage.
- * Instead of storing matrices in instanceMatrix buffer, stores instance IDs and
- * looks up matrices from a DataTexture in the vertex shader.
+ * Uses custom instanceID attribute (more efficient than gl_InstanceID + mapping texture).
  *
  * This allows fast per-frame swapping of which instances to render by only changing
  * the ID array instead of copying full 4x4 matrices.
@@ -14,9 +13,11 @@ import {
   DataTexture,
   FloatType,
   InstancedBufferAttribute,
-  InstancedMesh,
+  InstancedBufferGeometry,
+  Mesh,
   RGBAFormat,
   Sphere,
+  Vector3,
 } from "three";
 
 export class InstancedMeshManager {
@@ -39,6 +40,7 @@ export class InstancedMeshManager {
     baseMaterial,
     maxInstances,
     instanceData,
+    triangleCount = 100,
   ) {
     // Create DataTexture to store transformation matrices
     // Each matrix is 16 floats (4x4), packed into RGBA texture
@@ -50,12 +52,12 @@ export class InstancedMeshManager {
     const matrixTextureData = new Float32Array(textureSize);
 
     // Populate texture with matrices
-    instanceData.forEach((instance, index) => {
+    instanceData.forEach((instance) => {
       const matrix = instance.matrix;
       const matrixArray = matrix.elements;
 
-      // Store matrix in texture (4 pixels = 16 floats)
-      const baseIndex = index * 16;
+      // Store matrix in texture at position = instance.id
+      const baseIndex = instance.id * 16;
       for (let i = 0; i < 16; i++) {
         matrixTextureData[baseIndex + i] = matrixArray[i];
       }
@@ -70,12 +72,8 @@ export class InstancedMeshManager {
     );
     matrixTexture.needsUpdate = true;
 
-    // Create InstancedMesh with dummy geometry
-    const instancedMesh = new InstancedMesh(
-      geometry,
-      baseMaterial,
-      maxInstances,
-    );
+    // Create InstancedBufferGeometry (gives us full control over instanced attributes)
+    const instancedGeometry = new InstancedBufferGeometry().copy(geometry);
 
     // Add custom instanceID attribute
     const instanceIDs = new Float32Array(maxInstances);
@@ -84,21 +82,27 @@ export class InstancedMeshManager {
     });
 
     const instanceIDAttribute = new InstancedBufferAttribute(instanceIDs, 1);
-    instancedMesh.geometry.setAttribute("instanceID", instanceIDAttribute);
+    instancedGeometry.setAttribute("instanceID", instanceIDAttribute);
 
-    // Convert material to ShaderMaterial with matrix lookup
+    // Set instance count (this is what controls how many instances are rendered)
+    instancedGeometry.instanceCount = instanceData.length;
+
+    // Convert material to use our matrix lookup shader
     const customMaterial = this.createMatrixLookupMaterial(
       baseMaterial,
       matrixTexture,
     );
-    instancedMesh.material = customMaterial;
 
-    // Set initial count
-    instancedMesh.count = instanceData.length;
+    // Create regular Mesh with instanced geometry (not InstancedMesh)
+    const mesh = new Mesh(instancedGeometry, customMaterial);
+
+    // Mark as instanced for identification
+    mesh.userData.isInstancedMesh = true;
 
     // Store management data
     this.managedMeshes.set(assetKey, {
-      instancedMesh,
+      mesh,
+      geometry: instancedGeometry,
       matrixTexture,
       matrixTextureData,
       instanceIDAttribute,
@@ -108,15 +112,18 @@ export class InstancedMeshManager {
         id: d.id,
         matrix: d.matrix.clone(),
       })),
+      triangleCount: triangleCount,
     });
 
-    this.computeBoundingSphere(assetKey);
+    // Compute proper bounding box and sphere
+    this.computeBounds(assetKey);
 
-    return instancedMesh;
+    return mesh;
   }
 
   /**
    * Patch the material's shader to use matrix lookup from DataTexture
+   * Uses onBeforeCompile to inject custom code into Three.js standard shaders
    */
   createMatrixLookupMaterial(baseMaterial, matrixTexture) {
     // Clone the material to avoid modifying the original
@@ -128,7 +135,7 @@ export class InstancedMeshManager {
       shader.uniforms.matrixTexture = { value: matrixTexture };
       shader.uniforms.textureHeight = { value: matrixTexture.image.height };
 
-      // Add custom attribute and uniforms
+      // Add custom attribute and uniforms at the top
       shader.vertexShader = `
         attribute float instanceID;
         uniform sampler2D matrixTexture;
@@ -137,12 +144,11 @@ export class InstancedMeshManager {
         ${shader.vertexShader}
       `;
 
-      // Inject matrix lookup right before Three.js starts using instanceMatrix
       shader.vertexShader = shader.vertexShader.replace(
-        "#include <begin_vertex>",
+        "#include <beginnormal_vertex>",
         `
         #ifdef USE_INSTANCING
-          // Override instanceMatrix with our DataTexture lookup
+          // Look up transformation matrix from DataTexture using instanceID attribute
           float row = instanceID;
           float rowNorm = (row + 0.5) / textureHeight;
 
@@ -154,7 +160,7 @@ export class InstancedMeshManager {
           mat4 instanceMatrix = mat4(col0, col1, col2, col3);
         #endif
 
-        #include <begin_vertex>
+        #include <beginnormal_vertex>
         `,
       );
 
@@ -169,23 +175,33 @@ export class InstancedMeshManager {
     return material;
   }
 
-  computeBoundingSphere(assetKey) {
+  /**
+   * Compute proper bounding box and sphere for an instanced mesh
+   * accounting for all instance transforms
+   */
+  computeBounds(assetKey) {
     const data = this.managedMeshes.get(assetKey);
     if (!data) return;
 
-    const { instancedMesh, instanceData } = data;
+    const { mesh, instanceData } = data;
 
-    // Get base geometry bounding info
-    if (!instancedMesh.geometry.boundingBox) {
-      instancedMesh.geometry.computeBoundingBox();
+    // Get base geometry bounding box (single object, not instanced)
+    // We need to compute this from the position attribute
+    const positionAttr = mesh.geometry.attributes.position;
+    if (!positionAttr) return;
+
+    const baseBox = new Box3();
+    for (let i = 0; i < positionAttr.count; i++) {
+      const x = positionAttr.getX(i);
+      const y = positionAttr.getY(i);
+      const z = positionAttr.getZ(i);
+      baseBox.expandByPoint(new Vector3(x, y, z));
     }
-    if (!instancedMesh.geometry.boundingSphere) {
-      instancedMesh.geometry.computeBoundingSphere();
-    }
 
-    const baseBox = instancedMesh.geometry.boundingBox;
+    // Store base box for BVH to use
+    data.baseBoundingBox = baseBox.clone();
 
-    // Compute bounding box that encompasses all instances
+    // Compute world bounding box that encompasses all instances
     const worldBox = new Box3();
 
     instanceData.forEach((instance) => {
@@ -199,16 +215,16 @@ export class InstancedMeshManager {
       worldBox.union(instanceBox);
     });
 
-    // Set bounding box
-    instancedMesh.geometry.boundingBox = worldBox;
+    // Set bounding box for frustum culling
+    mesh.geometry.boundingBox = worldBox;
 
     // Compute and set bounding sphere from the box
     const sphere = new Sphere();
     worldBox.getBoundingSphere(sphere);
-    instancedMesh.geometry.boundingSphere = sphere;
+    mesh.geometry.boundingSphere = sphere;
 
     // Enable frustum culling
-    instancedMesh.frustumCulled = true;
+    mesh.frustumCulled = true;
   }
 
   /**
@@ -223,7 +239,7 @@ export class InstancedMeshManager {
       return;
     }
 
-    const { instancedMesh, instanceIDs, instanceIDAttribute } = data;
+    const { geometry, instanceIDs, instanceIDAttribute, mesh } = data;
 
     // Update the instance ID buffer with new visible IDs
     const count = Math.min(visibleInstanceIDs.length, data.maxInstances);
@@ -235,8 +251,8 @@ export class InstancedMeshManager {
     // Mark attribute for update
     instanceIDAttribute.needsUpdate = true;
 
-    // Update instance count
-    instancedMesh.count = count;
+    // Update instance count (this is what actually controls rendering!)
+    geometry.instanceCount = count;
   }
 
   /**
@@ -252,10 +268,11 @@ export class InstancedMeshManager {
       return;
     }
 
-    const { matrixTextureData, matrixTexture } = data;
+    const { matrixTextureData, matrixTexture, instanceData } = data;
 
-    // Find this instance's slot in the texture
-    const instance = data.instanceData.find((d) => d.id === instanceID);
+    // Instance ID is the index in the array
+    const instance = instanceData[instanceID];
+
     if (!instance) {
       console.warn(`Instance ${instanceID} not found`);
       return;
@@ -289,7 +306,7 @@ export class InstancedMeshManager {
       stats.meshes.push({
         assetKey,
         maxInstances: data.maxInstances,
-        currentlyVisible: data.instancedMesh.count,
+        currentlyVisible: data.geometry.instanceCount,
         textureSize:
           data.matrixTexture.image.width +
           "x" +
@@ -306,8 +323,8 @@ export class InstancedMeshManager {
   dispose() {
     for (const [assetKey, data] of this.managedMeshes) {
       data.matrixTexture.dispose();
-      data.instancedMesh.geometry.dispose();
-      data.instancedMesh.material.dispose();
+      data.mesh.geometry.dispose();
+      data.mesh.material.dispose();
     }
     this.managedMeshes.clear();
   }

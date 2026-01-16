@@ -2,6 +2,7 @@
  * Centralized render management with dirty flag system.
  * Ensures exactly one render per animation frame when needed.
  */
+
 export class RenderManager {
   constructor(renderer, scene, camera) {
     this.renderer = renderer;
@@ -12,23 +13,52 @@ export class RenderManager {
     this.isRendering = false;
     this.rafId = null;
 
-    // Additional render targets (like NavigationCube)
     this.renderTargets = [];
 
-    // Statistics for debugging
     this.stats = {
       frameCount: 0,
       lastFrameTime: 0,
       fps: 0,
     };
+
+    this.sceneBVH = null;
+    this.instanceManager = null;
+
+    // Camera tracking
+    this.cameraIsMoving = false;
+    this.cameraStopTimer = null;
+  }
+
+  setSceneBVH(sceneBVH) {
+    this.sceneBVH = sceneBVH;
+  }
+
+  setInstanceManager(instanceManager) {
+    this.instanceManager = instanceManager;
   }
 
   /**
-   * Mark the scene as needing a re-render.
-   * This is the ONLY method that should be called from outside.
+   * Call this when the camera changes (from orbit controls, etc.)
    */
+  onCameraMove() {
+    this.cameraIsMoving = true;
+
+    // Clear any existing "stopped" timer
+    if (this.cameraStopTimer) {
+      clearTimeout(this.cameraStopTimer);
+    }
+
+    // Set timer to detect when camera stops
+    this.cameraStopTimer = setTimeout(() => {
+      this.cameraIsMoving = false;
+      this.invalidate(); // Render full scene when stopped
+    }, 1000);
+
+    this.invalidate();
+  }
+
   invalidate() {
-    if (this.isDirty) return; // Already scheduled
+    if (this.isDirty) return;
 
     this.isDirty = true;
 
@@ -37,13 +67,9 @@ export class RenderManager {
     }
   }
 
-  /**
-   * Schedule a render for the next animation frame.
-   * @private
-   */
   scheduleRender() {
     if (this.rafId !== null) {
-      return; // Already scheduled
+      return;
     }
 
     this.rafId = requestAnimationFrame(() => {
@@ -51,44 +77,63 @@ export class RenderManager {
     });
   }
 
-  /**
-   * Perform the actual render if dirty.
-   * @private
-   */
   render() {
     this.rafId = null;
 
     if (!this.isDirty) {
-      return; // Nothing to render
+      return;
     }
 
     this.isDirty = false;
-    this.isRendering = true;
 
     try {
-      // Render main scene
+      if (this.instanceManager) {
+        if (this.cameraIsMoving && this.sceneBVH) {
+          // Camera moving: use BVH to select visible instances
+          const visible = this.sceneBVH.queryVisibleInstances(
+            this.camera,
+            500, // maxRays during motion
+            10_000_000, // maxTriangles budget
+          );
+
+          for (const [assetKey, instanceIDs] of visible) {
+            this.instanceManager.updateVisibleInstances(
+              assetKey,
+              Array.from(instanceIDs),
+            );
+          }
+
+          // For any asset types not in the visible map, show none
+          for (const [assetKey, meshData] of this.instanceManager
+            .managedMeshes) {
+            if (!visible.has(assetKey)) {
+              this.instanceManager.updateVisibleInstances(assetKey, []);
+            }
+          }
+        } else {
+          // Camera stopped: restore all instances
+          for (const [assetKey, meshData] of this.instanceManager
+            .managedMeshes) {
+            const allIDs = meshData.instanceData.map((d) => d.id);
+            this.instanceManager.updateVisibleInstances(assetKey, allIDs);
+          }
+        }
+      }
+
       this.renderer.render(this.scene, this.camera);
 
-      // Render additional targets (navigation cube, etc.)
-      this.renderTargets.forEach((target) => {
+      for (const target of this.renderTargets) {
         if (target.shouldRender && target.shouldRender()) {
           target.render();
         }
-      });
+      }
 
-      // Update stats
       this.updateStats();
     } catch (error) {
-      console.error("Render error:", error);
-    } finally {
-      this.isRendering = false;
+      console.error("RenderManager: Render error", error);
     }
   }
 
-  /**
-   * Force an immediate render (use sparingly).
-   * Useful for initial setup or screenshots.
-   */
   forceRender() {
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
@@ -98,18 +143,12 @@ export class RenderManager {
     this.render();
   }
 
-  /**
-   * Register an additional render target (like NavigationCube).
-   */
   registerRenderTarget(target) {
     if (!this.renderTargets.includes(target)) {
       this.renderTargets.push(target);
     }
   }
 
-  /**
-   * Unregister a render target.
-   */
   unregisterRenderTarget(target) {
     const index = this.renderTargets.indexOf(target);
     if (index > -1) {
@@ -117,10 +156,6 @@ export class RenderManager {
     }
   }
 
-  /**
-   * Start a continuous render loop (for animations).
-   * Returns a function to stop the loop.
-   */
   startContinuousRender() {
     let stopped = false;
 
@@ -150,13 +185,13 @@ export class RenderManager {
     }
   }
 
-  /**
-   * Clean up resources.
-   */
   dispose() {
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
+    }
+    if (this.cameraStopTimer) {
+      clearTimeout(this.cameraStopTimer);
     }
     this.renderTargets = [];
   }
