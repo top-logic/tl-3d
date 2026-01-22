@@ -62,6 +62,7 @@ export class SceneBVH {
     this.currentFrame = 0;
     this.staleFrameThreshold = 30; // Prune instances not seen for 30 frames
     this.maxTriangles = 10_000_000; // Maximum triangles in accumulated collection
+    this.currentTriangleCount = 0; // Running total of triangles in visible instances
   }
 
   /**
@@ -108,7 +109,6 @@ export class SceneBVH {
 
         // Get the base box center offset
         const baseCenter = new Vector3();
-        baseBox.getCenter(baseCenter);
 
         // First translate to account for base center offset
         boxGeom.translate(baseCenter.x, baseCenter.y, baseCenter.z);
@@ -172,9 +172,6 @@ export class SceneBVH {
     // Increment frame counter
     this.currentFrame++;
 
-    // Calculate current total triangle count in accumulated collection
-    let currentTriangleCount = this.getCurrentTriangleCount();
-
     // Buffer to cast rays slightly outside clip space (0.1 = 10% margin)
     const buffer = 0.1;
 
@@ -216,19 +213,20 @@ export class SceneBVH {
         const assetMap = this.visibleInstances.get(assetKey);
 
         // Get triangle count for this asset type
-        const triangleCount = this.getTriangleCount(assetKey);
+        const triangleCount =
+          this.instanceManager.managedMeshes.get(assetKey).triangleCount;
 
         // Check if this is a new instance
         const isNewInstance = !assetMap.has(instanceID);
 
         // Only add new instances if we haven't exceeded the budget
         if (isNewInstance) {
-          if (currentTriangleCount + triangleCount > this.maxTriangles) {
+          if (this.currentTriangleCount + triangleCount > this.maxTriangles) {
             // Budget exceeded, skip this instance
             continue;
           }
-          // Update running count for new instances
-          currentTriangleCount += triangleCount;
+          // Update running total for new instances
+          this.currentTriangleCount += triangleCount;
         }
 
         // Update or add instance with current frame number
@@ -252,6 +250,8 @@ export class SceneBVH {
     for (const [assetKey, assetMap] of this.visibleInstances) {
       for (const [instanceID, data] of assetMap) {
         if (data.lastSeenFrame < staleFrame) {
+          // Subtract from running total before removing
+          this.currentTriangleCount -= data.triangleCount;
           assetMap.delete(instanceID);
         }
       }
@@ -261,22 +261,6 @@ export class SceneBVH {
         this.visibleInstances.delete(assetKey);
       }
     }
-  }
-
-  /**
-   * Get the current total triangle count in the accumulated collection
-   * @returns {number} Total triangles across all visible instances
-   */
-  getCurrentTriangleCount() {
-    let total = 0;
-
-    for (const [assetKey, assetMap] of this.visibleInstances) {
-      for (const [instanceID, data] of assetMap) {
-        total += data.triangleCount;
-      }
-    }
-
-    return total;
   }
 
   /**
@@ -318,17 +302,7 @@ export class SceneBVH {
   clearVisibleInstances() {
     this.visibleInstances.clear();
     this.currentFrame = 0;
-  }
-
-  /**
-   * Get the triangle count for a given asset key
-   * Requires instanceManager to be set via setInstanceManager()
-   * @param {string} assetKey
-   * @returns {number} Triangle count
-   */
-  getTriangleCount(assetKey) {
-    const meshData = this.instanceManager.managedMeshes.get(assetKey);
-    return meshData.triangleCount;
+    this.currentTriangleCount = 0;
   }
 
   /**
