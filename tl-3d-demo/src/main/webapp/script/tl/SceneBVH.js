@@ -4,10 +4,22 @@
  * Builds a BVH from bounding boxes of all instanced objects in the scene.
  * Uses three-mesh-bvh for fast raycasting to determine visible instances.
  *
+ * Accumulates visible instances across frames and prunes based on stale time.
+ * Respects a maximum triangle budget for the total accumulated collection.
+ *
  * Usage:
  *   const bvh = new SceneBVH();
  *   bvh.buildFromInstanceManager(instanceManager, instanceGroups);
- *   const visible = bvh.queryVisibleInstances(camera, maxRays, maxTriangles);
+ *
+ *   // Configure settings (optional)
+ *   bvh.setMaxTriangles(5_000_000);
+ *   bvh.setStaleFrameThreshold(30);
+ *
+ *   // Each frame: update accumulated visible instances
+ *   bvh.queryVisibleInstances(camera, maxRays);
+ *
+ *   // Get current accumulated visible instances
+ *   const visible = bvh.getVisibleInstances();
  *   // visible is Map<assetKey, Set<instanceID>>
  */
 
@@ -43,6 +55,13 @@ export class SceneBVH {
       buildTime: 0,
     };
     this.raycaster = new Raycaster();
+
+    // Instance tracking for accumulation-based visibility
+    // Map<assetKey, Map<instanceID, {lastSeenFrame: number, triangleCount: number}>>
+    this.visibleInstances = new Map();
+    this.currentFrame = 0;
+    this.staleFrameThreshold = 30; // Prune instances not seen for 30 frames
+    this.maxTriangles = 10_000_000; // Maximum triangles in accumulated collection
   }
 
   /**
@@ -138,20 +157,23 @@ export class SceneBVH {
   }
 
   /**
-   * Query visible instances by casting random rays from the camera
+   * Query visible instances by casting random rays from the camera.
+   * Accumulates instances across frames and prunes based on stale time.
+   * Respects maxTriangles budget for the total accumulated collection.
    * @param {Camera} camera - The camera to cast rays from
-   * @param {number} maxRays - Maximum number of rays to cast
-   * @param {number} maxTriangles - Maximum triangles to accumulate before stopping
-   * @returns {Map<string, Set<number>>} Map of assetKey -> Set of visible instanceIDs
+   * @param {number} maxRays - Maximum number of rays to cast per frame
    */
-  queryVisibleInstances(camera, maxRays = 100, maxTriangles = 50000) {
+  queryVisibleInstances(camera, maxRays = 100) {
     if (!this.proxyMesh) {
       console.warn("SceneBVH: BVH not built yet");
-      return new Map();
+      return;
     }
 
-    const visibleInstances = new Map();
-    let totalTriangles = 0;
+    // Increment frame counter
+    this.currentFrame++;
+
+    // Calculate current total triangle count in accumulated collection
+    let currentTriangleCount = this.getCurrentTriangleCount();
 
     // Buffer to cast rays slightly outside clip space (0.1 = 10% margin)
     const buffer = 0.1;
@@ -187,22 +209,115 @@ export class SceneBVH {
 
         const { assetKey, instanceID } = instanceInfo;
 
-        if (!visibleInstances.has(assetKey)) {
-          visibleInstances.set(assetKey, new Set());
+        // Get or create asset map
+        if (!this.visibleInstances.has(assetKey)) {
+          this.visibleInstances.set(assetKey, new Map());
         }
-        visibleInstances.get(assetKey).add(instanceID);
+        const assetMap = this.visibleInstances.get(assetKey);
 
-        // Use triangle count from instance manager
+        // Get triangle count for this asset type
         const triangleCount = this.getTriangleCount(assetKey);
-        totalTriangles += triangleCount;
 
-        if (totalTriangles >= maxTriangles) {
-          return visibleInstances;
+        // Check if this is a new instance
+        const isNewInstance = !assetMap.has(instanceID);
+
+        // Only add new instances if we haven't exceeded the budget
+        if (isNewInstance) {
+          if (currentTriangleCount + triangleCount > this.maxTriangles) {
+            // Budget exceeded, skip this instance
+            continue;
+          }
+          // Update running count for new instances
+          currentTriangleCount += triangleCount;
         }
+
+        // Update or add instance with current frame number
+        assetMap.set(instanceID, {
+          lastSeenFrame: this.currentFrame,
+          triangleCount: triangleCount,
+        });
       }
     }
 
-    return visibleInstances;
+    // Prune stale instances
+    this.pruneStaleInstances();
+  }
+
+  /**
+   * Prune instances that haven't been seen in staleFrameThreshold frames
+   */
+  pruneStaleInstances() {
+    const staleFrame = this.currentFrame - this.staleFrameThreshold;
+
+    for (const [assetKey, assetMap] of this.visibleInstances) {
+      for (const [instanceID, data] of assetMap) {
+        if (data.lastSeenFrame < staleFrame) {
+          assetMap.delete(instanceID);
+        }
+      }
+
+      // Clean up empty asset maps
+      if (assetMap.size === 0) {
+        this.visibleInstances.delete(assetKey);
+      }
+    }
+  }
+
+  /**
+   * Get the current total triangle count in the accumulated collection
+   * @returns {number} Total triangles across all visible instances
+   */
+  getCurrentTriangleCount() {
+    let total = 0;
+
+    for (const [assetKey, assetMap] of this.visibleInstances) {
+      for (const [instanceID, data] of assetMap) {
+        total += data.triangleCount;
+      }
+    }
+
+    return total;
+  }
+
+  /**
+   * Get the current accumulated visible instances
+   * @returns {Map<string, Set<number>>} Map of assetKey -> Set of visible instanceIDs
+   */
+  getVisibleInstances() {
+    const result = new Map();
+
+    for (const [assetKey, assetMap] of this.visibleInstances) {
+      const instanceIDs = new Set(assetMap.keys());
+      if (instanceIDs.size > 0) {
+        result.set(assetKey, instanceIDs);
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Set the stale frame threshold (number of frames before pruning)
+   * @param {number} threshold - Frame count threshold
+   */
+  setStaleFrameThreshold(threshold) {
+    this.staleFrameThreshold = threshold;
+  }
+
+  /**
+   * Set the maximum triangle budget for accumulated instances
+   * @param {number} maxTriangles - Maximum triangles allowed
+   */
+  setMaxTriangles(maxTriangles) {
+    this.maxTriangles = maxTriangles;
+  }
+
+  /**
+   * Clear all accumulated visible instances
+   */
+  clearVisibleInstances() {
+    this.visibleInstances.clear();
+    this.currentFrame = 0;
   }
 
   /**

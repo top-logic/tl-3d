@@ -89,12 +89,14 @@ export class RenderManager {
     try {
       if (this.instanceManager) {
         if (this.cameraIsMoving && this.sceneBVH) {
-          // Camera moving: use BVH to select visible instances
-          const visible = this.sceneBVH.queryVisibleInstances(
+          // Camera moving: use BVH to accumulate visible instances
+          this.sceneBVH.queryVisibleInstances(
             this.camera,
             500, // maxRays during motion
-            10_000_000, // maxTriangles budget
           );
+
+          // Get the accumulated visible instances
+          const visible = this.sceneBVH.getVisibleInstances();
 
           for (const [assetKey, instanceIDs] of visible) {
             this.instanceManager.updateVisibleInstances(
