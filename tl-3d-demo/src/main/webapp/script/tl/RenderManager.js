@@ -27,6 +27,10 @@ export class RenderManager {
     // Camera tracking
     this.cameraIsMoving = false;
     this.cameraStopTimer = null;
+
+    // Background accumulation
+    this.accumulationIntervalId = null;
+    this.isAccumulating = false;
   }
 
   setSceneBVH(sceneBVH) {
@@ -43,6 +47,9 @@ export class RenderManager {
   onCameraMove() {
     this.cameraIsMoving = true;
 
+    // Stop background accumulation during camera movement
+    this.stopBackgroundAccumulation();
+
     // Clear any existing "stopped" timer
     if (this.cameraStopTimer) {
       clearTimeout(this.cameraStopTimer);
@@ -52,6 +59,9 @@ export class RenderManager {
     this.cameraStopTimer = setTimeout(() => {
       this.cameraIsMoving = false;
       this.invalidate(); // Render full scene when stopped
+
+      // Start background accumulation when camera stops
+      this.startBackgroundAccumulation();
     }, 1000);
 
     this.invalidate();
@@ -187,6 +197,41 @@ export class RenderManager {
     }
   }
 
+  /**
+   * Start background accumulation of visible instances when camera is stopped.
+   * This runs continuously to build up an accurate collection for when the camera starts moving.
+   */
+  startBackgroundAccumulation() {
+    if (this.isAccumulating || !this.sceneBVH || !this.instanceManager) {
+      return;
+    }
+
+    this.isAccumulating = true;
+
+    // Use setInterval to run independently of render cycles
+    // Run at ~60fps (16ms) to accumulate visible instances continuously
+    this.accumulationIntervalId = setInterval(() => {
+      if (!this.isAccumulating) {
+        return;
+      }
+
+      // Query visible instances with fewer rays since we're not in a hurry
+      // This accumulates over time to build a comprehensive visible set
+      this.sceneBVH.queryVisibleInstances(this.camera, 500);
+    }, 16);
+  }
+
+  /**
+   * Stop background accumulation of visible instances.
+   */
+  stopBackgroundAccumulation() {
+    this.isAccumulating = false;
+    if (this.accumulationIntervalId !== null) {
+      clearInterval(this.accumulationIntervalId);
+      this.accumulationIntervalId = null;
+    }
+  }
+
   dispose() {
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
@@ -195,6 +240,7 @@ export class RenderManager {
     if (this.cameraStopTimer) {
       clearTimeout(this.cameraStopTimer);
     }
+    this.stopBackgroundAccumulation();
     this.renderTargets = [];
   }
 }
