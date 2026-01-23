@@ -157,7 +157,12 @@ class ThreeJsControl {
     const container = this.container;
     this.renderer = new WebGLRenderer({
       powerPreference: "high-performance",
+      preserveDrawingBuffer: true,
     });
+
+    // Disable auto clear color and depth
+    this.renderer.autoClearColor = false;
+    this.renderer.autoClearDepth = false;
 
     this.renderer.setSize(container.clientWidth, container.clientHeight);
 
