@@ -101,6 +101,8 @@ class ThreeJsControl {
       this.camera,
     );
 
+    this.impostorManager = null; // Will be created during asset loading
+
     this.sceneBVH = new SceneBVH();
 
     this.initTransformControls();

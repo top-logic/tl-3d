@@ -11,11 +11,14 @@
 import {
   Box3,
   DataTexture,
+  DoubleSide,
   FloatType,
   InstancedBufferAttribute,
   InstancedBufferGeometry,
   Mesh,
+  PlaneGeometry,
   RGBAFormat,
+  ShaderMaterial,
   Sphere,
   Vector3,
 } from "three";
@@ -291,6 +294,264 @@ export class InstancedMeshManager {
 
     // Mark texture for update
     matrixTexture.needsUpdate = true;
+  }
+
+  /**
+   * Create instanced billboard quads for impostors
+   * @param {string} assetKey - Unique key for this asset type
+   * @param {Texture} colorTexture - Atlas texture with 26 views
+   * @param {Texture} depthTexture - Depth atlas texture
+   * @param {number} boundingRadius - Radius of the original model's bounding sphere
+   * @param {number} maxInstances - Maximum number of instances
+   * @param {Array} instanceData - Array of {id, matrix} objects
+   */
+  createImpostorMesh(
+    assetKey,
+    colorTexture,
+    depthTexture,
+    boundingRadius,
+    maxInstances,
+    instanceData,
+  ) {
+    // Get the existing instanced mesh data to access matrixTexture
+    const existingMeshData = this.managedMeshes.get(assetKey);
+    if (!existingMeshData) {
+      console.warn(`No existing mesh data for ${assetKey}`);
+      return null;
+    }
+
+    const { matrixTexture } = existingMeshData;
+    const textureHeight = matrixTexture.image.height;
+
+    // Create quad geometry sized to match bounding sphere diameter
+    const size = boundingRadius * 2;
+    const geometry = new PlaneGeometry(size, size);
+
+    // Convert to InstancedBufferGeometry
+    const instancedGeometry = new InstancedBufferGeometry().copy(geometry);
+
+    // Add instanceID attribute
+    const instanceIDs = new Float32Array(maxInstances);
+    instanceData.forEach((instance, index) => {
+      instanceIDs[index] = instance.id;
+    });
+
+    const instanceIDAttribute = new InstancedBufferAttribute(instanceIDs, 1);
+    instancedGeometry.setAttribute("instanceID", instanceIDAttribute);
+    instancedGeometry.instanceCount = instanceData.length;
+
+    // Create impostor material with matrix texture
+    const material = this.createImpostorMaterial(
+      colorTexture,
+      depthTexture,
+      boundingRadius,
+      matrixTexture,
+      textureHeight,
+    );
+
+    const mesh = new Mesh(instancedGeometry, material);
+    mesh.userData.isImpostorMesh = true;
+    mesh.frustumCulled = false;
+
+    // Store management data
+    const impostorKey = assetKey + "_impostor";
+    this.managedMeshes.set(impostorKey, {
+      mesh,
+      geometry: instancedGeometry,
+      instanceIDAttribute,
+      instanceIDs,
+      maxInstances,
+      instanceData: instanceData.map((d) => ({
+        id: d.id,
+        matrix: d.matrix.clone(),
+      })),
+    });
+
+    return mesh;
+  }
+
+  createImpostorMaterial(
+    colorTexture,
+    depthTexture,
+    boundingRadius,
+    matrixTexture,
+    textureHeight,
+  ) {
+    return new ShaderMaterial({
+      uniforms: {
+        colorAtlas: { value: colorTexture },
+        depthAtlas: { value: depthTexture },
+        matrixTexture: { value: matrixTexture },
+        textureHeight: { value: textureHeight },
+        cameraPosition: { value: new Vector3() },
+        atlasResolution: { value: 256 },
+        boundingRadius: { value: boundingRadius },
+      },
+      vertexShader: `
+        attribute float instanceID;
+        uniform sampler2D matrixTexture;
+        uniform float textureHeight;
+
+        varying vec2 vUv;
+        varying vec3 vViewDirection;
+        varying vec3 vBillboardCenter;
+        varying float vLinearDepth; // NEW: pass view-space depth to fragment shader
+
+        void main() {
+          vUv = uv;
+
+          // Look up instance matrix
+          float row = instanceID;
+          float rowNorm = (row + 0.5) / textureHeight;
+
+          vec4 col0 = texture2D(matrixTexture, vec2(0.125, rowNorm));
+          vec4 col1 = texture2D(matrixTexture, vec2(0.375, rowNorm));
+          vec4 col2 = texture2D(matrixTexture, vec2(0.625, rowNorm));
+          vec4 col3 = texture2D(matrixTexture, vec2(0.875, rowNorm));
+
+          mat4 instanceMatrix = mat4(col0, col1, col2, col3);
+
+          vec3 instancePosLocal = instanceMatrix[3].xyz;
+          vec3 instancePosWorld = (modelMatrix * vec4(instancePosLocal, 1.0)).xyz;
+
+          // Billboard
+          vec3 toCamera = normalize(cameraPosition - instancePosWorld);
+          vec3 up = vec3(0.0, 1.0, 0.0);
+          vec3 right = normalize(cross(up, toCamera));
+          vec3 billboardUp = cross(toCamera, right);
+
+          vec3 billboardPosWorld = instancePosWorld
+            + right * position.x
+            + billboardUp * position.y;
+
+          // Calculate view-space position for depth
+          vec4 viewPos = viewMatrix * vec4(billboardPosWorld, 1.0);
+          vLinearDepth = -viewPos.z; // Store linear depth in view space
+
+          gl_Position = projectionMatrix * viewPos;
+
+          vViewDirection = normalize(instancePosWorld - cameraPosition);
+          vBillboardCenter = instancePosWorld;
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D colorAtlas;
+        uniform sampler2D depthAtlas;
+        uniform float atlasResolution;
+        uniform float boundingRadius;
+
+        varying vec2 vUv;
+        varying vec3 vViewDirection;
+        varying vec3 vBillboardCenter;
+        varying float vLinearDepth;
+
+        // Find nearest of 26 cardinal directions
+        int findNearestDirection(vec3 dir) {
+          // Normalize the direction
+          vec3 d = normalize(dir);
+
+          // 6 faces
+          vec3 faces[6];
+          faces[0] = vec3(1.0, 0.0, 0.0);
+          faces[1] = vec3(-1.0, 0.0, 0.0);
+          faces[2] = vec3(0.0, 1.0, 0.0);
+          faces[3] = vec3(0.0, -1.0, 0.0);
+          faces[4] = vec3(0.0, 0.0, 1.0);
+          faces[5] = vec3(0.0, 0.0, -1.0);
+
+          // 12 edges (normalized)
+          vec3 edges[12];
+          edges[0] = normalize(vec3(1.0, 1.0, 0.0));
+          edges[1] = normalize(vec3(1.0, -1.0, 0.0));
+          edges[2] = normalize(vec3(-1.0, 1.0, 0.0));
+          edges[3] = normalize(vec3(-1.0, -1.0, 0.0));
+          edges[4] = normalize(vec3(1.0, 0.0, 1.0));
+          edges[5] = normalize(vec3(1.0, 0.0, -1.0));
+          edges[6] = normalize(vec3(-1.0, 0.0, 1.0));
+          edges[7] = normalize(vec3(-1.0, 0.0, -1.0));
+          edges[8] = normalize(vec3(0.0, 1.0, 1.0));
+          edges[9] = normalize(vec3(0.0, 1.0, -1.0));
+          edges[10] = normalize(vec3(0.0, -1.0, 1.0));
+          edges[11] = normalize(vec3(0.0, -1.0, -1.0));
+
+          // 8 vertices (normalized)
+          vec3 vertices[8];
+          vertices[0] = normalize(vec3(1.0, 1.0, 1.0));
+          vertices[1] = normalize(vec3(1.0, 1.0, -1.0));
+          vertices[2] = normalize(vec3(1.0, -1.0, 1.0));
+          vertices[3] = normalize(vec3(1.0, -1.0, -1.0));
+          vertices[4] = normalize(vec3(-1.0, 1.0, 1.0));
+          vertices[5] = normalize(vec3(-1.0, 1.0, -1.0));
+          vertices[6] = normalize(vec3(-1.0, -1.0, 1.0));
+          vertices[7] = normalize(vec3(-1.0, -1.0, -1.0));
+
+          // Find closest match by dot product
+          float maxDot = -2.0;
+          int bestIndex = 0;
+
+          // Check faces (indices 0-5)
+          for (int i = 0; i < 6; i++) {
+            float dotProd = dot(d, faces[i]);
+            if (dotProd > maxDot) {
+              maxDot = dotProd;
+              bestIndex = i;
+            }
+          }
+
+          // Check edges (indices 6-17)
+          for (int i = 0; i < 12; i++) {
+            float dotProd = dot(d, edges[i]);
+            if (dotProd > maxDot) {
+              maxDot = dotProd;
+              bestIndex = 6 + i;
+            }
+          }
+
+          // Check vertices (indices 18-25)
+          for (int i = 0; i < 8; i++) {
+            float dotProd = dot(d, vertices[i]);
+            if (dotProd > maxDot) {
+              maxDot = dotProd;
+              bestIndex = 18 + i;
+            }
+          }
+
+          return bestIndex;
+        }
+
+        void main() {
+          int spriteIndex = findNearestDirection(vViewDirection);
+
+          int gridX = spriteIndex - (spriteIndex / 6) * 6;
+          int gridY = spriteIndex / 6;
+
+          vec2 spriteUv = vUv;
+          vec2 atlasUv = (vec2(float(gridX), float(gridY)) + spriteUv) / vec2(6.0, 5.0);
+
+          vec4 color = texture2D(colorAtlas, atlasUv);
+          float capturedDepth = texture2D(depthAtlas, atlasUv).r;
+
+          if (color.a < 0.5) discard;
+
+          gl_FragColor = color;
+
+          // Adjust depth based on captured depth
+          // capturedDepth is [0,1] normalized depth from impostor capture
+          float nearPlane = 0.1;
+          float farPlane = boundingRadius * 3.0;
+          float depthOffset = capturedDepth * (farPlane - nearPlane);
+
+          // Offset the linear depth
+          float adjustedDepth = vLinearDepth + depthOffset - boundingRadius * 2.0;
+
+          // Write adjusted depth (this is a simplified approximation)
+          // For proper depth, you'd need camera near/far planes
+          gl_FragDepth = clamp(adjustedDepth / 100000.0, 0.0, 1.0);
+        }
+      `,
+      transparent: true,
+      side: DoubleSide,
+    });
   }
 
   /**
