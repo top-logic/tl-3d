@@ -101,6 +101,8 @@ class ThreeJsControl {
       this.camera,
     );
 
+    this.impostorManager = null; // Will be created during asset loading
+
     this.sceneBVH = new SceneBVH();
 
     this.initTransformControls();
@@ -1024,7 +1026,7 @@ class ThreeJsControl {
   }
 
   addAxesHelper(scene) {
-    const axesHelper = new AxesHelper(1000);
+    const axesHelper = new AxesHelper(15000);
     scene.add(axesHelper);
     axesHelper.rotation.x = -_90_DEGREE;
   }

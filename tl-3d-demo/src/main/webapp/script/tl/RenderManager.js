@@ -98,36 +98,18 @@ export class RenderManager {
 
     try {
       if (this.instanceManager) {
-        if (this.cameraIsMoving && this.sceneBVH) {
-          // Camera moving: use BVH to accumulate visible instances
-          this.sceneBVH.queryVisibleInstances(
-            this.camera,
-            500, // maxRays during motion
-          );
+        // Update camera position for impostor billboards
+        this.updateImpostorCameraUniforms();
 
-          // Get the accumulated visible instances
-          const visible = this.sceneBVH.getVisibleInstances();
-
-          for (const [assetKey, instanceIDs] of visible) {
-            this.instanceManager.updateVisibleInstances(
-              assetKey,
-              Array.from(instanceIDs),
-            );
-          }
-
-          // For any asset types not in the visible map, show none
-          for (const [assetKey, meshData] of this.instanceManager
-            .managedMeshes) {
-            if (!visible.has(assetKey)) {
-              this.instanceManager.updateVisibleInstances(assetKey, []);
-            }
-          }
-        } else {
-          // Camera stopped: restore all instances
-          for (const [assetKey, meshData] of this.instanceManager
-            .managedMeshes) {
+        for (const [assetKey, meshData] of this.instanceManager.managedMeshes) {
+          if (assetKey.endsWith("_impostor")) {
+            // Show all impostor instances
             const allIDs = meshData.instanceData.map((d) => d.id);
             this.instanceManager.updateVisibleInstances(assetKey, allIDs);
+            meshData.mesh.visible = true;
+          } else {
+            // Hide all real geometry
+            meshData.mesh.visible = false;
           }
         }
       }
@@ -143,6 +125,18 @@ export class RenderManager {
       this.updateStats();
     } catch (error) {
       console.error("RenderManager: Render error", error);
+    }
+  }
+
+  updateImpostorCameraUniforms() {
+    // Update camera position uniform for all impostor materials
+    for (const [assetKey, meshData] of this.instanceManager.managedMeshes) {
+      if (assetKey.endsWith("_impostor")) {
+        const material = meshData.mesh.material;
+        if (material.uniforms && material.uniforms.cameraPosition) {
+          material.uniforms.cameraPosition.value.copy(this.camera.position);
+        }
+      }
     }
   }
 
