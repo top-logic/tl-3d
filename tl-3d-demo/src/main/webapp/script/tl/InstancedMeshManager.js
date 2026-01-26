@@ -1,7 +1,7 @@
 /**
  * InstancedMeshManager.js
  *
- * Manages instanced meshes using ID-based rendering with DataTexture matrix storage.
+ * Manages instanced meshes using ID-based rendering with Data3DTexture matrix storage.
  * Uses custom instanceID attribute (more efficient than gl_InstanceID + mapping texture).
  *
  * This allows fast per-frame swapping of which instances to render by only changing
@@ -10,7 +10,7 @@
 
 import {
   Box3,
-  DataTexture,
+  Data3DTexture,
   FloatType,
   InstancedBufferAttribute,
   InstancedBufferGeometry,
@@ -24,6 +24,27 @@ export class InstancedMeshManager {
   constructor() {
     // Map of assetKey -> InstancedMeshData
     this.managedMeshes = new Map();
+  }
+
+  /**
+   * Calculate optimal texture dimensions for a given number of instances
+   * Returns dimensions that are as square as possible while staying within limits
+   */
+  calculateTextureDimensions(maxInstances, maxTextureSize = 16384) {
+    // Try to make it roughly square
+    const idealSize = Math.ceil(Math.sqrt(maxInstances));
+
+    // Clamp to max texture size
+    const width = Math.min(idealSize, maxTextureSize);
+    const height = Math.ceil(maxInstances / width);
+
+    if (height > maxTextureSize) {
+      throw new Error(
+        `Cannot fit ${maxInstances} instances in texture (exceeds ${maxTextureSize}x${maxTextureSize})`,
+      );
+    }
+
+    return { width, height };
   }
 
   /**
@@ -42,35 +63,16 @@ export class InstancedMeshManager {
     instanceData,
     triangleCount = 100,
   ) {
-    // Create DataTexture to store transformation matrices
-    // Each matrix is 16 floats (4x4), packed into RGBA texture
-    // Each matrix takes 4 pixels (4 rows × 4 RGBA values = 16 floats)
-    const textureWidth = 4; // 4 pixels wide (one matrix row per pixel)
-    const textureHeight = Math.ceil(maxInstances); // One row per instance
-    const textureSize = textureWidth * textureHeight * 4; // RGBA
+    // Calculate optimal texture dimensions
+    const { width: textureWidth, height: textureHeight } =
+      this.calculateTextureDimensions(maxInstances);
 
-    const matrixTextureData = new Float32Array(textureSize);
-
-    // Populate texture with matrices
-    instanceData.forEach((instance) => {
-      const matrix = instance.matrix;
-      const matrixArray = matrix.elements;
-
-      // Store matrix in texture at position = instance.id
-      const baseIndex = instance.id * 16;
-      for (let i = 0; i < 16; i++) {
-        matrixTextureData[baseIndex + i] = matrixArray[i];
-      }
-    });
-
-    const matrixTexture = new DataTexture(
-      matrixTextureData,
+    // Create Data3DTexture to store transformation matrices
+    const { matrixTexture, matrixTextureData } = this.createMatrixTexture(
       textureWidth,
       textureHeight,
-      RGBAFormat,
-      FloatType,
+      instanceData,
     );
-    matrixTexture.needsUpdate = true;
 
     // Create InstancedBufferGeometry (gives us full control over instanced attributes)
     const instancedGeometry = new InstancedBufferGeometry().copy(geometry);
@@ -91,6 +93,8 @@ export class InstancedMeshManager {
     const customMaterial = this.createMatrixLookupMaterial(
       baseMaterial,
       matrixTexture,
+      textureWidth,
+      textureHeight,
     );
 
     // Create regular Mesh with instanced geometry (not InstancedMesh)
@@ -108,6 +112,8 @@ export class InstancedMeshManager {
       instanceIDAttribute,
       instanceIDs,
       maxInstances,
+      textureWidth,
+      textureHeight,
       instanceData: instanceData.map((d) => ({
         id: d.id,
         matrix: d.matrix.clone(),
@@ -122,10 +128,65 @@ export class InstancedMeshManager {
   }
 
   /**
-   * Patch the material's shader to use matrix lookup from DataTexture
+   * Create the matrix texture using Data3DTexture
+   * Depth dimension contains the 4 columns of each matrix
+   */
+  createMatrixTexture(textureWidth, textureHeight, instanceData) {
+    const textureDepth = 4; // 4 columns per matrix
+
+    // Each layer is width * height, each pixel stores 4 floats (RGBA)
+    const layerSize = textureWidth * textureHeight * 4; // RGBA
+    const textureSize = layerSize * textureDepth;
+
+    const matrixTextureData = new Float32Array(textureSize);
+
+    // Populate texture with matrices
+    instanceData.forEach((instance) => {
+      const matrix = instance.matrix;
+      const matrixArray = matrix.elements; // Column-major order
+
+      // Calculate 2D position for this instance
+      const x = instance.id % textureWidth;
+      const y = Math.floor(instance.id / textureWidth);
+      const pixelIndex = y * textureWidth + x;
+
+      // Store each column of the matrix in a separate depth layer
+      for (let col = 0; col < 4; col++) {
+        const layerOffset = col * layerSize;
+        const pixelOffset = pixelIndex * 4; // RGBA
+        const baseIndex = layerOffset + pixelOffset;
+
+        // Store the 4 values of this column
+        for (let row = 0; row < 4; row++) {
+          const matrixIndex = col * 4 + row; // Column-major: col * 4 + row
+          matrixTextureData[baseIndex + row] = matrixArray[matrixIndex];
+        }
+      }
+    });
+
+    const matrixTexture = new Data3DTexture(
+      matrixTextureData,
+      textureWidth,
+      textureHeight,
+      textureDepth,
+    );
+    matrixTexture.format = RGBAFormat;
+    matrixTexture.type = FloatType;
+    matrixTexture.needsUpdate = true;
+
+    return { matrixTexture, matrixTextureData };
+  }
+
+  /**
+   * Patch the material's shader to use matrix lookup from Data3DTexture
    * Uses onBeforeCompile to inject custom code into Three.js standard shaders
    */
-  createMatrixLookupMaterial(baseMaterial, matrixTexture) {
+  createMatrixLookupMaterial(
+    baseMaterial,
+    matrixTexture,
+    textureWidth,
+    textureHeight,
+  ) {
     // Clone the material to avoid modifying the original
     const material = baseMaterial.clone();
 
@@ -133,12 +194,14 @@ export class InstancedMeshManager {
     material.onBeforeCompile = (shader) => {
       // Add uniforms to shader
       shader.uniforms.matrixTexture = { value: matrixTexture };
-      shader.uniforms.textureHeight = { value: matrixTexture.image.height };
+      shader.uniforms.textureWidth = { value: textureWidth };
+      shader.uniforms.textureHeight = { value: textureHeight };
 
       // Add custom attribute and uniforms at the top
       shader.vertexShader = `
         attribute float instanceID;
-        uniform sampler2D matrixTexture;
+        uniform sampler3D matrixTexture;
+        uniform float textureWidth;
         uniform float textureHeight;
 
         ${shader.vertexShader}
@@ -148,14 +211,18 @@ export class InstancedMeshManager {
         "#include <beginnormal_vertex>",
         `
         #ifdef USE_INSTANCING
-          // Look up transformation matrix from DataTexture using instanceID attribute
-          float row = instanceID;
-          float rowNorm = (row + 0.5) / textureHeight;
+          // Calculate 2D texture coordinates from instanceID
+          float x = mod(instanceID, textureWidth);
+          float y = floor(instanceID / textureWidth);
 
-          vec4 col0 = texture2D(matrixTexture, vec2(0.125, rowNorm));
-          vec4 col1 = texture2D(matrixTexture, vec2(0.375, rowNorm));
-          vec4 col2 = texture2D(matrixTexture, vec2(0.625, rowNorm));
-          vec4 col3 = texture2D(matrixTexture, vec2(0.875, rowNorm));
+          // Normalise to [0, 1] range and centre on pixel
+          vec2 uv = (vec2(x, y) + 0.5) / vec2(textureWidth, textureHeight);
+
+          // Look up 4 columns from the 4 depth layers
+          vec4 col0 = texture(matrixTexture, vec3(uv, 0.125));
+          vec4 col1 = texture(matrixTexture, vec3(uv, 0.375));
+          vec4 col2 = texture(matrixTexture, vec3(uv, 0.625));
+          vec4 col3 = texture(matrixTexture, vec3(uv, 0.875));
 
           mat4 instanceMatrix = mat4(col0, col1, col2, col3);
         #endif
@@ -163,9 +230,6 @@ export class InstancedMeshManager {
         #include <beginnormal_vertex>
         `,
       );
-
-      // Store reference for debugging
-      material.userData.patchedShader = shader;
     };
 
     // Enable instancing so Three.js includes the necessary shader code
@@ -268,7 +332,13 @@ export class InstancedMeshManager {
       return;
     }
 
-    const { matrixTextureData, matrixTexture, instanceData } = data;
+    const {
+      matrixTextureData,
+      matrixTexture,
+      instanceData,
+      textureWidth,
+      textureHeight,
+    } = data;
 
     // Instance ID is the index in the array
     const instance = instanceData[instanceID];
@@ -281,12 +351,25 @@ export class InstancedMeshManager {
     // Update matrix in our storage
     instance.matrix.copy(newMatrix);
 
-    // Update matrix in texture data
-    const baseIndex = instanceID * 16;
-    const matrixArray = newMatrix.elements;
+    // Calculate 2D position for this instance
+    const x = instanceID % textureWidth;
+    const y = Math.floor(instanceID / textureWidth);
+    const pixelIndex = y * textureWidth + x;
 
-    for (let i = 0; i < 16; i++) {
-      matrixTextureData[baseIndex + i] = matrixArray[i];
+    const matrixArray = newMatrix.elements;
+    const layerSize = textureWidth * textureHeight * 4; // RGBA
+
+    // Update matrix in texture data (4 columns across 4 depth layers)
+    for (let col = 0; col < 4; col++) {
+      const layerOffset = col * layerSize;
+      const pixelOffset = pixelIndex * 4; // RGBA
+      const baseIndex = layerOffset + pixelOffset;
+
+      // Update the 4 values of this column
+      for (let row = 0; row < 4; row++) {
+        const matrixIndex = col * 4 + row;
+        matrixTextureData[baseIndex + row] = matrixArray[matrixIndex];
+      }
     }
 
     // Mark texture for update
@@ -307,14 +390,25 @@ export class InstancedMeshManager {
         assetKey,
         maxInstances: data.maxInstances,
         currentlyVisible: data.geometry.instanceCount,
-        textureSize:
-          data.matrixTexture.image.width +
-          "x" +
-          data.matrixTexture.image.height,
+        textureSize: `${data.textureWidth}x${data.textureHeight}x4`,
       });
     }
 
     return stats;
+  }
+
+  /**
+   * Calculate the total triangle count across all managed instanced meshes.
+   * This is the sum of (triangleCount * instanceCount) for each asset.
+   * Used to decide whether BVH visibility culling is needed.
+   * @returns {number} Total triangle count
+   */
+  getTotalInstancedTriangleCount() {
+    let total = 0;
+    for (const [, data] of this.managedMeshes) {
+      total += data.triangleCount * data.instanceData.length;
+    }
+    return total;
   }
 
   /**

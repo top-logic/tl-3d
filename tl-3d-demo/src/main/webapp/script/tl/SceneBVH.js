@@ -38,6 +38,11 @@ import {
   Vector3,
 } from "three";
 
+import {
+  INSTANCING_BVH_MAX_TRIANGLES,
+  INSTANCING_BVH_STALE_FRAME_THRESHOLD,
+} from "./Constants.js";
+
 // Extend Three.js prototypes for BVH
 if (!BufferGeometry.prototype.computeBoundsTree) {
   BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
@@ -60,8 +65,8 @@ export class SceneBVH {
     // Map<assetKey, Map<instanceID, {lastSeenFrame: number, triangleCount: number}>>
     this.visibleInstances = new Map();
     this.currentFrame = 0;
-    this.staleFrameThreshold = 30; // Prune instances not seen for 30 frames
-    this.maxTriangles = 10_000_000; // Maximum triangles in accumulated collection
+    this.staleFrameThreshold = INSTANCING_BVH_STALE_FRAME_THRESHOLD;
+    this.maxTriangles = INSTANCING_BVH_MAX_TRIANGLES;
     this.currentTriangleCount = 0; // Running total of triangles in visible instances
   }
 
@@ -103,12 +108,7 @@ export class SceneBVH {
         const matrix = instance.matrix;
 
         // Create base box geometry centered at origin
-        const baseSize = new Vector3();
-        baseBox.getSize(baseSize);
         const boxGeom = new BoxGeometry(baseSize.x, baseSize.y, baseSize.z);
-
-        // Get the base box center offset
-        const baseCenter = new Vector3();
 
         // First translate to account for base center offset
         boxGeom.translate(baseCenter.x, baseCenter.y, baseCenter.z);
