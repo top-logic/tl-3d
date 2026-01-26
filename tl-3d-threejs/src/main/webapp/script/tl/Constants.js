@@ -26,3 +26,13 @@ export const GRID_SNAP_THRESHOLD = 200;
 export const FLOOR_PADDING = 20000;
 // Make non-selected objects 30% transparent
 export const TRANSPARENCY_LEVEL = 0.3;
+// Total instanced triangle budget (sum of triangleCount * instanceCount across
+// all managed meshes) above which BVH-accelerated visibility culling kicks in.
+// Below this, all instances are rendered every frame unconditionally.
+export const INSTANCING_BVH_TRIANGLE_THRESHOLD = 8_000_000;
+// Maximum triangles the BVH is allowed to accumulate in its visible set
+// before it starts rejecting new hits. Should be higher than the threshold above.
+export const INSTANCING_BVH_MAX_TRIANGLES = 10_000_000;
+// Number of frames an instance can go undetected by BVH raycasting before
+// it gets pruned from the visible set.
+export const INSTANCING_BVH_STALE_FRAME_THRESHOLD = 30;
