@@ -386,198 +386,177 @@ export class InstancedMeshManager {
         depthAtlas: { value: depthTexture },
         matrixTexture: { value: matrixTexture },
         textureHeight: { value: textureHeight },
-        cameraPosition: { value: new Vector3() },
         atlasResolution: { value: 256 },
         centerOffset: { value: centerOffset },
         boundingRadius: { value: boundingRadius },
       },
       vertexShader: `
-        attribute float instanceID;
-        uniform sampler2D matrixTexture;
-        uniform float textureHeight;
-        uniform vec3 centerOffset;
+       attribute float instanceID;
+       uniform sampler2D matrixTexture;
+       uniform float textureHeight;
+       uniform vec3 centerOffset;
+       uniform float boundingRadius;
 
-        varying vec2 vUv;
-        varying vec3 vViewDirection;
-        varying vec3 vBillboardCenter;
-        varying float vLinearDepth;
-        varying mat3 vInstanceRotation;
+       varying vec2 vUv;
+       varying vec3 vBillboardCenter;
+       varying vec3 vBillboardRight;
+       varying vec3 vBillboardUp;
+       varying vec3 vViewPosition;
+       varying mat3 vInstanceRotation;
 
-        void main() {
-          vUv = uv;
+       void main() {
+         vUv = uv;
 
-          // Look up instance matrix
-          float row = instanceID;
-          float rowNorm = (row + 0.5) / textureHeight;
+         // Look up instance matrix
+         float row = instanceID;
+         float rowNorm = (row + 0.5) / textureHeight;
 
-          vec4 col0 = texture2D(matrixTexture, vec2(0.125, rowNorm));
-          vec4 col1 = texture2D(matrixTexture, vec2(0.375, rowNorm));
-          vec4 col2 = texture2D(matrixTexture, vec2(0.625, rowNorm));
-          vec4 col3 = texture2D(matrixTexture, vec2(0.875, rowNorm));
+         vec4 col0 = texture2D(matrixTexture, vec2(0.125, rowNorm));
+         vec4 col1 = texture2D(matrixTexture, vec2(0.375, rowNorm));
+         vec4 col2 = texture2D(matrixTexture, vec2(0.625, rowNorm));
+         vec4 col3 = texture2D(matrixTexture, vec2(0.875, rowNorm));
 
-          mat4 instanceMatrix = mat4(col0, col1, col2, col3);
+         mat4 instanceMatrix = mat4(col0, col1, col2, col3);
 
-          vec3 instancePosLocal = instanceMatrix[3].xyz;
+         vec3 instancePosLocal = instanceMatrix[3].xyz;
+         vec3 adjustedPosLocal = instancePosLocal + centerOffset;
+         vec3 instancePosWorld = (modelMatrix * vec4(adjustedPosLocal, 1.0)).xyz;
 
-          // Apply the center offset that was used during capture
-          vec3 adjustedPosLocal = instancePosLocal + centerOffset;
+         // Extract rotation from instance matrix (combined with modelMatrix)
+          mat4 fullMatrix = modelMatrix;// * instanceMatrix;
 
-          vec3 instancePosWorld = (modelMatrix * vec4(adjustedPosLocal, 1.0)).xyz;
-
-          // Extract rotation from instance matrix (upper-left 3x3)
-          // Combined with modelMatrix rotation (zUpRoot)
-          mat4 fullMatrix = modelMatrix * instanceMatrix;
           vInstanceRotation = mat3(
             normalize(fullMatrix[0].xyz),
             normalize(fullMatrix[1].xyz),
             normalize(fullMatrix[2].xyz)
           );
 
-          // Screen-aligned billboard: extract camera axes from view matrix
-          // View matrix transforms world to camera space, so its inverse gives us camera axes
-          vec3 cameraRight = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
-          vec3 cameraUp = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
+         // Simple screen-aligned billboard
+         vec3 cameraRight = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
+         vec3 cameraUp = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
 
-          // Build billboard position using screen-aligned axes
-          vec3 billboardPosWorld = instancePosWorld
-            + cameraRight * position.x
-            + cameraUp * position.y;
+         // Pass these to fragment shader
+         vBillboardRight = cameraRight;
+         vBillboardUp = cameraUp;
 
-          // Calculate view-space position for depth
-          vec4 viewPos = viewMatrix * vec4(billboardPosWorld, 1.0);
-          vLinearDepth = -viewPos.z;
+         vec3 billboardPosWorld = instancePosWorld
+           + cameraRight * position.x
+           + cameraUp * position.y;
 
-          gl_Position = projectionMatrix * viewPos;
+         vec4 viewPos = viewMatrix * vec4(billboardPosWorld, 1.0);
+         vViewPosition = viewPos.xyz;
 
-          vViewDirection = normalize(instancePosWorld - cameraPosition);
-          vBillboardCenter = instancePosWorld;
-        }
+         gl_Position = projectionMatrix * viewPos;
+
+         vBillboardCenter = instancePosWorld;
+       }
       `,
+
       fragmentShader: `
-        uniform sampler2D colorAtlas;
-        uniform sampler2D depthAtlas;
-        uniform float atlasResolution;
-        uniform float boundingRadius;
+       uniform float boundingRadius;
+       uniform mat4 projectionMatrix;
+       uniform sampler2D colorAtlas;
 
-        varying vec2 vUv;
-        varying vec3 vViewDirection;
-        varying vec3 vBillboardCenter;
-        varying float vLinearDepth;
-        varying mat3 vInstanceRotation;
+       varying vec2 vUv;
+       varying vec3 vBillboardCenter;
+       varying vec3 vBillboardRight;
+       varying vec3 vBillboardUp;
+       varying vec3 vViewPosition;
+       varying mat3 vInstanceRotation;
 
-        // sRGB transfer function
-        vec3 LinearTosRGB(vec3 color) {
-          vec3 a = vec3(0.055);
-          vec3 ap1 = vec3(1.0) + a;
-          vec3 g = vec3(2.4);
-          vec3 ginv = vec3(1.0) / g;
+       // Find nearest of 26 cardinal directions
+       int findNearestDirection(vec3 dir) {
+         vec3 d = normalize(dir);
 
-          return mix(
-            color * 12.92,
-            ap1 * pow(color, ginv) - a,
-            step(vec3(0.0031308), color)
-          );
-        }
+         vec3 faces[6];
+         faces[0] = vec3(1.0, 0.0, 0.0);
+         faces[1] = vec3(-1.0, 0.0, 0.0);
+         faces[2] = vec3(0.0, 1.0, 0.0);
+         faces[3] = vec3(0.0, -1.0, 0.0);
+         faces[4] = vec3(0.0, 0.0, 1.0);
+         faces[5] = vec3(0.0, 0.0, -1.0);
 
-        // Find nearest of 26 cardinal directions
-        int findNearestDirection(vec3 dir) {
-          // Normalize the direction
-          vec3 d = normalize(dir);
-          // 6 faces
-          vec3 faces[6];
-          faces[0] = vec3(1.0, 0.0, 0.0);
-          faces[1] = vec3(-1.0, 0.0, 0.0);
-          faces[2] = vec3(0.0, 1.0, 0.0);
-          faces[3] = vec3(0.0, -1.0, 0.0);
-          faces[4] = vec3(0.0, 0.0, 1.0);
-          faces[5] = vec3(0.0, 0.0, -1.0);
+         vec3 edges[12];
+         edges[0] = normalize(vec3(1.0, 1.0, 0.0));
+         edges[1] = normalize(vec3(1.0, -1.0, 0.0));
+         edges[2] = normalize(vec3(-1.0, 1.0, 0.0));
+         edges[3] = normalize(vec3(-1.0, -1.0, 0.0));
+         edges[4] = normalize(vec3(1.0, 0.0, 1.0));
+         edges[5] = normalize(vec3(1.0, 0.0, -1.0));
+         edges[6] = normalize(vec3(-1.0, 0.0, 1.0));
+         edges[7] = normalize(vec3(-1.0, 0.0, -1.0));
+         edges[8] = normalize(vec3(0.0, 1.0, 1.0));
+         edges[9] = normalize(vec3(0.0, 1.0, -1.0));
+         edges[10] = normalize(vec3(0.0, -1.0, 1.0));
+         edges[11] = normalize(vec3(0.0, -1.0, -1.0));
 
-          // 12 edges (normalized)
-          vec3 edges[12];
-          edges[0] = normalize(vec3(1.0, 1.0, 0.0));
-          edges[1] = normalize(vec3(1.0, -1.0, 0.0));
-          edges[2] = normalize(vec3(-1.0, 1.0, 0.0));
-          edges[3] = normalize(vec3(-1.0, -1.0, 0.0));
-          edges[4] = normalize(vec3(1.0, 0.0, 1.0));
-          edges[5] = normalize(vec3(1.0, 0.0, -1.0));
-          edges[6] = normalize(vec3(-1.0, 0.0, 1.0));
-          edges[7] = normalize(vec3(-1.0, 0.0, -1.0));
-          edges[8] = normalize(vec3(0.0, 1.0, 1.0));
-          edges[9] = normalize(vec3(0.0, 1.0, -1.0));
-          edges[10] = normalize(vec3(0.0, -1.0, 1.0));
-          edges[11] = normalize(vec3(0.0, -1.0, -1.0));
+         vec3 vertices[8];
+         vertices[0] = normalize(vec3(1.0, 1.0, 1.0));
+         vertices[1] = normalize(vec3(1.0, 1.0, -1.0));
+         vertices[2] = normalize(vec3(1.0, -1.0, 1.0));
+         vertices[3] = normalize(vec3(1.0, -1.0, -1.0));
+         vertices[4] = normalize(vec3(-1.0, 1.0, 1.0));
+         vertices[5] = normalize(vec3(-1.0, 1.0, -1.0));
+         vertices[6] = normalize(vec3(-1.0, -1.0, 1.0));
+         vertices[7] = normalize(vec3(-1.0, -1.0, -1.0));
 
-          // 8 vertices (normalized)
-          vec3 vertices[8];
-          vertices[0] = normalize(vec3(1.0, 1.0, 1.0));
-          vertices[1] = normalize(vec3(1.0, 1.0, -1.0));
-          vertices[2] = normalize(vec3(1.0, -1.0, 1.0));
-          vertices[3] = normalize(vec3(1.0, -1.0, -1.0));
-          vertices[4] = normalize(vec3(-1.0, 1.0, 1.0));
-          vertices[5] = normalize(vec3(-1.0, 1.0, -1.0));
-          vertices[6] = normalize(vec3(-1.0, -1.0, 1.0));
-          vertices[7] = normalize(vec3(-1.0, -1.0, -1.0));
+         float maxDot = -2.0;
+         int bestIndex = 0;
 
-          // Find closest match by dot product
-          float maxDot = -2.0;
-          int bestIndex = 0;
+         // Test for the camera position vector with the dot product closest to -1.0,
+         // since it is the closest to being parallel and opposite to the camera forward direction.
 
-          // Check faces (indices 0-5)
-          for (int i = 0; i < 6; i++) {
-            float dotProd = dot(d, faces[i]);
-            if (dotProd > maxDot) {
-              maxDot = dotProd;
-              bestIndex = i;
-            }
-          }
+         for (int i = 0; i < 6; i++) {
+           float dotProd = dot(d, faces[i]);
+           if (dotProd > maxDot) {
+             maxDot = dotProd;
+             bestIndex = i;
+           }
+         }
 
-          // Check edges (indices 6-17)
-          for (int i = 0; i < 12; i++) {
-            float dotProd = dot(d, edges[i]);
-            if (dotProd > maxDot) {
-              maxDot = dotProd;
-              bestIndex = 6 + i;
-            }
-          }
+         for (int i = 0; i < 12; i++) {
+           float dotProd = dot(d, edges[i]);
+           if (dotProd > maxDot) {
+             maxDot = dotProd;
+             bestIndex = 6 + i;
+           }
+         }
 
-          // Check vertices (indices 18-25)
-          for (int i = 0; i < 8; i++) {
-            float dotProd = dot(d, vertices[i]);
-            if (dotProd > maxDot) {
-              maxDot = dotProd;
-              bestIndex = 18 + i;
-            }
-          }
-          return bestIndex;
-        }
+         for (int i = 0; i < 8; i++) {
+           float dotProd = dot(d, vertices[i]);
+           if (dotProd > maxDot) {
+             maxDot = dotProd;
+             bestIndex = 18 + i;
+           }
+         }
 
-        void main() {
-           // Transform view direction to instance's local space
-           vec3 localViewDir = transpose(vInstanceRotation) * vViewDirection;
+         return bestIndex;
+       }
 
-           int spriteIndex = findNearestDirection(localViewDir);
-           int gridX = spriteIndex - (spriteIndex / 6) * 6;
-           int gridY = spriteIndex / 6;
-           vec2 spriteUv = vUv;
-           vec2 atlasUv = (vec2(float(gridX), float(gridY)) + spriteUv) / vec2(6.0, 5.0);
+       void main() {
+         // Use camera forward direction
+         vec3 cameraForward = -vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
 
-           vec4 color = texture2D(colorAtlas, atlasUv);
-           float capturedDepth = texture2D(depthAtlas, atlasUv).r;
+         // Transform to instance's local space
+         vec3 localViewDir = transpose(vInstanceRotation) * cameraForward;
 
-           if (color.a < 0.5) discard;
+         // For now, use world-space direction directly (ignoring instance rotation)
+         int spriteIndex = findNearestDirection(-localViewDir);
 
-           // Apply sRGB transfer function to match main scene output
-           color.rgb = LinearTosRGB(color.rgb);
+         // Calculate atlas UV based on sprite index
+         int gridX = spriteIndex % 6;
+         int gridY = spriteIndex / 6;
+         vec2 atlasUv = (vec2(float(gridX), float(gridY)) + vUv) / vec2(6.0, 5.0);
 
-           gl_FragColor = color;
+         // Sample from atlas
+         vec4 color = texture2D(colorAtlas, atlasUv);
 
-           // Adjust depth based on captured depth
-           float nearPlane = 0.1;
-           float farPlane = boundingRadius * 3.0;
-           float depthOffset = capturedDepth * (farPlane - nearPlane);
-           float adjustedDepth = vLinearDepth + depthOffset - boundingRadius * 2.0;
-           gl_FragDepth = clamp(adjustedDepth / 100000.0, 0.0, 1.0);
-        }
+         // Discard transparent pixels
+         if (color.a < 0.5) discard;
+
+         // Use atlas color instead of normal color
+         gl_FragColor = color;
+       }
       `,
       transparent: true,
       side: FrontSide,

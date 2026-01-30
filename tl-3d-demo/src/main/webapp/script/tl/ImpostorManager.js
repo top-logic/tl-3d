@@ -6,6 +6,7 @@
 import {
   AxesHelper,
   Box3,
+  Color,
   DepthTexture,
   OrthographicCamera,
   RGBAFormat,
@@ -89,7 +90,7 @@ export class ImpostorManager {
   generateImpostorForAsset(assetKey, gltf) {
     // Clone and rotate model first
     const modelClone = gltf.scene.clone();
-    modelClone.rotation.x = -Math.PI / 2;
+    //modelClone.rotation.x = -_90_DEGREE;
     modelClone.updateMatrixWorld(true);
 
     // Compute bounding box and sphere AFTER rotation
@@ -98,7 +99,7 @@ export class ImpostorManager {
     boundingBox.getBoundingSphere(boundingSphere);
 
     // Check if center is at origin
-    const center = boundingSphere.center;
+    const center = boundingSphere.center.clone();
     console.log("Bounding sphere center:", center);
     console.log("Distance from origin:", center.length());
 
@@ -144,7 +145,7 @@ export class ImpostorManager {
     const axesHelper = new AxesHelper(radius * 0.5); // Half the radius so it's visible but not huge
     scene.add(axesHelper);
 
-    const originalClearColor = this.renderer.getClearColor(new Vector3());
+    const originalClearColor = this.renderer.getClearColor(new Color());
     const originalClearAlpha = this.renderer.getClearAlpha();
 
     const currentViewport = new Vector4();
@@ -154,19 +155,26 @@ export class ImpostorManager {
     this.renderer.setRenderTarget(atlasTarget);
     this.renderer.clear();
 
+    // Store the camera "up" orientation for each view, so that
+    // it can be used to orient the impostors in the correct direction
+    const captureOrientations = [];
+
     // Render each of the 26 views directly into atlas positions
     for (let i = 0; i < this.directions.length; i++) {
       const dir = this.directions[i];
       const gridX = i % 6;
       const gridY = Math.floor(i / 6);
 
-      // Transform direction from Y-up to Z-up space (rotate +90° on X)
-      const rotatedDir = new Vector3(dir.x, dir.z, -dir.y);
-
-      camera.position.copy(rotatedDir).multiplyScalar(radius * 2);
+      camera.position.copy(dir).multiplyScalar(radius * 2);
       camera.lookAt(0, 0, 0);
+      camera.updateMatrixWorld(true);
 
-      camera.updateProjectionMatrix();
+      const cameraRight = new Vector3();
+      const cameraUp = new Vector3();
+      const cameraForward = new Vector3();
+
+      camera.matrix.extractBasis(cameraRight, cameraUp, cameraForward);
+      captureOrientations.push(cameraUp.clone());
 
       // Set viewport to render into correct atlas position
       this.renderer.setViewport(
@@ -200,7 +208,8 @@ export class ImpostorManager {
       colorTexture: atlasTarget.texture,
       depthTexture: atlasTarget.depthTexture,
       boundingRadius: radius,
-      centerOffset: center.clone(),
+      centerOffset: center,
+      captureOrientations,
       resolution,
     });
   }
@@ -249,13 +258,5 @@ export class ImpostorManager {
       a.click();
       URL.revokeObjectURL(url);
     });
-  }
-
-  computeBoundingSphere(object) {
-    // Similar to your existing bounding box computation
-    const box = new Box3().setFromObject(object);
-    const sphere = new Sphere();
-    box.getBoundingSphere(sphere);
-    return sphere;
   }
 }
