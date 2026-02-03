@@ -13,6 +13,8 @@ export class RenderManager {
     this.isRendering = false;
     this.rafId = null;
 
+    this.useBVH = false;
+
     this.renderTargets = [];
 
     this.stats = {
@@ -49,6 +51,13 @@ export class RenderManager {
    * Call this when the camera changes (from orbit controls, etc.)
    */
   onCameraMove() {
+    // If we're not using BVH, camera movement is irrelevant to instance
+    // visibility. Just invalidate and return.
+    if (!this.useBVH) {
+      this.invalidate();
+      return;
+    }
+
     this.cameraIsMoving = true;
 
     // Stop progressive filling-in during camera movement
@@ -111,7 +120,14 @@ export class RenderManager {
 
     try {
       if (this.instanceManager) {
-        if (this.cameraIsMoving && this.sceneBVH) {
+        if (!this.useBVH) {
+          // Simple path: just show every instance, every frame.
+          for (const [assetKey, meshData] of this.instanceManager
+            .managedMeshes) {
+            const allIDs = meshData.instanceData.map((d) => d.id);
+            this.instanceManager.updateVisibleInstances(assetKey, allIDs);
+          }
+        } else if (this.cameraIsMoving && this.sceneBVH) {
           this.renderer.clear(true, true);
 
           // Camera moving: use BVH to accumulate visible instances
@@ -294,6 +310,34 @@ export class RenderManager {
       // This accumulates over time to build a comprehensive visible set
       this.sceneBVH.queryVisibleInstances(this.camera, 500);
     }, 16);
+  }
+
+  /**
+   * Switch between BVH-culled rendering and simple "render all" rendering.
+   * Safe to call at any time; cleans up in-progress state from the previous mode.
+   * @param {boolean} enabled - true = use BVH culling; false = render all instances every frame
+   */
+  setUseBVH(enabled) {
+    this.useBVH = enabled;
+
+    if (!enabled) {
+      // We're going into simple mode. Stop anything the BVH path may have
+      // started, and make sure all instances are visible on the next frame.
+      this.isFillingIn = false;
+      this.drawnInstances.clear();
+      this.stopBackgroundAccumulation();
+      this.cameraIsMoving = false;
+
+      this.renderer.autoClearColor = true;
+      this.renderer.autoClearDepth = true;
+
+      this.invalidate();
+    } else {
+      // When using the BVH, disable auto clear color and depth to allow for
+      // the scene to fill in over multiple frames.
+      this.renderer.autoClearColor = false;
+      this.renderer.autoClearDepth = false;
+    }
   }
 
   /**

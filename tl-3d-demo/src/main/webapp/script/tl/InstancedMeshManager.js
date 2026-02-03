@@ -398,6 +398,20 @@ export class InstancedMeshManager {
   }
 
   /**
+   * Calculate the total triangle count across all managed instanced meshes.
+   * This is the sum of (triangleCount * instanceCount) for each asset.
+   * Used to decide whether BVH visibility culling is needed.
+   * @returns {number} Total triangle count
+   */
+  getTotalInstancedTriangleCount() {
+    let total = 0;
+    for (const [, data] of this.managedMeshes) {
+      total += data.triangleCount * data.instanceData.length;
+    }
+    return total;
+  }
+
+  /**
    * Clean up resources
    */
   dispose() {

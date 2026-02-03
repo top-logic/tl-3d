@@ -46,6 +46,7 @@ import {
   GRID_SMALL_CELL,
   GRID_SNAP_THRESHOLD,
   HEIGHT_SEGMENTS,
+  INSTANCING_BVH_TRIANGLE_THRESHOLD,
   OPTIMIZED_PIXEL_RATIO,
   SELECTION_COLOR,
   SNAP_THRESHOLD,
@@ -159,10 +160,6 @@ class ThreeJsControl {
       powerPreference: "high-performance",
       preserveDrawingBuffer: true,
     });
-
-    // Disable auto clear color and depth
-    this.renderer.autoClearColor = false;
-    this.renderer.autoClearDepth = false;
 
     this.renderer.setSize(container.clientWidth, container.clientHeight);
 
@@ -1537,15 +1534,29 @@ class ThreeJsControl {
     this.invalidate();
   }
 
+  /**
+   * Decide whether BVH culling is needed based on total instanced triangle
+   * count, build it if so, and tell the RenderManager which path to take.
+   */
   buildSceneBVH() {
-    this.sceneBVH.buildFromInstanceManager(
-      this.scope.instanceManager,
-      this.scope.instanceGroups,
-    );
+    const totalTriangles =
+      this.scope.instanceManager.getTotalInstancedTriangleCount();
 
-    // Add proxy mesh to zUpRoot (so it inherits the rotation)
-    // Instead of adding to scene root
-    this.zUpRoot.add(this.sceneBVH.proxyMesh);
+    console.log(`Total triangles: ${totalTriangles}`);
+
+    const needsBVH = totalTriangles >= INSTANCING_BVH_TRIANGLE_THRESHOLD;
+
+    if (needsBVH) {
+      this.sceneBVH.buildFromInstanceManager(
+        this.scope.instanceManager,
+        this.scope.instanceGroups,
+      );
+      this.zUpRoot.add(this.sceneBVH.proxyMesh);
+    }
+
+    // Tell the render manager which rendering path to use.
+    // This also resets any in-progress filling-in / accumulation state.
+    this.renderManager.setUseBVH(needsBVH);
   }
 
   sendSceneChanges(commands) {

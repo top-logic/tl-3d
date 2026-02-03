@@ -557,6 +557,9 @@ export class SceneGraph extends SharedObject {
       // Update instanced meshes with real geometry
       scope.updateInstancedMeshesWithGLTF(this.ctrl);
 
+      // Re-evaluate whether BVH is needed now that real geometry is loaded
+      this.ctrl.buildSceneBVH();
+
       this.ctrl.applySelection(this.selection);
       this.ctrl.updateTransformControls();
       this.ctrl.invalidate();
