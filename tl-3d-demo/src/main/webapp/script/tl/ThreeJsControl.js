@@ -1,6 +1,6 @@
 /**
  * Main class for managing 3D scenes using Three.js library.
- * Provides methods for initializing and controlling a 3D scene with various functionalities.
+ * Provides methods for initialising and controlling a 3D scene with various functionalities.
  */
 
 import {
@@ -9,6 +9,7 @@ import {
   Box3Helper,
   BoxHelper,
   Color,
+  Frustum,
   Group,
   Matrix4,
   RGBAFormat,
@@ -25,7 +26,7 @@ import { InsertElement, RemoveElement, SetProperty } from "./Commands.js";
 import { Scope, SharedObject } from "./DataModels.js";
 import { NavigationCube } from "./NavigationCube.js";
 import { RenderManager } from "./RenderManager.js";
-import { SceneBVH } from "./SceneBVH.js";
+import { SceneOctree } from "./SceneOctree.js";
 import { SkyboxManager } from "./SkyboxManager.js";
 import {
   CameraUtils,
@@ -102,12 +103,12 @@ class ThreeJsControl {
       this.camera,
     );
 
-    this.sceneBVH = new SceneBVH();
+    this.sceneOctree = null;
 
     this.initTransformControls();
     this.initNavigationCube();
 
-    this.renderManager.setSceneBVH(this.sceneBVH);
+    this.renderManager.setSceneOctree(this.sceneOctree);
     this.renderManager.setInstanceManager(this.scope.instanceManager);
 
     // Initial render
@@ -129,8 +130,6 @@ class ThreeJsControl {
           .then(() =>
             this.skyboxManager.toggleSkybox(initialState.isSkyboxVisible),
           );
-
-        // Recreate floors after scene is loaded - moved to loadScene()
       }, 100),
     );
   }
@@ -186,6 +185,95 @@ class ThreeJsControl {
         passive: false,
       },
     );
+
+    // Add keyboard shortcuts for debug visualisation
+    window.addEventListener("keydown", (event) => {
+      // Press 'O' to toggle octree nodes
+      if (event.key === "o" || event.key === "O") {
+        this.octreeDebugState = this.octreeDebugState || {
+          visible: false,
+          showNodes: true,
+          showInstances: false,
+          showOnlyVisible: false,
+        };
+        this.octreeDebugState.visible = !this.octreeDebugState.visible;
+        this.toggleOctreeDebug(this.octreeDebugState.visible, {
+          showNodes: this.octreeDebugState.showNodes,
+          showInstances: this.octreeDebugState.showInstances,
+          showOnlyVisible: this.octreeDebugState.showOnlyVisible,
+        });
+        console.log(
+          "Octree debug:",
+          this.octreeDebugState.visible ? "ON" : "OFF",
+        );
+      }
+      // Press 'I' to toggle instance bounding boxes
+      if (event.key === "i" || event.key === "I") {
+        this.octreeDebugState = this.octreeDebugState || {
+          visible: false,
+          showNodes: true,
+          showInstances: false,
+          showOnlyVisible: false,
+        };
+        this.octreeDebugState.showInstances =
+          !this.octreeDebugState.showInstances;
+        if (this.octreeDebugState.visible) {
+          this.toggleOctreeDebug(true, {
+            showNodes: this.octreeDebugState.showNodes,
+            showInstances: this.octreeDebugState.showInstances,
+            showOnlyVisible: this.octreeDebugState.showOnlyVisible,
+          });
+          console.log(
+            "Instance boxes:",
+            this.octreeDebugState.showInstances ? "ON" : "OFF",
+          );
+        }
+      }
+      // Press 'V' to toggle visible-only filter
+      if (event.key === "v" || event.key === "V") {
+        this.octreeDebugState = this.octreeDebugState || {
+          visible: false,
+          showNodes: true,
+          showInstances: false,
+          showOnlyVisible: false,
+        };
+        this.octreeDebugState.showOnlyVisible =
+          !this.octreeDebugState.showOnlyVisible;
+        if (this.octreeDebugState.visible) {
+          this.toggleOctreeDebug(true, {
+            showNodes: this.octreeDebugState.showNodes,
+            showInstances: this.octreeDebugState.showInstances,
+            showOnlyVisible: this.octreeDebugState.showOnlyVisible,
+          });
+          console.log(
+            "Visible only:",
+            this.octreeDebugState.showOnlyVisible ? "ON" : "OFF",
+          );
+        }
+      }
+      // Press 'T' to toggle triangle budget
+      if (event.key === "t" || event.key === "T") {
+        const enabled = !this.renderManager.useTriangleBudget;
+        this.renderManager.setUseTriangleBudget(enabled);
+      }
+      // Press '+' to increase triangle budget
+      if (event.key === "+" || event.key === "=") {
+        const current = this.renderManager.maxTrianglesPerFrame;
+        const newBudget = Math.min(current + 1_000_000, 50_000_000);
+        this.renderManager.setTriangleBudget(newBudget);
+      }
+      // Press '-' to decrease triangle budget
+      if (event.key === "-" || event.key === "_") {
+        const current = this.renderManager.maxTrianglesPerFrame;
+        const newBudget = Math.max(current - 1_000_000, 1_000_000);
+        this.renderManager.setTriangleBudget(newBudget);
+      }
+      // Press 'S' to show stats
+      if (event.key === "s" || event.key === "S") {
+        const stats = this.renderManager.getStats();
+        console.log("Render Statistics:", stats);
+      }
+    });
 
     // Create a MutationObserver to detect DOM changes that might affect layout
     const mutationObserver = new MutationObserver(() => {
@@ -1363,7 +1451,7 @@ class ThreeJsControl {
     return command;
   }
 
-  // applies red color to selected shared objects from the graphScene
+  // applies red colour to selected shared objects from the graphScene
   applySelection(selectedSharedNodes) {
     // remove selection from the previously selected objects
     for (const shared3JSNode of this.selection) {
@@ -1380,7 +1468,7 @@ class ThreeJsControl {
     this.updateObjectsTransparency();
   }
 
-  // Apply colors to all objects that have color and 3D node
+  // Apply colours to all objects that have colour and 3D node
   applyColors() {
     for (const [id, obj] of Object.entries(this.scope.objects)) {
       if (obj.color && obj.node && obj.color.trim() !== "") {
@@ -1504,7 +1592,7 @@ class ThreeJsControl {
 
     this.sceneGraph = this.scope.loadJson(dataJson);
 
-    // Analyze for instancing
+    // Analyse for instancing
     this.scope.analyzeForInstancing();
 
     this.sceneGraph.buildGraph(this);
@@ -1523,8 +1611,8 @@ class ThreeJsControl {
 
       this.updateObjectsTransparency();
 
-      // NEW: Build BVH after all instances are loaded
-      this.buildSceneBVH();
+      // Build octree after all instances are loaded
+      this.buildSceneOctree();
     });
 
     this.camera.position.applyMatrix4(this.scene.matrix);
@@ -1535,28 +1623,132 @@ class ThreeJsControl {
   }
 
   /**
-   * Decide whether BVH culling is needed based on total instanced triangle
+   * Decide whether octree culling is needed based on total instanced triangle
    * count, build it if so, and tell the RenderManager which path to take.
    */
-  buildSceneBVH() {
+  buildSceneOctree() {
     const totalTriangles =
       this.scope.instanceManager.getTotalInstancedTriangleCount();
 
     console.log(`Total triangles: ${totalTriangles}`);
 
-    const needsBVH = totalTriangles >= INSTANCING_BVH_TRIANGLE_THRESHOLD;
+    const needsOctree = totalTriangles >= INSTANCING_BVH_TRIANGLE_THRESHOLD;
 
-    if (needsBVH) {
-      this.sceneBVH.buildFromInstanceManager(
+    if (needsOctree) {
+      // Get the zUpRoot transformation matrix
+      this.zUpRoot.updateMatrixWorld(true);
+      const zUpTransform = this.zUpRoot.matrixWorld.clone();
+
+      this.sceneOctree = SceneOctree.fromInstanceManager(
         this.scope.instanceManager,
         this.scope.instanceGroups,
+        this.boundingBox,
+        zUpTransform, // Pass the zUpRoot transform
       );
-      this.zUpRoot.add(this.sceneBVH.proxyMesh);
+
+      // Update render manager reference
+      this.renderManager.setSceneOctree(this.sceneOctree);
     }
 
     // Tell the render manager which rendering path to use.
-    // This also resets any in-progress filling-in / accumulation state.
-    this.renderManager.setUseBVH(needsBVH);
+    // This also resets any in-progress state.
+    this.renderManager.setUseOctree(needsOctree);
+  }
+
+  /**
+   * Toggle octree debug visualisation
+   * @param {boolean} visible - Show or hide visualisation
+   * @param {Object} options - Visualisation options
+   *   - showNodes: Show octree node boundaries (default: true)
+   *   - showInstances: Show instance bounding boxes (default: false)
+   *   - showOnlyVisible: Only show currently visible instances (default: false)
+   */
+  toggleOctreeDebug(visible, options = {}) {
+    const {
+      showNodes = true,
+      showInstances = false,
+      showOnlyVisible = false,
+    } = options;
+
+    // Remove existing helpers
+    const helper = this.scene.getObjectByName("OctreeDebugHelper");
+    if (helper) {
+      this.scene.remove(helper);
+    }
+
+    if (visible && this.sceneOctree) {
+      const debugGroup = new Group();
+      debugGroup.name = "OctreeDebugHelper";
+
+      // Show octree node boundaries
+      if (showNodes) {
+        this.sceneOctree.root.addDebugLines(debugGroup);
+      }
+
+      // Show instance bounding boxes
+      if (showInstances) {
+        const instanceColor = showOnlyVisible ? 0x00ff00 : 0xffff00;
+
+        // Get currently visible instances if filtering
+        let visibleSet = null;
+        if (showOnlyVisible) {
+          const frustum = new Frustum();
+          const projScreenMatrix = new Matrix4();
+          projScreenMatrix.multiplyMatrices(
+            this.camera.projectionMatrix,
+            this.camera.matrixWorldInverse,
+          );
+          frustum.setFromProjectionMatrix(projScreenMatrix);
+          const visibleObjects = this.sceneOctree.queryFrustum(frustum);
+
+          visibleSet = new Set();
+          for (const obj of visibleObjects) {
+            visibleSet.add(`${obj.assetKey}-${obj.instanceID}`);
+          }
+        }
+
+        // Draw bounding boxes for instances
+        for (const [assetKey, data] of this.scope.instanceManager
+          .managedMeshes) {
+          const group = this.scope.instanceGroups.get(assetKey);
+          if (!group) continue;
+
+          const baseBox = data.baseBoundingBox;
+          if (!baseBox) continue;
+
+          for (const instance of data.instanceData) {
+            // Skip if filtering to visible only
+            if (
+              showOnlyVisible &&
+              !visibleSet.has(`${assetKey}-${instance.id}`)
+            ) {
+              continue;
+            }
+
+            // Transform base bounding box
+            const instanceBox = baseBox.clone();
+            instanceBox.applyMatrix4(instance.matrix);
+
+            // Create box helper
+            const boxHelper = new Box3Helper(
+              instanceBox,
+              showOnlyVisible ? 0x00ff00 : 0xffff00,
+            );
+            boxHelper.userData.assetKey = assetKey;
+            boxHelper.userData.instanceID = instance.id;
+            debugGroup.add(boxHelper);
+          }
+        }
+      }
+
+      this.scene.add(debugGroup);
+
+      // Log statistics
+      const stats = this.sceneOctree.getStats();
+      console.log("Octree Statistics:", stats);
+    }
+
+    this.invalidate();
   }
 
   sendSceneChanges(commands) {
@@ -1695,7 +1887,7 @@ class ThreeJsControl {
   }
 }
 
-// For sever communication written in legacy JS.
+// For server communication written in legacy JS.
 window.services.threejs = {
   init: function (initialState) {
     const control = new ThreeJsControl(initialState);
@@ -1764,5 +1956,12 @@ window.services.threejs = {
 
   rotate: function (container, axis, direction, stepSize) {
     ThreeJsControl.control(container)?.rotate(axis, direction, stepSize);
+  },
+
+  toggleOctreeDebug: function (container, visible) {
+    const control = ThreeJsControl.control(container);
+    if (control != null) {
+      control.toggleOctreeDebug(visible);
+    }
   },
 };
