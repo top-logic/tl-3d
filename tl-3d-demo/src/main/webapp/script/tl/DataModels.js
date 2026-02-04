@@ -49,7 +49,7 @@ export class Scope {
   }
 
   /**
-   * Analyze the scene graph to find duplicate assets that should be instanced
+   * Analyse the scene graph to find duplicate assets that should be instanced
    * @returns {Map} Map of assetKey -> {asset, instances[]}
    */
   analyzeForInstancing() {
@@ -264,7 +264,7 @@ export class Scope {
 
   /**
    * Update which instances are visible for a specific asset
-   * This will be called by the BVH/visibility system
+   * This will be called by the octree/visibility system
    */
   updateVisibleInstances(assetKey, visibleInstanceIDs) {
     this.instanceManager.updateVisibleInstances(assetKey, visibleInstanceIDs);
@@ -545,7 +545,7 @@ export class SceneGraph extends SharedObject {
     this.ctrl.zUpRoot.clear();
     this.ctrl.multiTransformGroup.clear();
 
-    // Re-analyze for instancing
+    // Re-analyse for instancing
     scope.analyzeForInstancing();
 
     this.build(this.ctrl.zUpRoot);
@@ -557,8 +557,8 @@ export class SceneGraph extends SharedObject {
       // Update instanced meshes with real geometry
       scope.updateInstancedMeshesWithGLTF(this.ctrl);
 
-      // Re-evaluate whether BVH is needed now that real geometry is loaded
-      this.ctrl.buildSceneBVH();
+      // Re-evaluate whether octree is needed now that real geometry is loaded
+      this.ctrl.buildSceneOctree();
 
       this.ctrl.applySelection(this.selection);
       this.ctrl.updateTransformControls();
@@ -701,7 +701,7 @@ export class GroupNode extends SharedObject {
     transform(group, this.transform);
     this.contents.forEach((c) => c.build(group, context));
 
-    // Apply color to this group node
+    // Apply colour to this group node
     if (this.color) {
       applyColorToObject(group, this.color);
     }
@@ -848,7 +848,7 @@ export class PartNode extends SharedObject {
         break;
       case "color":
         this.color = value;
-        // Update 3D object color
+        // Update 3D object colour
         if (this.node && value) {
           applyColorToObject(this.node, value);
         }
@@ -924,7 +924,7 @@ export class GltfAsset extends SharedObject {
 
     this.gltf = newGLTF;
 
-    // Ensure group is initialized before trying to use it
+    // Ensure group is initialised before trying to use it
     if (!this.group) {
       return;
     }

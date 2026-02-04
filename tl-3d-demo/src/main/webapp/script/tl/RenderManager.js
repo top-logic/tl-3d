@@ -1,7 +1,9 @@
 /**
- * Centralized render management with dirty flag system.
+ * Centralised render management with dirty flag system.
  * Ensures exactly one render per animation frame when needed.
  */
+
+import { Frustum, Matrix4 } from "three";
 
 export class RenderManager {
   constructor(renderer, scene, camera) {
@@ -13,7 +15,12 @@ export class RenderManager {
     this.isRendering = false;
     this.rafId = null;
 
-    this.useBVH = false;
+    this.useOctree = false;
+    this.sortVisibleInstances = true; // Enable by default for triangle budgeting
+
+    // Triangle budget settings
+    this.maxTrianglesPerFrame = 10_000_000; // 5M triangles per frame
+    this.useTriangleBudget = true; // Enable/disable budget system
 
     this.renderTargets = [];
 
@@ -21,26 +28,21 @@ export class RenderManager {
       frameCount: 0,
       lastFrameTime: 0,
       fps: 0,
+      renderedTriangles: 0,
+      visibleInstances: 0,
+      culledInstances: 0,
     };
 
-    this.sceneBVH = null;
+    this.sceneOctree = null;
     this.instanceManager = null;
 
     // Camera tracking
     this.cameraIsMoving = false;
     this.cameraStopTimer = null;
-
-    // Progressive filling-in when camera stops
-    this.drawnInstances = new Map(); // Map<assetKey, Set<instanceID>>
-    this.isFillingIn = false;
-
-    // Background accumulation
-    this.accumulationIntervalId = null;
-    this.isAccumulating = false;
   }
 
-  setSceneBVH(sceneBVH) {
-    this.sceneBVH = sceneBVH;
+  setSceneOctree(sceneOctree) {
+    this.sceneOctree = sceneOctree;
   }
 
   setInstanceManager(instanceManager) {
@@ -51,42 +53,62 @@ export class RenderManager {
    * Call this when the camera changes (from orbit controls, etc.)
    */
   onCameraMove() {
-    // If we're not using BVH, camera movement is irrelevant to instance
+    // If we're not using octree, camera movement is irrelevant to instance
     // visibility. Just invalidate and return.
-    if (!this.useBVH) {
+    if (!this.useOctree) {
       this.invalidate();
       return;
     }
 
     this.cameraIsMoving = true;
 
-    // Stop progressive filling-in during camera movement
-    this.isFillingIn = false;
-
-    // Stop background accumulation during camera movement
-    this.stopBackgroundAccumulation();
-
     // Clear any existing "stopped" timer
     if (this.cameraStopTimer) {
       clearTimeout(this.cameraStopTimer);
     }
 
-    // Set timer to detect when camera stops (minimal timeout)
+    // Set timer to detect when camera stops
     this.cameraStopTimer = setTimeout(() => {
       this.cameraIsMoving = false;
-
-      // Reset progressive filling-in state
-      this.drawnInstances.clear();
-      this.isFillingIn = true;
-
-      // Start background accumulation when camera stops
-      this.startBackgroundAccumulation();
-
-      // Start progressive filling-in immediately
       this.invalidate();
-    }, 50); // Minimal timeout to debounce camera movement
+    }, 100);
 
     this.invalidate();
+  }
+
+  /**
+   * Apply triangle budget to visible objects, prioritizing closer objects.
+   * Objects are already sorted by distance (front to back).
+   * @param {Array} visibleObjects - Sorted array of visible objects
+   * @returns {Array} Filtered array within triangle budget
+   */
+  applyTriangleBudget(visibleObjects) {
+    let triangleCount = 0;
+    const result = [];
+
+    for (const obj of visibleObjects) {
+      // Get triangle count for this asset type
+      const meshData = this.instanceManager.managedMeshes.get(obj.assetKey);
+      if (!meshData) continue;
+
+      const instanceTriangles = meshData.triangleCount;
+
+      // Check if adding this instance would exceed budget
+      if (triangleCount + instanceTriangles > this.maxTrianglesPerFrame) {
+        // Budget exceeded, stop adding instances
+        break;
+      }
+
+      triangleCount += instanceTriangles;
+      result.push(obj);
+    }
+
+    // Update stats
+    this.stats.renderedTriangles = triangleCount;
+    this.stats.visibleInstances = result.length;
+    this.stats.culledInstances = visibleObjects.length - result.length;
+
+    return result;
   }
 
   invalidate() {
@@ -120,105 +142,56 @@ export class RenderManager {
 
     try {
       if (this.instanceManager) {
-        if (!this.useBVH) {
+        if (!this.useOctree) {
           // Simple path: just show every instance, every frame.
           for (const [assetKey, meshData] of this.instanceManager
             .managedMeshes) {
             const allIDs = meshData.instanceData.map((d) => d.id);
             this.instanceManager.updateVisibleInstances(assetKey, allIDs);
           }
-        } else if (this.cameraIsMoving && this.sceneBVH) {
-          this.renderer.clear(true, true);
+        } else if (this.sceneOctree) {
+          // Octree path: use frustum culling
+          const frustum = new Frustum();
+          const projScreenMatrix = new Matrix4();
+          projScreenMatrix.multiplyMatrices(
+            this.camera.projectionMatrix,
+            this.camera.matrixWorldInverse,
+          );
+          frustum.setFromProjectionMatrix(projScreenMatrix);
 
-          // Camera moving: use BVH to accumulate visible instances
-          this.sceneBVH.queryVisibleInstances(
-            this.camera,
-            500, // maxRays during motion
+          // Query visible instances from octree.
+          // Results come back in approximate front-to-back order.
+          const cameraPos = this.camera.position;
+          let visibleObjects = this.sceneOctree.queryFrustum(
+            frustum,
+            cameraPos,
           );
 
-          // Get the accumulated visible instances
-          const visible = this.sceneBVH.getVisibleInstances();
-
-          for (const [assetKey, instanceIDs] of visible) {
-            this.instanceManager.updateVisibleInstances(
-              assetKey,
-              Array.from(instanceIDs),
-            );
+          // Apply triangle budget if enabled
+          if (this.useTriangleBudget) {
+            visibleObjects = this.applyTriangleBudget(visibleObjects);
           }
 
-          // For any asset types not in the visible map, show none
+          // Group by asset key
+          const visibleByAsset = new Map();
+          for (const obj of visibleObjects) {
+            if (!visibleByAsset.has(obj.assetKey)) {
+              visibleByAsset.set(obj.assetKey, []);
+            }
+            visibleByAsset.get(obj.assetKey).push(obj.instanceID);
+          }
+
+          // Update instance visibility
+          for (const [assetKey, instanceIDs] of visibleByAsset) {
+            this.instanceManager.updateVisibleInstances(assetKey, instanceIDs);
+          }
+
+          // For assets not in visible set, hide all instances
           for (const [assetKey, meshData] of this.instanceManager
             .managedMeshes) {
-            if (!visible.has(assetKey)) {
+            if (!visibleByAsset.has(assetKey)) {
               this.instanceManager.updateVisibleInstances(assetKey, []);
             }
-          }
-        } else if (this.isFillingIn) {
-          // Camera stopped: progressively fill in instances
-          // Draw a new batch each frame - previous batches remain visible via preserved buffers
-          let hasMoreToFill = false;
-
-          for (const [assetKey, meshData] of this.instanceManager
-            .managedMeshes) {
-            // Get or initialize drawn instances for this asset
-            if (!this.drawnInstances.has(assetKey)) {
-              this.drawnInstances.set(assetKey, new Set());
-            }
-
-            const drawnSet = this.drawnInstances.get(assetKey);
-            const totalInstances = meshData.instanceData.length;
-
-            let batchForThisFrame = [];
-
-            if (drawnSet.size < totalInstances) {
-              hasMoreToFill = true;
-
-              // Randomly select a batch of instances to draw this frame
-              const batchSize = Math.min(
-                Math.ceil((totalInstances - drawnSet.size) * 0.2),
-                250,
-              );
-
-              // Pick random undrawn instances without creating full arrays
-              const batchSet = new Set();
-              let attempts = 0;
-              const maxAttempts = batchSize * 10; // Prevent infinite loop
-
-              while (batchSet.size < batchSize && attempts < maxAttempts) {
-                const randomIndex = Math.floor(Math.random() * totalInstances);
-                const instanceID = meshData.instanceData[randomIndex].id;
-
-                if (!drawnSet.has(instanceID)) {
-                  batchSet.add(instanceID);
-                  drawnSet.add(instanceID);
-                }
-                attempts++;
-              }
-
-              batchForThisFrame = Array.from(batchSet);
-            }
-
-            // Update visible instances to draw ONLY the new batch this frame
-            // Previous batches remain visible due to preserved color/depth buffers
-            this.instanceManager.updateVisibleInstances(
-              assetKey,
-              batchForThisFrame,
-            );
-          }
-
-          // If there are still instances to fill, schedule another frame
-          if (hasMoreToFill) {
-            this.invalidate();
-          } else {
-            // All instances are drawn, stop filling-in
-            this.isFillingIn = false;
-          }
-        } else {
-          // Camera stopped and filling complete: show all instances
-          for (const [assetKey, meshData] of this.instanceManager
-            .managedMeshes) {
-            const allIDs = meshData.instanceData.map((d) => d.id);
-            this.instanceManager.updateVisibleInstances(assetKey, allIDs);
           }
         }
       }
@@ -289,65 +262,65 @@ export class RenderManager {
   }
 
   /**
-   * Start background accumulation of visible instances when camera is stopped.
-   * This runs continuously to build up an accurate collection for when the camera starts moving.
+   * Get current rendering statistics
+   * @returns {Object} Statistics object with FPS, triangle count, etc.
    */
-  startBackgroundAccumulation() {
-    if (this.isAccumulating || !this.sceneBVH || !this.instanceManager) {
-      return;
-    }
-
-    this.isAccumulating = true;
-
-    // Use setInterval to run independently of render cycles
-    // Run at ~60fps (16ms) to accumulate visible instances continuously
-    this.accumulationIntervalId = setInterval(() => {
-      if (!this.isAccumulating) {
-        return;
-      }
-
-      // Query visible instances with fewer rays since we're not in a hurry
-      // This accumulates over time to build a comprehensive visible set
-      this.sceneBVH.queryVisibleInstances(this.camera, 500);
-    }, 16);
+  getStats() {
+    return {
+      fps: this.stats.fps,
+      renderedTriangles: this.stats.renderedTriangles,
+      visibleInstances: this.stats.visibleInstances,
+      culledInstances: this.stats.culledInstances,
+      triangleBudget: this.maxTrianglesPerFrame,
+      budgetUsage:
+        (
+          (this.stats.renderedTriangles / this.maxTrianglesPerFrame) *
+          100
+        ).toFixed(1) + "%",
+    };
   }
 
   /**
-   * Switch between BVH-culled rendering and simple "render all" rendering.
-   * Safe to call at any time; cleans up in-progress state from the previous mode.
-   * @param {boolean} enabled - true = use BVH culling; false = render all instances every frame
+   * Set the triangle budget for rendering
+   * @param {number} maxTriangles - Maximum triangles to render per frame
    */
-  setUseBVH(enabled) {
-    this.useBVH = enabled;
+  setTriangleBudget(maxTriangles) {
+    this.maxTrianglesPerFrame = maxTriangles;
+    this.invalidate();
+  }
+
+  /**
+   * Enable or disable triangle budget system
+   * @param {boolean} enabled - Whether to use triangle budgeting
+   */
+  setUseTriangleBudget(enabled) {
+    this.useTriangleBudget = enabled;
+    this.invalidate();
+  }
+
+  /**
+   * Switch between octree-culled rendering and simple "render all" rendering.
+   * Safe to call at any time; cleans up in-progress state from the previous mode.
+   * @param {boolean} enabled - true = use octree culling; false = render all instances every frame
+   */
+  setUseOctree(enabled) {
+    this.useOctree = enabled;
 
     if (!enabled) {
-      // We're going into simple mode. Stop anything the BVH path may have
+      // We're going into simple mode. Stop anything the octree path may have
       // started, and make sure all instances are visible on the next frame.
-      this.isFillingIn = false;
-      this.drawnInstances.clear();
-      this.stopBackgroundAccumulation();
       this.cameraIsMoving = false;
 
+      // Re-enable auto clear
       this.renderer.autoClearColor = true;
       this.renderer.autoClearDepth = true;
 
       this.invalidate();
     } else {
-      // When using the BVH, disable auto clear color and depth to allow for
-      // the scene to fill in over multiple frames.
-      this.renderer.autoClearColor = false;
-      this.renderer.autoClearDepth = false;
-    }
-  }
-
-  /**
-   * Stop background accumulation of visible instances.
-   */
-  stopBackgroundAccumulation() {
-    this.isAccumulating = false;
-    if (this.accumulationIntervalId !== null) {
-      clearInterval(this.accumulationIntervalId);
-      this.accumulationIntervalId = null;
+      // When using octree, we can keep auto-clear enabled
+      // since we're doing deterministic frustum culling
+      this.renderer.autoClearColor = true;
+      this.renderer.autoClearDepth = true;
     }
   }
 
@@ -359,7 +332,6 @@ export class RenderManager {
     if (this.cameraStopTimer) {
       clearTimeout(this.cameraStopTimer);
     }
-    this.stopBackgroundAccumulation();
     this.renderTargets = [];
   }
 }
