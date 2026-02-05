@@ -4,7 +4,6 @@
  */
 
 import {
-  AxesHelper,
   Box3,
   Color,
   DepthTexture,
@@ -88,35 +87,29 @@ export class ImpostorManager {
    * Generate impostor textures for a GLTF asset
    */
   generateImpostorForAsset(assetKey, gltf) {
-    // Clone and rotate model first
+    // Clone model
     const modelClone = gltf.scene.clone();
-    //modelClone.rotation.x = -_90_DEGREE;
     modelClone.updateMatrixWorld(true);
 
-    // Compute bounding box and sphere AFTER rotation
+    // Compute bounding box and sphere
     const boundingBox = new Box3().setFromObject(modelClone);
     const boundingSphere = new Sphere();
     boundingBox.getBoundingSphere(boundingSphere);
 
     // Check if center is at origin
     const center = boundingSphere.center.clone();
-    console.log("Bounding sphere center:", center);
-    console.log("Distance from origin:", center.length());
 
     // If not centered, adjust model position
     if (center.length() > 0.001) {
-      console.log("Model not centered, adjusting...");
       modelClone.position.sub(center);
       modelClone.updateMatrixWorld(true);
 
       // Recompute bounding box/sphere after centering
       boundingBox.setFromObject(modelClone);
       boundingBox.getBoundingSphere(boundingSphere);
-      console.log("New center after adjustment:", boundingSphere.center);
     }
 
     const radius = boundingSphere.radius;
-    console.log("Bounding radius:", radius);
 
     const resolution = 256;
     const atlasWidth = resolution * 6;
@@ -139,11 +132,8 @@ export class ImpostorManager {
     );
 
     const scene = new Scene();
-    scene.add(modelClone); // Already rotated and centered
-    SceneUtils.addStandardLights(scene);
-
-    const axesHelper = new AxesHelper(radius * 0.5); // Half the radius so it's visible but not huge
-    scene.add(axesHelper);
+    scene.add(modelClone);
+    SceneUtils.addImpostorCaptureLights(scene);
 
     const originalClearColor = this.renderer.getClearColor(new Color());
     const originalClearAlpha = this.renderer.getClearAlpha();
@@ -155,9 +145,10 @@ export class ImpostorManager {
     this.renderer.setRenderTarget(atlasTarget);
     this.renderer.clear();
 
-    // Store the camera "up" orientation for each view, so that
-    // it can be used to orient the impostors in the correct direction
     const captureOrientations = [];
+
+    // Model's up is Z-up (matches how models are authored)
+    const modelUpWorld = new Vector3(0, 0, 1);
 
     // Render each of the 26 views directly into atlas positions
     for (let i = 0; i < this.directions.length; i++) {
@@ -166,14 +157,25 @@ export class ImpostorManager {
       const gridY = Math.floor(i / 6);
 
       camera.position.copy(dir).multiplyScalar(radius * 2);
+
+      // Set camera up to match model's up (Z-up)
+      // Exception: when looking along Z axis, use X as up to avoid singularity
+      if (Math.abs(dir.dot(modelUpWorld)) > 0.99) {
+        camera.up.set(1, 0, 0); // Use X-up when looking along Z
+      } else {
+        camera.up.copy(modelUpWorld); // Use Z-up otherwise
+      }
+
       camera.lookAt(0, 0, 0);
       camera.updateMatrixWorld(true);
 
+      // Extract the actual camera orientation after lookAt
       const cameraRight = new Vector3();
       const cameraUp = new Vector3();
       const cameraForward = new Vector3();
-
       camera.matrix.extractBasis(cameraRight, cameraUp, cameraForward);
+
+      // Store the camera's up vector for this view
       captureOrientations.push(cameraUp.clone());
 
       // Set viewport to render into correct atlas position
@@ -201,8 +203,6 @@ export class ImpostorManager {
 
     this.renderer.setClearColor(originalClearColor, originalClearAlpha);
     this.renderer.setRenderTarget(null);
-
-    //this.debugSaveAtlas(atlasTarget, assetKey, atlasWidth, atlasHeight);
 
     this.impostorData.set(assetKey, {
       colorTexture: atlasTarget.texture,

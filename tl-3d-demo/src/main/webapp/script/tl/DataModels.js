@@ -263,8 +263,13 @@ export class Scope {
         const impostorData = ctrl.impostorManager.impostorData.get(gltfUrl);
 
         if (impostorData) {
-          const { colorTexture, depthTexture, boundingRadius, centerOffset } =
-            impostorData;
+          const {
+            colorTexture,
+            depthTexture,
+            boundingRadius,
+            centerOffset,
+            captureOrientations,
+          } = impostorData;
 
           // Prepare instance data (same as for real meshes)
           const instanceData = group.instances.map((instance, index) => ({
@@ -282,6 +287,7 @@ export class Scope {
             centerOffset,
             group.instances.length,
             instanceData,
+            captureOrientations,
           );
 
           // Add to scene (initially hidden, will be shown when needed)

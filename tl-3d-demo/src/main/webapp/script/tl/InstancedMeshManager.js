@@ -313,6 +313,7 @@ export class InstancedMeshManager {
     centerOffset,
     maxInstances,
     instanceData,
+    captureOrientations,
   ) {
     // Get the existing instanced mesh data to access matrixTexture
     const existingMeshData = this.managedMeshes.get(assetKey);
@@ -349,6 +350,7 @@ export class InstancedMeshManager {
       centerOffset,
       matrixTexture,
       textureHeight,
+      captureOrientations,
     );
 
     const mesh = new Mesh(instancedGeometry, material);
@@ -379,6 +381,7 @@ export class InstancedMeshManager {
     centerOffset,
     matrixTexture,
     textureHeight,
+    captureOrientations,
   ) {
     return new ShaderMaterial({
       uniforms: {
@@ -389,6 +392,7 @@ export class InstancedMeshManager {
         atlasResolution: { value: 256 },
         centerOffset: { value: centerOffset },
         boundingRadius: { value: boundingRadius },
+        captureOrientations: { value: captureOrientations },
       },
       vertexShader: `
        attribute float instanceID;
@@ -398,69 +402,7 @@ export class InstancedMeshManager {
        uniform float boundingRadius;
 
        varying vec2 vUv;
-       varying vec3 vBillboardCenter;
-       varying vec3 vBillboardRight;
-       varying vec3 vBillboardUp;
-       varying vec3 vViewPosition;
-       varying mat3 vInstanceRotation;
-
-       void main() {
-         vUv = uv;
-
-         // Look up instance matrix
-         float row = instanceID;
-         float rowNorm = (row + 0.5) / textureHeight;
-
-         vec4 col0 = texture2D(matrixTexture, vec2(0.125, rowNorm));
-         vec4 col1 = texture2D(matrixTexture, vec2(0.375, rowNorm));
-         vec4 col2 = texture2D(matrixTexture, vec2(0.625, rowNorm));
-         vec4 col3 = texture2D(matrixTexture, vec2(0.875, rowNorm));
-
-         mat4 instanceMatrix = mat4(col0, col1, col2, col3);
-
-         vec3 instancePosLocal = instanceMatrix[3].xyz;
-         vec3 adjustedPosLocal = instancePosLocal + centerOffset;
-         vec3 instancePosWorld = (modelMatrix * vec4(adjustedPosLocal, 1.0)).xyz;
-
-         // Extract rotation from instance matrix (combined with modelMatrix)
-          mat4 fullMatrix = modelMatrix;// * instanceMatrix;
-
-          vInstanceRotation = mat3(
-            normalize(fullMatrix[0].xyz),
-            normalize(fullMatrix[1].xyz),
-            normalize(fullMatrix[2].xyz)
-          );
-
-         // Simple screen-aligned billboard
-         vec3 cameraRight = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
-         vec3 cameraUp = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
-
-         // Pass these to fragment shader
-         vBillboardRight = cameraRight;
-         vBillboardUp = cameraUp;
-
-         vec3 billboardPosWorld = instancePosWorld
-           + cameraRight * position.x
-           + cameraUp * position.y;
-
-         vec4 viewPos = viewMatrix * vec4(billboardPosWorld, 1.0);
-         vViewPosition = viewPos.xyz;
-
-         gl_Position = projectionMatrix * viewPos;
-
-         vBillboardCenter = instancePosWorld;
-       }
-      `,
-
-      fragmentShader: `
-       uniform float boundingRadius;
-       uniform mat4 projectionMatrix;
-       uniform sampler2D colorAtlas;
-
-       varying vec2 vUv;
-       varying vec3 vBillboardCenter;
-       varying vec3 vBillboardRight;
-       varying vec3 vBillboardUp;
+       flat varying int vSpriteIndex;
        varying vec3 vViewPosition;
        varying mat3 vInstanceRotation;
 
@@ -534,27 +476,143 @@ export class InstancedMeshManager {
        }
 
        void main() {
-         // Use camera forward direction
-         vec3 cameraForward = -vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
+         vUv = uv;
 
-         // Transform to instance's local space
+         // Look up instance matrix
+         float row = instanceID;
+         float rowNorm = (row + 0.5) / textureHeight;
+
+         vec4 col0 = texture2D(matrixTexture, vec2(0.125, rowNorm));
+         vec4 col1 = texture2D(matrixTexture, vec2(0.375, rowNorm));
+         vec4 col2 = texture2D(matrixTexture, vec2(0.625, rowNorm));
+         vec4 col3 = texture2D(matrixTexture, vec2(0.875, rowNorm));
+
+         mat4 instanceMatrix = mat4(col0, col1, col2, col3);
+
+         vec3 instancePosLocal = instanceMatrix[3].xyz;
+
+         // Extract rotation from instance matrix (combined with modelMatrix)
+         mat4 fullMatrix = modelMatrix * instanceMatrix;
+
+         mat3 instanceRotationLocal = mat3(
+           normalize(instanceMatrix[0].xyz),
+           normalize(instanceMatrix[1].xyz),
+           normalize(instanceMatrix[2].xyz)
+         );
+
+         vInstanceRotation = mat3(
+           normalize(fullMatrix[0].xyz),
+           normalize(fullMatrix[1].xyz),
+           normalize(fullMatrix[2].xyz)
+         );
+
+         // Apply instance rotation to center offset and add it back to the instance position
+         vec3 adjustedPosLocal = instancePosLocal + instanceRotationLocal * centerOffset;
+
+         vec3 instancePosWorld = (modelMatrix * vec4(adjustedPosLocal, 1.0)).xyz;
+
+         // Simple screen-aligned billboard
+         vec3 cameraRight = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
+         vec3 cameraUp = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
+
+         vec3 billboardPosWorld = instancePosWorld
+           + cameraRight * position.x
+           + cameraUp * position.y;
+
+         vec4 viewPos = viewMatrix * vec4(billboardPosWorld, 1.0);
+         vViewPosition = viewPos.xyz;
+
+         gl_Position = projectionMatrix * viewPos;
+
+         // Compute view direction in instance local space
+         vec3 cameraForward = -vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
          vec3 localViewDir = transpose(vInstanceRotation) * cameraForward;
 
-         // For now, use world-space direction directly (ignoring instance rotation)
-         int spriteIndex = findNearestDirection(-localViewDir);
+         // Find nearest direction
+         vSpriteIndex = findNearestDirection(-localViewDir);
+       }
+      `,
+
+      fragmentShader: `
+       uniform float boundingRadius;
+       uniform mat4 projectionMatrix;
+       uniform sampler2D colorAtlas;
+       uniform sampler2D depthAtlas;
+       uniform vec3 captureOrientations[26];
+
+       varying vec2 vUv;
+       flat varying int vSpriteIndex;
+       varying vec3 vViewPosition;
+       varying mat3 vInstanceRotation;
+
+       vec3 LinearTosRGB(vec3 color) {
+         vec3 a = vec3(0.055);
+         vec3 ap1 = vec3(1.0) + a;
+         vec3 g = vec3(2.4);
+         vec3 ginv = vec3(1.0) / g;
+
+         return mix(
+           color * 12.92,
+           ap1 * pow(color, ginv) - a,
+           step(vec3(0.0031308), color)
+         );
+       }
+
+
+       void main() {
+         vec2 centeredUv = vUv - 0.5;
+         float distFromCenter = length(centeredUv);
+         if (distFromCenter > 0.5) discard;
+
+         // Get the capture orientation for this sprite
+         vec3 captureUp = captureOrientations[vSpriteIndex];
+
+         // DEBUG: Visualize the capture up vector
+         // Transform to world space and then show as color
+         vec3 worldCaptureUp = normalize(vInstanceRotation * captureUp);
+
+         // Project onto screen space (view space)
+         vec3 screenCaptureUp = normalize(mat3(viewMatrix) * worldCaptureUp);
+
+         // Calculate rotation angle needed to align screenCaptureUp with (0, 1, 0)
+         float rotationAngle = atan(screenCaptureUp.x, screenCaptureUp.y);
+
+         // Rotate UV coordinates around center (0.5, 0.5)
+         float cosAngle = cos(rotationAngle);
+         float sinAngle = sin(rotationAngle);
+         vec2 rotatedUv = vec2(
+           centeredUv.x * cosAngle - centeredUv.y * sinAngle,
+           centeredUv.x * sinAngle + centeredUv.y * cosAngle
+         );
+         rotatedUv += 0.5;
 
          // Calculate atlas UV based on sprite index
-         int gridX = spriteIndex % 6;
-         int gridY = spriteIndex / 6;
-         vec2 atlasUv = (vec2(float(gridX), float(gridY)) + vUv) / vec2(6.0, 5.0);
+         int gridX = vSpriteIndex % 6;
+         int gridY = vSpriteIndex / 6;
+         vec2 atlasUv = (vec2(float(gridX), float(gridY)) + rotatedUv) / vec2(6.0, 5.0);
 
          // Sample from atlas
          vec4 color = texture2D(colorAtlas, atlasUv);
 
+         float sampledDepth = texture2D(depthAtlas, atlasUv).r;
+         if (sampledDepth >= 1.0) discard;
+
+         float near = 0.1;
+         float far = boundingRadius * 3.0;
+         float linearDepth = near + sampledDepth * (far - near);
+         float centerDepthInCapture = boundingRadius * 2.0 - near;
+         float depthOffset = centerDepthInCapture - linearDepth;
+
+         vec3 adjustedViewPos = vViewPosition;
+         adjustedViewPos.z += depthOffset;
+
+         vec4 clipPos = projectionMatrix * vec4(adjustedViewPos, 1.0);
+         gl_FragDepth = (clipPos.z / clipPos.w) * 0.5 + 0.5;
+
          // Discard transparent pixels
          if (color.a < 0.5) discard;
 
-         // Use atlas color instead of normal color
+         color.rgb = LinearTosRGB(color.rgb);
          gl_FragColor = color;
        }
       `,
