@@ -19,7 +19,7 @@ export class RenderManager {
     this.sortVisibleInstances = true; // Enable by default for triangle budgeting
 
     // Triangle budget settings
-    this.maxTrianglesPerFrame = 10_000_000; // 5M triangles per frame
+    this.maxTrianglesPerFrame = 10_000_000; // 10M triangles per frame
     this.useTriangleBudget = true; // Enable/disable budget system
 
     this.renderTargets = [];
@@ -77,38 +77,36 @@ export class RenderManager {
   }
 
   /**
-   * Apply triangle budget to visible objects, prioritizing closer objects.
+   * Apply triangle budget to visible objects, prioritising closer objects.
    * Objects are already sorted by distance (front to back).
+   * Instances within budget get full geometry; the rest get impostors.
    * @param {Array} visibleObjects - Sorted array of visible objects
-   * @returns {Array} Filtered array within triangle budget
+   * @returns {{ fullDetail: Array, impostors: Array }}
    */
   applyTriangleBudget(visibleObjects) {
     let triangleCount = 0;
-    const result = [];
+    const fullDetail = [];
+    const impostors = [];
 
     for (const obj of visibleObjects) {
-      // Get triangle count for this asset type
       const meshData = this.instanceManager.managedMeshes.get(obj.assetKey);
       if (!meshData) continue;
 
       const instanceTriangles = meshData.triangleCount;
 
-      // Check if adding this instance would exceed budget
-      if (triangleCount + instanceTriangles > this.maxTrianglesPerFrame) {
-        // Budget exceeded, stop adding instances
-        break;
+      if (triangleCount + instanceTriangles <= this.maxTrianglesPerFrame) {
+        triangleCount += instanceTriangles;
+        fullDetail.push(obj);
+      } else {
+        impostors.push(obj);
       }
-
-      triangleCount += instanceTriangles;
-      result.push(obj);
     }
 
-    // Update stats
     this.stats.renderedTriangles = triangleCount;
-    this.stats.visibleInstances = result.length;
-    this.stats.culledInstances = visibleObjects.length - result.length;
+    this.stats.visibleInstances = fullDetail.length;
+    this.stats.culledInstances = impostors.length;
 
-    return result;
+    return { fullDetail, impostors };
   }
 
   invalidate() {
@@ -143,9 +141,13 @@ export class RenderManager {
     try {
       if (this.instanceManager) {
         if (!this.useOctree) {
-          // Simple path: just show every instance, every frame.
+          // Simple path: show every real instance, hide impostors.
           for (const [assetKey, meshData] of this.instanceManager
             .managedMeshes) {
+            if (assetKey.endsWith("_impostor")) {
+              this.instanceManager.updateVisibleInstances(assetKey, []);
+              continue;
+            }
             const allIDs = meshData.instanceData.map((d) => d.id);
             this.instanceManager.updateVisibleInstances(assetKey, allIDs);
           }
@@ -167,30 +169,41 @@ export class RenderManager {
             cameraPos,
           );
 
-          // Apply triangle budget if enabled
-          if (this.useTriangleBudget) {
-            visibleObjects = this.applyTriangleBudget(visibleObjects);
-          }
+          // Split into full detail vs impostor buckets
+          const { fullDetail, impostors } = this.useTriangleBudget
+            ? this.applyTriangleBudget(visibleObjects)
+            : { fullDetail: visibleObjects, impostors: [] };
 
-          // Group by asset key
+          // Group full-detail instances by asset key
           const visibleByAsset = new Map();
-          for (const obj of visibleObjects) {
+          for (const obj of fullDetail) {
             if (!visibleByAsset.has(obj.assetKey)) {
               visibleByAsset.set(obj.assetKey, []);
             }
             visibleByAsset.get(obj.assetKey).push(obj.instanceID);
           }
 
-          // Update instance visibility
-          for (const [assetKey, instanceIDs] of visibleByAsset) {
-            this.instanceManager.updateVisibleInstances(assetKey, instanceIDs);
+          // Group impostor instances by asset key
+          const impostorByAsset = new Map();
+          for (const obj of impostors) {
+            const impostorKey = obj.assetKey + "_impostor";
+            // Only add if impostor mesh actually exists
+            if (this.instanceManager.managedMeshes.has(impostorKey)) {
+              if (!impostorByAsset.has(impostorKey)) {
+                impostorByAsset.set(impostorKey, []);
+              }
+              impostorByAsset.get(impostorKey).push(obj.instanceID);
+            }
           }
 
-          // For assets not in visible set, hide all instances
-          for (const [assetKey, meshData] of this.instanceManager
-            .managedMeshes) {
-            if (!visibleByAsset.has(assetKey)) {
-              this.instanceManager.updateVisibleInstances(assetKey, []);
+          // Update visibility for all managed meshes
+          for (const [assetKey] of this.instanceManager.managedMeshes) {
+            if (assetKey.endsWith("_impostor")) {
+              const ids = impostorByAsset.get(assetKey) || [];
+              this.instanceManager.updateVisibleInstances(assetKey, ids);
+            } else {
+              const ids = visibleByAsset.get(assetKey) || [];
+              this.instanceManager.updateVisibleInstances(assetKey, ids);
             }
           }
         }
