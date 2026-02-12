@@ -29,6 +29,8 @@ import {
 
 import { InstancedMeshManager } from "./InstancedMeshManager.js";
 
+import { ImpostorManager } from "./ImpostorManager.js";
+
 import { GLTFLoader } from "GLTFLoader";
 import { InsertElement, RemoveElement, SetProperty } from "./Commands.js";
 
@@ -100,10 +102,10 @@ export class Scope {
       collectPartNodes(sceneGraph.root);
     }
 
-    // Filter to only assets with 2+ instances
+    // Filter to only assets with 10+ instances
     const result = new Map();
     for (const [assetKey, group] of instanceGroups) {
-      if (group.instances.length >= 2) {
+      if (group.instances.length >= 10) {
         result.set(assetKey, group);
       }
     }
@@ -259,6 +261,41 @@ export class Scope {
 
       // Add to scene
       ctrl.zUpRoot.add(newInstancedMesh);
+
+      if (ctrl.impostorManager) {
+        const impostorData = ctrl.impostorManager.impostorData.get(gltfUrl);
+
+        if (impostorData) {
+          const {
+            colorTexture,
+            depthTexture,
+            boundingRadius,
+            centerOffset,
+            captureOrientations,
+          } = impostorData;
+
+          // Prepare instance data (same as for real meshes)
+          const instanceData = group.instances.map((instance, index) => ({
+            id: index,
+            matrix: instance.worldTransform,
+            partNode: instance.partNode,
+          }));
+
+          // Create impostor mesh
+          const impostorMesh = this.instanceManager.createImpostorMesh(
+            assetKey,
+            colorTexture,
+            depthTexture,
+            boundingRadius,
+            centerOffset,
+            group.instances.length,
+            instanceData,
+            captureOrientations,
+          );
+
+          ctrl.zUpRoot.add(impostorMesh);
+        }
+      }
     }
   }
 
@@ -385,10 +422,26 @@ export class Scope {
       batches.push(urls);
     }
 
-    // Load batches sequentially
-    return batches.reduce((promise, batch) => {
-      return promise.then(() => loadURLs(batch, assetsByURL));
-    }, Promise.resolve());
+    return batches
+      .reduce((promise, batch) => {
+        return promise.then(() => loadURLs(batch, assetsByURL));
+      }, Promise.resolve())
+      .then(() => {
+        return this.generateImpostors(ctrl);
+      });
+  }
+
+  generateImpostors(ctrl) {
+    if (!ctrl.impostorManager) {
+      ctrl.impostorManager = new ImpostorManager(
+        ctrl.renderer,
+        ctrl.contextPath,
+      );
+    }
+
+    for (const [url, gltf] of Object.entries(this.gltfs)) {
+      ctrl.impostorManager.generateImpostorForAsset(url, gltf);
+    }
   }
 
   setGLTF(ctrl, url, assetsByURL) {

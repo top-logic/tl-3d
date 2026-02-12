@@ -103,6 +103,8 @@ class ThreeJsControl {
       this.camera,
     );
 
+    this.impostorManager = null;
+
     this.sceneOctree = null;
 
     this.initTransformControls();
@@ -140,7 +142,7 @@ class ThreeJsControl {
     this.selection = [];
 
     this.scene = new Scene();
-    this.scene.background = new Color("black");
+    this.scene.background = new Color("skyblue");
 
     this.createCamera();
     this.addLights();

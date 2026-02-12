@@ -391,6 +391,31 @@ export const SceneUtils = {
     return { mainLight: light1, secondaryLight: light2 };
   },
 
+  addImpostorCaptureLights: function (scene) {
+    // Six directional lights - one for each axis direction
+    const lightIntensity = 4.5;
+
+    const lights = [
+      new DirectionalLight(WHITE, lightIntensity), // +X
+      new DirectionalLight(WHITE, lightIntensity), // -X
+      new DirectionalLight(WHITE, lightIntensity), // +Y
+      new DirectionalLight(WHITE, lightIntensity), // -Y
+      new DirectionalLight(WHITE, lightIntensity), // +Z
+      new DirectionalLight(WHITE, lightIntensity), // -Z
+    ];
+
+    lights[0].position.set(5000, 0, 0);
+    lights[1].position.set(-5000, 0, 0);
+    lights[2].position.set(0, 5000, 0);
+    lights[3].position.set(0, -5000, 0);
+    lights[4].position.set(0, 0, 5000);
+    lights[5].position.set(0, 0, -5000);
+
+    lights.forEach((light) => scene.add(light));
+
+    return { lights };
+  },
+
   addCubeSceneLights: function (scene) {
     scene.add(new AmbientLight(WHITE, 0.7));
 
