@@ -10,13 +10,13 @@
 
 import {
   Box3,
+  BoxGeometry,
   Data3DTexture,
   FloatType,
   FrontSide,
   InstancedBufferAttribute,
   InstancedBufferGeometry,
   Mesh,
-  PlaneGeometry,
   RGBAFormat,
   ShaderMaterial,
   Sphere,
@@ -252,8 +252,7 @@ export class InstancedMeshManager {
 
     const { mesh, instanceData } = data;
 
-    // Get base geometry bounding box (single object, not instanced)
-    // We need to compute this from the position attribute
+    // Get base geometry bounding box
     const positionAttr = mesh.geometry.attributes.position;
     if (!positionAttr) return;
 
@@ -268,29 +267,27 @@ export class InstancedMeshManager {
     // Store base box for BVH to use
     data.baseBoundingBox = baseBox.clone();
 
+    // Store bounding box dimensions
+    const size = new Vector3();
+    baseBox.getSize(size);
+    data.boundingBoxSize = size;
+
     // Compute world bounding box that encompasses all instances
     const worldBox = new Box3();
 
     instanceData.forEach((instance) => {
       const matrix = instance.matrix;
-
-      // Transform the base bounding box by the instance matrix
       const instanceBox = baseBox.clone();
       instanceBox.applyMatrix4(matrix);
-
-      // Expand world box to include this instance
       worldBox.union(instanceBox);
     });
 
-    // Set bounding box for frustum culling
     mesh.geometry.boundingBox = worldBox;
 
-    // Compute and set bounding sphere from the box
     const sphere = new Sphere();
     worldBox.getBoundingSphere(sphere);
     mesh.geometry.boundingSphere = sphere;
 
-    // Enable frustum culling
     mesh.frustumCulled = true;
   }
 
@@ -398,20 +395,22 @@ export class InstancedMeshManager {
     instanceData,
     captureOrientations,
   ) {
-    // Get the existing instanced mesh data to access matrixTexture
     const existingMeshData = this.managedMeshes.get(assetKey);
     if (!existingMeshData) {
       console.warn(`No existing mesh data for ${assetKey}`);
       return null;
     }
 
-    const { matrixTexture } = existingMeshData;
+    const { matrixTexture, boundingBoxSize } = existingMeshData;
     const textureWidth = matrixTexture.image.width;
     const textureHeight = matrixTexture.image.height;
 
-    // Create quad geometry sized to match bounding sphere diameter
-    const size = boundingRadius * 2;
-    const geometry = new PlaneGeometry(size, size);
+    // Create box geometry sized to match the bounding box
+    const geometry = new BoxGeometry(
+      boundingBoxSize.x,
+      boundingBoxSize.y,
+      boundingBoxSize.z,
+    );
 
     // Convert to InstancedBufferGeometry
     const instancedGeometry = new InstancedBufferGeometry().copy(geometry);
@@ -426,7 +425,7 @@ export class InstancedMeshManager {
     instancedGeometry.setAttribute("instanceID", instanceIDAttribute);
     instancedGeometry.instanceCount = instanceData.length;
 
-    // Create impostor material with matrix texture
+    // Create impostor material with bounding box dimensions
     const material = this.createImpostorMaterial(
       colorTexture,
       depthTexture,
@@ -436,6 +435,7 @@ export class InstancedMeshManager {
       textureWidth,
       textureHeight,
       captureOrientations,
+      boundingBoxSize,
     );
 
     const mesh = new Mesh(instancedGeometry, material);
@@ -468,6 +468,7 @@ export class InstancedMeshManager {
     textureWidth,
     textureHeight,
     captureOrientations,
+    boundingBoxSize,
   ) {
     return new ShaderMaterial({
       uniforms: {
@@ -480,235 +481,228 @@ export class InstancedMeshManager {
         centerOffset: { value: centerOffset },
         boundingRadius: { value: boundingRadius },
         captureOrientations: { value: captureOrientations },
+        boundingBoxSize: { value: boundingBoxSize },
       },
       vertexShader: `
-       attribute float instanceID;
-       uniform sampler3D matrixTexture;
-       uniform float textureWidth;
-       uniform float textureHeight;
-       uniform vec3 centerOffset;
-       uniform float boundingRadius;
+        attribute float instanceID;
+        uniform sampler3D matrixTexture;
+        uniform float textureWidth;
+        uniform float textureHeight;
+        uniform vec3 centerOffset;
+        uniform float boundingRadius;
+        uniform vec3 boundingBoxSize;
 
-       varying vec2 vUv;
-       flat varying int vSpriteIndex;
-       varying vec3 vViewPosition;
-       varying mat3 vInstanceRotation;
+        varying vec3 vNormal;
+        varying vec3 vWorldPosition;
 
-       // Find nearest of 26 cardinal directions
-       int findNearestDirection(vec3 dir) {
-         vec3 d = normalize(dir);
+        // Find nearest of 26 cardinal directions
+        int findNearestDirection(vec3 dir) {
+          vec3 d = normalize(dir);
 
-         vec3 faces[6];
-         faces[0] = vec3(1.0, 0.0, 0.0);
-         faces[1] = vec3(-1.0, 0.0, 0.0);
-         faces[2] = vec3(0.0, 1.0, 0.0);
-         faces[3] = vec3(0.0, -1.0, 0.0);
-         faces[4] = vec3(0.0, 0.0, 1.0);
-         faces[5] = vec3(0.0, 0.0, -1.0);
+          vec3 faces[6];
+          faces[0] = vec3(1.0, 0.0, 0.0);
+          faces[1] = vec3(-1.0, 0.0, 0.0);
+          faces[2] = vec3(0.0, 1.0, 0.0);
+          faces[3] = vec3(0.0, -1.0, 0.0);
+          faces[4] = vec3(0.0, 0.0, 1.0);
+          faces[5] = vec3(0.0, 0.0, -1.0);
 
-         vec3 edges[12];
-         edges[0] = normalize(vec3(1.0, 1.0, 0.0));
-         edges[1] = normalize(vec3(1.0, -1.0, 0.0));
-         edges[2] = normalize(vec3(-1.0, 1.0, 0.0));
-         edges[3] = normalize(vec3(-1.0, -1.0, 0.0));
-         edges[4] = normalize(vec3(1.0, 0.0, 1.0));
-         edges[5] = normalize(vec3(1.0, 0.0, -1.0));
-         edges[6] = normalize(vec3(-1.0, 0.0, 1.0));
-         edges[7] = normalize(vec3(-1.0, 0.0, -1.0));
-         edges[8] = normalize(vec3(0.0, 1.0, 1.0));
-         edges[9] = normalize(vec3(0.0, 1.0, -1.0));
-         edges[10] = normalize(vec3(0.0, -1.0, 1.0));
-         edges[11] = normalize(vec3(0.0, -1.0, -1.0));
+          vec3 edges[12];
+          edges[0] = normalize(vec3(1.0, 1.0, 0.0));
+          edges[1] = normalize(vec3(1.0, -1.0, 0.0));
+          edges[2] = normalize(vec3(-1.0, 1.0, 0.0));
+          edges[3] = normalize(vec3(-1.0, -1.0, 0.0));
+          edges[4] = normalize(vec3(1.0, 0.0, 1.0));
+          edges[5] = normalize(vec3(1.0, 0.0, -1.0));
+          edges[6] = normalize(vec3(-1.0, 0.0, 1.0));
+          edges[7] = normalize(vec3(-1.0, 0.0, -1.0));
+          edges[8] = normalize(vec3(0.0, 1.0, 1.0));
+          edges[9] = normalize(vec3(0.0, 1.0, -1.0));
+          edges[10] = normalize(vec3(0.0, -1.0, 1.0));
+          edges[11] = normalize(vec3(0.0, -1.0, -1.0));
 
-         vec3 vertices[8];
-         vertices[0] = normalize(vec3(1.0, 1.0, 1.0));
-         vertices[1] = normalize(vec3(1.0, 1.0, -1.0));
-         vertices[2] = normalize(vec3(1.0, -1.0, 1.0));
-         vertices[3] = normalize(vec3(1.0, -1.0, -1.0));
-         vertices[4] = normalize(vec3(-1.0, 1.0, 1.0));
-         vertices[5] = normalize(vec3(-1.0, 1.0, -1.0));
-         vertices[6] = normalize(vec3(-1.0, -1.0, 1.0));
-         vertices[7] = normalize(vec3(-1.0, -1.0, -1.0));
+          vec3 vertices[8];
+          vertices[0] = normalize(vec3(1.0, 1.0, 1.0));
+          vertices[1] = normalize(vec3(1.0, 1.0, -1.0));
+          vertices[2] = normalize(vec3(1.0, -1.0, 1.0));
+          vertices[3] = normalize(vec3(1.0, -1.0, -1.0));
+          vertices[4] = normalize(vec3(-1.0, 1.0, 1.0));
+          vertices[5] = normalize(vec3(-1.0, 1.0, -1.0));
+          vertices[6] = normalize(vec3(-1.0, -1.0, 1.0));
+          vertices[7] = normalize(vec3(-1.0, -1.0, -1.0));
 
-         float maxDot = -2.0;
-         int bestIndex = 0;
+          float maxDot = -2.0;
+          int bestIndex = 0;
 
-         // Test for the camera position vector with the dot product closest to -1.0,
-         // since it is the closest to being parallel and opposite to the camera forward direction.
+          for (int i = 0; i < 6; i++) {
+            float dotProd = dot(d, faces[i]);
+            if (dotProd > maxDot) {
+              maxDot = dotProd;
+              bestIndex = i;
+            }
+          }
 
-         for (int i = 0; i < 6; i++) {
-           float dotProd = dot(d, faces[i]);
-           if (dotProd > maxDot) {
-             maxDot = dotProd;
-             bestIndex = i;
-           }
-         }
+          for (int i = 0; i < 12; i++) {
+            float dotProd = dot(d, edges[i]);
+            if (dotProd > maxDot) {
+              maxDot = dotProd;
+              bestIndex = 6 + i;
+            }
+          }
 
-         for (int i = 0; i < 12; i++) {
-           float dotProd = dot(d, edges[i]);
-           if (dotProd > maxDot) {
-             maxDot = dotProd;
-             bestIndex = 6 + i;
-           }
-         }
+          for (int i = 0; i < 8; i++) {
+            float dotProd = dot(d, vertices[i]);
+            if (dotProd > maxDot) {
+              maxDot = dotProd;
+              bestIndex = 18 + i;
+            }
+          }
 
-         for (int i = 0; i < 8; i++) {
-           float dotProd = dot(d, vertices[i]);
-           if (dotProd > maxDot) {
-             maxDot = dotProd;
-             bestIndex = 18 + i;
-           }
-         }
+          return bestIndex;
+        }
 
-         return bestIndex;
-       }
+        void main() {
+          // Calculate 2D texture coordinates from instanceID
+          float x = mod(instanceID, textureWidth);
+          float y = floor(instanceID / textureWidth);
 
-       void main() {
-         vUv = uv;
+          // Normalise to [0, 1] range and centre on pixel
+          vec2 uv = (vec2(x, y) + 0.5) / vec2(textureWidth, textureHeight);
 
-         // Calculate 2D texture coordinates from instanceID
-         float x = mod(instanceID, textureWidth);
-         float y = floor(instanceID / textureWidth);
+          // Look up 4 columns from the 4 depth layers
+          vec4 col0 = texture(matrixTexture, vec3(uv, 0.125));
+          vec4 col1 = texture(matrixTexture, vec3(uv, 0.375));
+          vec4 col2 = texture(matrixTexture, vec3(uv, 0.625));
+          vec4 col3 = texture(matrixTexture, vec3(uv, 0.875));
 
-         // Normalise to [0, 1] range and centre on pixel
-         vec2 uv = (vec2(x, y) + 0.5) / vec2(textureWidth, textureHeight);
+          mat4 instanceMatrix = mat4(col0, col1, col2, col3);
 
-         // Look up 4 columns from the 4 depth layers
-         vec4 col0 = texture(matrixTexture, vec3(uv, 0.125));
-         vec4 col1 = texture(matrixTexture, vec3(uv, 0.375));
-         vec4 col2 = texture(matrixTexture, vec3(uv, 0.625));
-         vec4 col3 = texture(matrixTexture, vec3(uv, 0.875));
+          // Extract rotation from instance matrix
+          mat3 instanceRotation = mat3(
+            normalize(instanceMatrix[0].xyz),
+            normalize(instanceMatrix[1].xyz),
+            normalize(instanceMatrix[2].xyz)
+          );
 
-         mat4 instanceMatrix = mat4(col0, col1, col2, col3);
+          // Extract instance position from matrix
+          vec3 instancePosLocal = instanceMatrix[3].xyz;
 
-         vec3 instancePosLocal = instanceMatrix[3].xyz;
+          // Apply instance rotation to center offset and add to instance position
+          vec3 adjustedPosLocal = instancePosLocal + instanceRotation * centerOffset;
 
-         // Extract rotation from instance matrix (combined with modelMatrix)
-         mat4 fullMatrix = modelMatrix * instanceMatrix;
+          // Transform normal to world space
+          vNormal = normalize(mat3(modelMatrix) * instanceRotation * normal);
 
-         mat3 instanceRotationLocal = mat3(
-           normalize(instanceMatrix[0].xyz),
-           normalize(instanceMatrix[1].xyz),
-           normalize(instanceMatrix[2].xyz)
-         );
+          // Transform position: first apply instance transform, then add adjusted position
+          vec3 transformedPosition = instanceRotation * position + adjustedPosLocal;
+          vec4 worldPosition = modelMatrix * vec4(transformedPosition, 1.0);
+          vWorldPosition = worldPosition.xyz;
 
-         vInstanceRotation = mat3(
-           normalize(fullMatrix[0].xyz),
-           normalize(fullMatrix[1].xyz),
-           normalize(fullMatrix[2].xyz)
-         );
-
-         // Apply instance rotation to center offset and add it back to the instance position
-         vec3 adjustedPosLocal = instancePosLocal + instanceRotationLocal * centerOffset;
-
-         vec3 instancePosWorld = (modelMatrix * vec4(adjustedPosLocal, 1.0)).xyz;
-
-         // Simple screen-aligned billboard
-         vec3 cameraRight = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
-         vec3 cameraUp = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
-
-         vec3 billboardPosWorld = instancePosWorld
-           + cameraRight * position.x
-           + cameraUp * position.y;
-
-         vec4 viewPos = viewMatrix * vec4(billboardPosWorld, 1.0);
-         vViewPosition = viewPos.xyz;
-
-         gl_Position = projectionMatrix * viewPos;
-
-         // Compute view direction in instance local space
-         vec3 cameraForward = -vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
-         vec3 localViewDir = transpose(vInstanceRotation) * cameraForward;
-
-         // Find nearest direction
-         vSpriteIndex = findNearestDirection(-localViewDir);
-       }
+          gl_Position = projectionMatrix * viewMatrix * worldPosition;
+        }
       `,
 
       fragmentShader: `
-       uniform float boundingRadius;
-       uniform mat4 projectionMatrix;
-       uniform sampler2D colorAtlas;
-       uniform sampler2D depthAtlas;
-       uniform vec3 captureOrientations[26];
+        uniform float boundingRadius;
+        uniform mat4 projectionMatrix;
+        uniform sampler2D colorAtlas;
+        uniform sampler2D depthAtlas;
+        uniform vec3 captureOrientations[26];
+        uniform vec3 boundingBoxSize;
 
-       varying vec2 vUv;
-       flat varying int vSpriteIndex;
-       varying vec3 vViewPosition;
-       varying mat3 vInstanceRotation;
+        varying vec3 vNormal;
+        varying vec3 vWorldPosition;
 
-       vec3 LinearTosRGB(vec3 color) {
-         vec3 a = vec3(0.055);
-         vec3 ap1 = vec3(1.0) + a;
-         vec3 g = vec3(2.4);
-         vec3 ginv = vec3(1.0) / g;
+        vec3 LinearTosRGB(vec3 color) {
+          vec3 a = vec3(0.055);
+          vec3 ap1 = vec3(1.0) + a;
+          vec3 g = vec3(2.4);
+          vec3 ginv = vec3(1.0) / g;
 
-         return mix(
-           color * 12.92,
-           ap1 * pow(color, ginv) - a,
-           step(vec3(0.0031308), color)
-         );
-       }
+          return mix(
+            color * 12.92,
+            ap1 * pow(color, ginv) - a,
+            step(vec3(0.0031308), color)
+          );
+        }
 
+        int findNearestDirection(vec3 dir) {
+          vec3 d = normalize(dir);
 
-       void main() {
-         vec2 centeredUv = vUv - 0.5;
-         float distFromCenter = length(centeredUv);
-         if (distFromCenter > 0.5) discard;
+          vec3 faces[6];
+          faces[0] = vec3(1.0, 0.0, 0.0);
+          faces[1] = vec3(-1.0, 0.0, 0.0);
+          faces[2] = vec3(0.0, 1.0, 0.0);
+          faces[3] = vec3(0.0, -1.0, 0.0);
+          faces[4] = vec3(0.0, 0.0, 1.0);
+          faces[5] = vec3(0.0, 0.0, -1.0);
 
-         // Get the capture orientation for this sprite
-         vec3 captureUp = captureOrientations[vSpriteIndex];
+          vec3 edges[12];
+          edges[0] = normalize(vec3(1.0, 1.0, 0.0));
+          edges[1] = normalize(vec3(1.0, -1.0, 0.0));
+          edges[2] = normalize(vec3(-1.0, 1.0, 0.0));
+          edges[3] = normalize(vec3(-1.0, -1.0, 0.0));
+          edges[4] = normalize(vec3(1.0, 0.0, 1.0));
+          edges[5] = normalize(vec3(1.0, 0.0, -1.0));
+          edges[6] = normalize(vec3(-1.0, 0.0, 1.0));
+          edges[7] = normalize(vec3(-1.0, 0.0, -1.0));
+          edges[8] = normalize(vec3(0.0, 1.0, 1.0));
+          edges[9] = normalize(vec3(0.0, 1.0, -1.0));
+          edges[10] = normalize(vec3(0.0, -1.0, 1.0));
+          edges[11] = normalize(vec3(0.0, -1.0, -1.0));
 
-         // DEBUG: Visualize the capture up vector
-         // Transform to world space and then show as color
-         vec3 worldCaptureUp = normalize(vInstanceRotation * captureUp);
+          vec3 vertices[8];
+          vertices[0] = normalize(vec3(1.0, 1.0, 1.0));
+          vertices[1] = normalize(vec3(1.0, 1.0, -1.0));
+          vertices[2] = normalize(vec3(1.0, -1.0, 1.0));
+          vertices[3] = normalize(vec3(1.0, -1.0, -1.0));
+          vertices[4] = normalize(vec3(-1.0, 1.0, 1.0));
+          vertices[5] = normalize(vec3(-1.0, 1.0, -1.0));
+          vertices[6] = normalize(vec3(-1.0, -1.0, 1.0));
+          vertices[7] = normalize(vec3(-1.0, -1.0, -1.0));
 
-         // Project onto screen space (view space)
-         vec3 screenCaptureUp = normalize(mat3(viewMatrix) * worldCaptureUp);
+          float maxDot = -2.0;
+          int bestIndex = 0;
 
-         // Calculate rotation angle needed to align screenCaptureUp with (0, 1, 0)
-         float rotationAngle = atan(screenCaptureUp.x, screenCaptureUp.y);
+          for (int i = 0; i < 6; i++) {
+            float dotProd = dot(d, faces[i]);
+            if (dotProd > maxDot) {
+              maxDot = dotProd;
+              bestIndex = i;
+            }
+          }
 
-         // Rotate UV coordinates around center (0.5, 0.5)
-         float cosAngle = cos(rotationAngle);
-         float sinAngle = sin(rotationAngle);
-         vec2 rotatedUv = vec2(
-           centeredUv.x * cosAngle - centeredUv.y * sinAngle,
-           centeredUv.x * sinAngle + centeredUv.y * cosAngle
-         );
-         rotatedUv += 0.5;
+          for (int i = 0; i < 12; i++) {
+            float dotProd = dot(d, edges[i]);
+            if (dotProd > maxDot) {
+              maxDot = dotProd;
+              bestIndex = 6 + i;
+            }
+          }
 
-         // Calculate atlas UV based on sprite index
-         int gridX = vSpriteIndex % 6;
-         int gridY = vSpriteIndex / 6;
-         vec2 atlasUv = (vec2(float(gridX), float(gridY)) + rotatedUv) / vec2(6.0, 5.0);
+          for (int i = 0; i < 8; i++) {
+            float dotProd = dot(d, vertices[i]);
+            if (dotProd > maxDot) {
+              maxDot = dotProd;
+              bestIndex = 18 + i;
+            }
+          }
 
-         // Sample from atlas
-         vec4 color = texture2D(colorAtlas, atlasUv);
+          return bestIndex;
+        }
 
-         float sampledDepth = texture2D(depthAtlas, atlasUv).r;
-         if (sampledDepth >= 1.0) discard;
+        void main() {
+          // Normalise the normal for colour mapping
+          vec3 n = normalize(vNormal);
 
-         float near = 0.1;
-         float far = boundingRadius * 3.0;
-         float linearDepth = near + sampledDepth * (far - near);
-         float centerDepthInCapture = boundingRadius * 2.0 - near;
-         float depthOffset = centerDepthInCapture - linearDepth;
+          // Map normal to RGB (standard normal mapping visualisation)
+          // Convert from [-1, 1] to [0, 1]
+          vec3 normalColor = n * 0.5 + 0.5;
 
-         vec3 adjustedViewPos = vViewPosition;
-         adjustedViewPos.z += depthOffset;
-
-         vec4 clipPos = projectionMatrix * vec4(adjustedViewPos, 1.0);
-         gl_FragDepth = (clipPos.z / clipPos.w) * 0.5 + 0.5;
-
-         // Discard transparent pixels
-         if (color.a < 0.5) discard;
-
-         color.rgb = LinearTosRGB(color.rgb);
-         gl_FragColor = color;
-       }
+          gl_FragColor = vec4(normalColor, 1.0);
+        }
       `,
-      transparent: true,
+      transparent: false,
       side: FrontSide,
     });
   }
