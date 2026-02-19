@@ -2,10 +2,9 @@
 
 <config:template-call
 	xmlns:config="http://www.top-logic.com/ns/config/6.0"
-	final="true"
 	template="com.top_logic/selector.template.xml"
 >
-	<arguments>
+	<arguments partnerGroup="sceneSelection">
 		<dialogs>
 			<layout-reference resource="tl-3d-demo/three_js3D/eigenschaften/dialog.layout.xml"/>
 		</dialogs>

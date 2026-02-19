@@ -2,11 +2,11 @@
 
 <config:template-call
 	xmlns:config="http://www.top-logic.com/ns/config/6.0"
-	final="true"
 	template="com.top_logic/table.template.xml"
 >
 	<arguments
 		defaultColumns="_actions,name"
+		partnerGroup="sceneSelection"
 		type="tl.threed.demo:Scene"
 	>
 		<dialogs>
