@@ -20,6 +20,7 @@ import {
   RGBAFormat,
   ShaderMaterial,
   Sphere,
+  Vector2,
   Vector3,
 } from "three";
 
@@ -384,6 +385,7 @@ export class InstancedMeshManager {
    * @param {number} boundingRadius - Radius of the original model's bounding sphere
    * @param {number} maxInstances - Maximum number of instances
    * @param {Array} instanceData - Array of {id, matrix} objects
+   * @param {Float32Array} faceCornerUVData - Flattened array of atlas UVs per capture/face/corner
    */
   createImpostorMesh(
     assetKey,
@@ -394,6 +396,7 @@ export class InstancedMeshManager {
     maxInstances,
     instanceData,
     captureOrientations,
+    faceCornerUVData,
   ) {
     const existingMeshData = this.managedMeshes.get(assetKey);
     if (!existingMeshData) {
@@ -425,7 +428,15 @@ export class InstancedMeshManager {
     instancedGeometry.setAttribute("instanceID", instanceIDAttribute);
     instancedGeometry.instanceCount = instanceData.length;
 
-    // Create impostor material with bounding box dimensions
+    // Build Vector2 array for the uniform — Three.js requires Vector2 objects for vec2 array uniforms
+    const faceCornerUVs = [];
+    for (let i = 0; i < faceCornerUVData.length; i += 2) {
+      faceCornerUVs.push(
+        new Vector2(faceCornerUVData[i], faceCornerUVData[i + 1]),
+      );
+    }
+
+    // Create impostor material
     const material = this.createImpostorMaterial(
       colorTexture,
       depthTexture,
@@ -436,6 +447,7 @@ export class InstancedMeshManager {
       textureHeight,
       captureOrientations,
       boundingBoxSize,
+      faceCornerUVs,
     );
 
     const mesh = new Mesh(instancedGeometry, material);
@@ -469,6 +481,7 @@ export class InstancedMeshManager {
     textureHeight,
     captureOrientations,
     boundingBoxSize,
+    faceCornerUVs,
   ) {
     return new ShaderMaterial({
       uniforms: {
@@ -482,224 +495,168 @@ export class InstancedMeshManager {
         boundingRadius: { value: boundingRadius },
         captureOrientations: { value: captureOrientations },
         boundingBoxSize: { value: boundingBoxSize },
+        faceCornerUVs: { value: faceCornerUVs },
       },
       vertexShader: `
         attribute float instanceID;
+
         uniform sampler3D matrixTexture;
         uniform float textureWidth;
         uniform float textureHeight;
         uniform vec3 centerOffset;
-        uniform float boundingRadius;
         uniform vec3 boundingBoxSize;
 
-        varying vec3 vNormal;
-        varying vec3 vWorldPosition;
-
-        // Find nearest of 26 cardinal directions
-        int findNearestDirection(vec3 dir) {
-          vec3 d = normalize(dir);
-
-          vec3 faces[6];
-          faces[0] = vec3(1.0, 0.0, 0.0);
-          faces[1] = vec3(-1.0, 0.0, 0.0);
-          faces[2] = vec3(0.0, 1.0, 0.0);
-          faces[3] = vec3(0.0, -1.0, 0.0);
-          faces[4] = vec3(0.0, 0.0, 1.0);
-          faces[5] = vec3(0.0, 0.0, -1.0);
-
-          vec3 edges[12];
-          edges[0] = normalize(vec3(1.0, 1.0, 0.0));
-          edges[1] = normalize(vec3(1.0, -1.0, 0.0));
-          edges[2] = normalize(vec3(-1.0, 1.0, 0.0));
-          edges[3] = normalize(vec3(-1.0, -1.0, 0.0));
-          edges[4] = normalize(vec3(1.0, 0.0, 1.0));
-          edges[5] = normalize(vec3(1.0, 0.0, -1.0));
-          edges[6] = normalize(vec3(-1.0, 0.0, 1.0));
-          edges[7] = normalize(vec3(-1.0, 0.0, -1.0));
-          edges[8] = normalize(vec3(0.0, 1.0, 1.0));
-          edges[9] = normalize(vec3(0.0, 1.0, -1.0));
-          edges[10] = normalize(vec3(0.0, -1.0, 1.0));
-          edges[11] = normalize(vec3(0.0, -1.0, -1.0));
-
-          vec3 vertices[8];
-          vertices[0] = normalize(vec3(1.0, 1.0, 1.0));
-          vertices[1] = normalize(vec3(1.0, 1.0, -1.0));
-          vertices[2] = normalize(vec3(1.0, -1.0, 1.0));
-          vertices[3] = normalize(vec3(1.0, -1.0, -1.0));
-          vertices[4] = normalize(vec3(-1.0, 1.0, 1.0));
-          vertices[5] = normalize(vec3(-1.0, 1.0, -1.0));
-          vertices[6] = normalize(vec3(-1.0, -1.0, 1.0));
-          vertices[7] = normalize(vec3(-1.0, -1.0, -1.0));
-
-          float maxDot = -2.0;
-          int bestIndex = 0;
-
-          for (int i = 0; i < 6; i++) {
-            float dotProd = dot(d, faces[i]);
-            if (dotProd > maxDot) {
-              maxDot = dotProd;
-              bestIndex = i;
-            }
-          }
-
-          for (int i = 0; i < 12; i++) {
-            float dotProd = dot(d, edges[i]);
-            if (dotProd > maxDot) {
-              maxDot = dotProd;
-              bestIndex = 6 + i;
-            }
-          }
-
-          for (int i = 0; i < 8; i++) {
-            float dotProd = dot(d, vertices[i]);
-            if (dotProd > maxDot) {
-              maxDot = dotProd;
-              bestIndex = 18 + i;
-            }
-          }
-
-          return bestIndex;
-        }
+        flat varying int vCaptureIndex;
+        varying vec3 vModelPos;
+        varying vec3 vWorldNormal;
 
         void main() {
-          // Calculate 2D texture coordinates from instanceID
-          float x = mod(instanceID, textureWidth);
-          float y = floor(instanceID / textureWidth);
+          // ---- Matrix lookup ----
+          float tx = mod(instanceID, textureWidth);
+          float ty = floor(instanceID / textureWidth);
+          vec2 tuv = (vec2(tx, ty) + 0.5) / vec2(textureWidth, textureHeight);
 
-          // Normalise to [0, 1] range and centre on pixel
-          vec2 uv = (vec2(x, y) + 0.5) / vec2(textureWidth, textureHeight);
-
-          // Look up 4 columns from the 4 depth layers
-          vec4 col0 = texture(matrixTexture, vec3(uv, 0.125));
-          vec4 col1 = texture(matrixTexture, vec3(uv, 0.375));
-          vec4 col2 = texture(matrixTexture, vec3(uv, 0.625));
-          vec4 col3 = texture(matrixTexture, vec3(uv, 0.875));
+          vec4 col0 = texture(matrixTexture, vec3(tuv, 0.125));
+          vec4 col1 = texture(matrixTexture, vec3(tuv, 0.375));
+          vec4 col2 = texture(matrixTexture, vec3(tuv, 0.625));
+          vec4 col3 = texture(matrixTexture, vec3(tuv, 0.875));
 
           mat4 instanceMatrix = mat4(col0, col1, col2, col3);
 
-          // Extract rotation from instance matrix
+          // Extract rotation and position from instance matrix
           mat3 instanceRotation = mat3(
             normalize(instanceMatrix[0].xyz),
             normalize(instanceMatrix[1].xyz),
             normalize(instanceMatrix[2].xyz)
           );
-
-          // Extract instance position from matrix
           vec3 instancePosLocal = instanceMatrix[3].xyz;
-
-          // Apply instance rotation to center offset and add to instance position
           vec3 adjustedPosLocal = instancePosLocal + instanceRotation * centerOffset;
 
-          // Transform normal to world space
-          vNormal = normalize(mat3(modelMatrix) * instanceRotation * normal);
-
-          // Transform position: first apply instance transform, then add adjusted position
+          // ---- World position ----
           vec3 transformedPosition = instanceRotation * position + adjustedPosLocal;
           vec4 worldPosition = modelMatrix * vec4(transformedPosition, 1.0);
-          vWorldPosition = worldPosition.xyz;
+
+          // ---- World normal ----
+          vWorldNormal = normalize(mat3(modelMatrix) * instanceRotation * normal);
+
+          // ---- Model-space position for face UV lookup ----
+          // 'position' is the raw bounding box vertex in local space
+          vModelPos = position;
+
+          // ---- Capture index from view direction ----
+          // Compute camera view direction in world space,
+          // then transform into model space (undo instance rotation and model matrix rotation)
+
+          // Compute camera forward view direction
+          vec3 cameraForward = -vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
+
+          mat3 worldToModel = transpose(mat3(modelMatrix) * instanceRotation);
+          vec3 modelViewDir = normalize(worldToModel * cameraForward);
+
+          // Determine which axes are significant by comparing to the dominant axis
+          vec3 a = abs(modelViewDir);
+          float maxA = max(a.x, max(a.y, a.z));
+
+          // A component is considered active if it's within ~sin(45°) of the dominant one.
+          // This partitions space into the same 26 Voronoi regions as the cardinal directions.
+          bool xActive = a.x > maxA * 0.7071;
+          bool yActive = a.y > maxA * 0.7071;
+          bool zActive = a.z > maxA * 0.7071;
+
+          bool px = modelViewDir.x > 0.0;
+          bool py = modelViewDir.y > 0.0;
+          bool pz = modelViewDir.z > 0.0;
+
+          int captureIdx;
+
+          // Face captures (indices 0-5)
+          if (xActive && !yActive && !zActive) {
+            captureIdx = px ? 0 : 1;
+          } else if (!xActive && yActive && !zActive) {
+            captureIdx = py ? 2 : 3;
+          } else if (!xActive && !yActive && zActive) {
+            captureIdx = pz ? 4 : 5;
+
+          // Edge captures (indices 6-17)
+          // edgeCombos order: [1,1,0],[1,-1,0],[-1,1,0],[-1,-1,0],
+          //                   [1,0,1],[1,0,-1],[-1,0,1],[-1,0,-1],
+          //                   [0,1,1],[0,1,-1],[0,-1,1],[0,-1,-1]
+          } else if (xActive && yActive && !zActive) {
+            captureIdx = px ? (py ? 6 : 7) : (py ? 8 : 9);
+          } else if (xActive && !yActive && zActive) {
+            captureIdx = px ? (pz ? 10 : 11) : (pz ? 12 : 13);
+          } else if (!xActive && yActive && zActive) {
+            captureIdx = py ? (pz ? 14 : 15) : (pz ? 16 : 17);
+
+          // Vertex captures (indices 18-25)
+          // vertexCombos order: [1,1,1],[1,1,-1],[1,-1,1],[1,-1,-1],
+          //                     [-1,1,1],[-1,1,-1],[-1,-1,1],[-1,-1,-1]
+          } else {
+            captureIdx = 18 + (px ? 0 : 4) + (py ? 0 : 2) + (pz ? 0 : 1);
+          }
+
+          vCaptureIndex = captureIdx;
 
           gl_Position = projectionMatrix * viewMatrix * worldPosition;
         }
       `,
 
       fragmentShader: `
-        uniform float boundingRadius;
-        uniform mat4 projectionMatrix;
         uniform sampler2D colorAtlas;
-        uniform sampler2D depthAtlas;
-        uniform vec3 captureOrientations[26];
+        uniform vec2 faceCornerUVs[624]; // 26 captures * 6 faces * 4 corners
         uniform vec3 boundingBoxSize;
 
-        varying vec3 vNormal;
-        varying vec3 vWorldPosition;
+        flat varying int vCaptureIndex;
+        varying vec3 vModelPos;
+        varying vec3 vWorldNormal;
 
-        vec3 LinearTosRGB(vec3 color) {
-          vec3 a = vec3(0.055);
-          vec3 ap1 = vec3(1.0) + a;
-          vec3 g = vec3(2.4);
-          vec3 ginv = vec3(1.0) / g;
-
-          return mix(
-            color * 12.92,
-            ap1 * pow(color, ginv) - a,
-            step(vec3(0.0031308), color)
-          );
-        }
-
-        int findNearestDirection(vec3 dir) {
-          vec3 d = normalize(dir);
-
-          vec3 faces[6];
-          faces[0] = vec3(1.0, 0.0, 0.0);
-          faces[1] = vec3(-1.0, 0.0, 0.0);
-          faces[2] = vec3(0.0, 1.0, 0.0);
-          faces[3] = vec3(0.0, -1.0, 0.0);
-          faces[4] = vec3(0.0, 0.0, 1.0);
-          faces[5] = vec3(0.0, 0.0, -1.0);
-
-          vec3 edges[12];
-          edges[0] = normalize(vec3(1.0, 1.0, 0.0));
-          edges[1] = normalize(vec3(1.0, -1.0, 0.0));
-          edges[2] = normalize(vec3(-1.0, 1.0, 0.0));
-          edges[3] = normalize(vec3(-1.0, -1.0, 0.0));
-          edges[4] = normalize(vec3(1.0, 0.0, 1.0));
-          edges[5] = normalize(vec3(1.0, 0.0, -1.0));
-          edges[6] = normalize(vec3(-1.0, 0.0, 1.0));
-          edges[7] = normalize(vec3(-1.0, 0.0, -1.0));
-          edges[8] = normalize(vec3(0.0, 1.0, 1.0));
-          edges[9] = normalize(vec3(0.0, 1.0, -1.0));
-          edges[10] = normalize(vec3(0.0, -1.0, 1.0));
-          edges[11] = normalize(vec3(0.0, -1.0, -1.0));
-
-          vec3 vertices[8];
-          vertices[0] = normalize(vec3(1.0, 1.0, 1.0));
-          vertices[1] = normalize(vec3(1.0, 1.0, -1.0));
-          vertices[2] = normalize(vec3(1.0, -1.0, 1.0));
-          vertices[3] = normalize(vec3(1.0, -1.0, -1.0));
-          vertices[4] = normalize(vec3(-1.0, 1.0, 1.0));
-          vertices[5] = normalize(vec3(-1.0, 1.0, -1.0));
-          vertices[6] = normalize(vec3(-1.0, -1.0, 1.0));
-          vertices[7] = normalize(vec3(-1.0, -1.0, -1.0));
-
-          float maxDot = -2.0;
-          int bestIndex = 0;
-
-          for (int i = 0; i < 6; i++) {
-            float dotProd = dot(d, faces[i]);
-            if (dotProd > maxDot) {
-              maxDot = dotProd;
-              bestIndex = i;
-            }
-          }
-
-          for (int i = 0; i < 12; i++) {
-            float dotProd = dot(d, edges[i]);
-            if (dotProd > maxDot) {
-              maxDot = dotProd;
-              bestIndex = 6 + i;
-            }
-          }
-
-          for (int i = 0; i < 8; i++) {
-            float dotProd = dot(d, vertices[i]);
-            if (dotProd > maxDot) {
-              maxDot = dotProd;
-              bestIndex = 18 + i;
-            }
-          }
-
-          return bestIndex;
+        // Maps a world-space normal to one of 6 face indices:
+        //   0 = +X, 1 = -X, 2 = +Y, 3 = -Y, 4 = +Z, 5 = -Z
+        int faceIndexFromNormal(vec3 n) {
+          vec3 a = abs(n);
+          if (a.x >= a.y && a.x >= a.z) return n.x > 0.0 ? 0 : 1;
+          if (a.y >= a.x && a.y >= a.z) return n.y > 0.0 ? 2 : 3;
+          return n.z > 0.0 ? 4 : 5;
         }
 
         void main() {
-          // Normalise the normal for colour mapping
-          vec3 n = normalize(vNormal);
+          // ---- Determine which bounding box face this fragment is on ----
+          int faceIdx = faceIndexFromNormal(normalize(vWorldNormal));
 
-          // Map normal to RGB (standard normal mapping visualisation)
-          // Convert from [-1, 1] to [0, 1]
-          vec3 normalColor = n * 0.5 + 0.5;
+          // ---- Compute local [0,1] UV within this face ----
+          // vModelPos is in local bounding box space (centred at origin).
+          // Remap each axis from [-half, half] to [0, 1].
+          vec3 localPos = vModelPos / boundingBoxSize + 0.5;
 
-          gl_FragColor = vec4(normalColor, 1.0);
+          // Each face uses the two axes tangent to it.
+          // The axis order here must match the corner winding in buildBoxFaceDefinitions.
+          //   +X / -X face: U = Z, V = Y
+          //   +Y / -Y face: U = X, V = Z
+          //   +Z / -Z face: U = X, V = Y
+          vec2 faceUV;
+          if (faceIdx == 0 || faceIdx == 1) faceUV = localPos.zy;
+          else if (faceIdx == 2 || faceIdx == 3) faceUV = localPos.xz;
+          else faceUV = localPos.xy;
+
+          // ---- Look up the 4 corner atlas UVs for this capture + face ----
+          int base = vCaptureIndex * 24 + faceIdx * 4; // 24 = 6 faces * 4 corners
+          vec2 c00 = faceCornerUVs[base + 0]; // local (0,0)
+          vec2 c10 = faceCornerUVs[base + 1]; // local (1,0)
+          vec2 c11 = faceCornerUVs[base + 2]; // local (1,1)
+          vec2 c01 = faceCornerUVs[base + 3]; // local (0,1)
+
+          // ---- Affine (parallelogram) mapping ----
+          vec2 edgeU = c10 - c00;
+          vec2 edgeV = c01 - c00;
+          vec2 atlasUV = c00 + faceUV.x * edgeU + faceUV.y * edgeV;
+
+
+          vec4 color= texture2D(colorAtlas, atlasUV);
+
+          if(color.a < 0.5)
+            discard;
+
+          gl_FragColor = color;
         }
       `,
       transparent: false,

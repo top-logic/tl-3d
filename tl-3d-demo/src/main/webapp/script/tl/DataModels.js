@@ -272,6 +272,7 @@ export class Scope {
             boundingRadius,
             centerOffset,
             captureOrientations,
+            faceCornerUVData,
           } = impostorData;
 
           // Prepare instance data (same as for real meshes)
@@ -291,6 +292,7 @@ export class Scope {
             group.instances.length,
             instanceData,
             captureOrientations,
+            faceCornerUVData,
           );
 
           ctrl.zUpRoot.add(impostorMesh);
