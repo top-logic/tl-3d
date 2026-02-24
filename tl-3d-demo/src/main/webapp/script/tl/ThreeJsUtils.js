@@ -393,7 +393,7 @@ export const SceneUtils = {
 
   addImpostorCaptureLights: function (scene) {
     // Six directional lights - one for each axis direction
-    const lightIntensity = 4.5;
+    const lightIntensity = 4;
 
     const lights = [
       new DirectionalLight(WHITE, lightIntensity), // +X
