@@ -407,8 +407,39 @@ class ThreeJsControl {
 
           const sharedObject = outer.selection[0];
           if (sharedObject) {
-            const commands = [sharedObject.notifyTransform(diffMatrix)];
-            outer.sendSceneChanges(commands);
+            if (
+              sharedObject.willBeInstanced &&
+              object.userData.isInstanceProxy
+            ) {
+              // Sync proxy's new matrix into the instance texture
+              const { assetKey, instanceID, parentWorldMatrix } =
+                object.userData;
+              outer.scope.instanceManager.updateInstanceMatrix(
+                assetKey,
+                instanceID,
+                updatedMatrix,
+              );
+              outer.buildSceneOctree();
+
+              // Compute diff in PartNode-local space for server sync
+              const newLocalMatrix = parentWorldMatrix
+                .clone()
+                .invert()
+                .multiply(updatedMatrix);
+              const currentLocalMatrix = sharedObject.transform
+                ? toMatrix(sharedObject.transform)
+                : new Matrix4();
+              const localDiff = currentLocalMatrix
+                .clone()
+                .invert()
+                .multiply(newLocalMatrix);
+
+              const commands = [sharedObject.notifyTransform(localDiff)];
+              outer.sendSceneChanges(commands);
+            } else {
+              const commands = [sharedObject.notifyTransform(diffMatrix)];
+              outer.sendSceneChanges(commands);
+            }
           }
         }
 
@@ -1133,8 +1164,175 @@ class ThreeJsControl {
     const visibleObjects = this.scene.children.filter((obj) => obj.visible);
     const intersects = raycaster.intersectObjects(visibleObjects, true);
 
-    this.updateSelection(intersects, event.ctrlKey);
+    // Check whether any regular (non-instanced) selectable was hit
+    const hasRegularSelectableHit = intersects.some((intersect) => {
+      let candidate = intersect.object;
+      while (candidate) {
+        if (
+          candidate.userData?.nodeRef instanceof SharedObject &&
+          candidate.userData.nodeRef.selectable
+        ) {
+          return true;
+        }
+        candidate = candidate.parent;
+      }
+      return false;
+    });
+
+    if (hasRegularSelectableHit) {
+      this.updateSelection(intersects, event.ctrlKey);
+    } else {
+      // Try per-instance AABB raycasting
+      const hit = this.raycastInstancedMeshes(raycaster);
+      if (hit && hit.partNode) {
+        this.updateSelectionInstanced(hit.partNode, event.ctrlKey);
+      } else {
+        // No hit of any kind — clear selection
+        this.updateSelection([], event.ctrlKey);
+      }
+    }
+
     this.invalidate();
+  }
+
+  /**
+   * Raycast instanced meshes using per-instance AABB testing.
+   * Uses the octree when available, otherwise falls back to a linear scan.
+   * Returns {partNode, assetKey, instanceID} for the closest hit, or null.
+   */
+  raycastInstancedMeshes(raycaster) {
+    const { instanceManager } = this.scope;
+
+    const hitPoint = new Vector3();
+
+    if (this.sceneOctree) {
+      const candidates = this.sceneOctree.queryRay(raycaster.ray);
+      if (candidates.length === 0) return null;
+
+      let best = null;
+      let bestDist = Infinity;
+
+      for (const candidate of candidates) {
+        if (raycaster.ray.intersectBox(candidate.boundingBox, hitPoint)) {
+          const dist = raycaster.ray.origin.distanceTo(hitPoint);
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = candidate;
+          }
+        }
+      }
+
+      return best
+        ? {
+            partNode: best.partNode,
+            assetKey: best.assetKey,
+            instanceID: best.instanceID,
+          }
+        : null;
+    }
+
+    // No octree — linear scan using transformed bounding boxes
+    this.zUpRoot.updateMatrixWorld(true);
+    const zUpWorld = this.zUpRoot.matrixWorld;
+
+    let best = null;
+    let bestDist = Infinity;
+
+    for (const [assetKey, data] of instanceManager.managedMeshes) {
+      if (assetKey.endsWith("_impostor")) continue;
+      const baseBox = data.baseBoundingBox;
+      if (!baseBox) continue;
+
+      for (const instance of data.instanceData) {
+        const worldBox = baseBox
+          .clone()
+          .applyMatrix4(instance.matrix)
+          .applyMatrix4(zUpWorld);
+
+        if (raycaster.ray.intersectBox(worldBox, hitPoint)) {
+          const dist = raycaster.ray.origin.distanceTo(hitPoint);
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = {
+              partNode: instance.partNode,
+              assetKey,
+              instanceID: instance.id,
+            };
+          }
+        }
+      }
+    }
+
+    return best;
+  }
+
+  /**
+   * Create a proxy Group for an instanced PartNode so TransformControls
+   * and the rest of the selection machinery can work with it.
+   * Sets partNode.node = proxy and adds it to zUpRoot.
+   */
+  createInstanceProxy(partNode) {
+    const { assetKey, instanceID } = partNode;
+    const data = this.scope.instanceManager.managedMeshes.get(assetKey);
+    if (!data) return null;
+
+    const instanceMatrix = data.instanceData[instanceID]?.matrix;
+    if (!instanceMatrix) return null;
+
+    // Compute the parent's world matrix (zUpRoot-local) for server sync
+    const partNodeLocalMatrix = partNode.transform
+      ? toMatrix(partNode.transform)
+      : new Matrix4();
+    const parentWorldMatrix = instanceMatrix
+      .clone()
+      .multiply(partNodeLocalMatrix.clone().invert());
+
+    const proxy = new Group();
+    proxy.applyMatrix4(instanceMatrix);
+    proxy.userData.isInstanceProxy = true;
+    proxy.userData.assetKey = assetKey;
+    proxy.userData.instanceID = instanceID;
+    proxy.userData.parentWorldMatrix = parentWorldMatrix;
+
+    this.zUpRoot.add(proxy);
+    proxy.updateMatrixWorld(true);
+
+    partNode.node = proxy;
+    return proxy;
+  }
+
+  /**
+   * Remove the proxy Group for a selected instanced PartNode.
+   * Sets partNode.node = null and removes it from zUpRoot.
+   */
+  removeInstanceProxy(partNode) {
+    if (partNode.node?.userData?.isInstanceProxy) {
+      this.zUpRoot.remove(partNode.node);
+      partNode.node = null;
+    }
+  }
+
+  /**
+   * Handle selection of an instanced PartNode (from raycastInstancedMeshes).
+   */
+  updateSelectionInstanced(partNode, toggleMode) {
+    const changes = [];
+
+    if (!toggleMode) {
+      const clearCmd = this.clearSelection();
+      if (clearCmd != null) {
+        changes.push(clearCmd);
+      }
+    }
+
+    const doSelect = toggleMode ? !this.selection.includes(partNode) : true;
+    const setCmd = this.setSelected(partNode, doSelect);
+    if (setCmd != null) {
+      changes.push(setCmd);
+    }
+
+    this.invalidate();
+    this.sendSceneChanges(changes);
   }
 
   onMouseWheel(event) {
@@ -1339,9 +1537,19 @@ class ThreeJsControl {
         // Do not select again
         return;
       }
-      this.setColor(sharedNode.node, WHITE);
-      this.selection.splice(index, 1);
 
+      if (sharedNode.willBeInstanced) {
+        this.scope.instanceManager.setInstanceSelectionState(
+          sharedNode.assetKey,
+          sharedNode.instanceID,
+          false,
+        );
+        this.removeInstanceProxy(sharedNode);
+      } else {
+        this.setColor(sharedNode.node, WHITE);
+      }
+
+      this.selection.splice(index, 1);
       command = this.sceneGraph.removeSelected(sharedNode);
     } else {
       // Currently not selected
@@ -1349,9 +1557,19 @@ class ThreeJsControl {
         // Cannot remove from selection
         return;
       }
-      this.setColor(sharedNode.node, SELECTION_COLOR);
-      this.selection.push(sharedNode);
 
+      if (sharedNode.willBeInstanced) {
+        this.createInstanceProxy(sharedNode);
+        this.scope.instanceManager.setInstanceSelectionState(
+          sharedNode.assetKey,
+          sharedNode.instanceID,
+          true,
+        );
+      } else {
+        this.setColor(sharedNode.node, SELECTION_COLOR);
+      }
+
+      this.selection.push(sharedNode);
       command = this.sceneGraph.addSelected(sharedNode);
     }
 
@@ -1366,15 +1584,33 @@ class ThreeJsControl {
 
   // applies red colour to selected shared objects from the graphScene
   applySelection(selectedSharedNodes) {
-    // remove selection from the previously selected objects
+    // Remove selection from previously selected objects
     for (const shared3JSNode of this.selection) {
-      this.setColor(shared3JSNode.node, WHITE);
+      if (shared3JSNode.willBeInstanced) {
+        this.scope.instanceManager.setInstanceSelectionState(
+          shared3JSNode.assetKey,
+          shared3JSNode.instanceID,
+          false,
+        );
+        this.removeInstanceProxy(shared3JSNode);
+      } else {
+        this.setColor(shared3JSNode.node, WHITE);
+      }
     }
     this.selection = [];
 
-    // apply selection to new objects that have to be selected
+    // Apply selection to new objects
     for (const shared3JSNode of selectedSharedNodes) {
-      this.setColor(shared3JSNode.node, SELECTION_COLOR);
+      if (shared3JSNode.willBeInstanced) {
+        this.createInstanceProxy(shared3JSNode);
+        this.scope.instanceManager.setInstanceSelectionState(
+          shared3JSNode.assetKey,
+          shared3JSNode.instanceID,
+          true,
+        );
+      } else {
+        this.setColor(shared3JSNode.node, SELECTION_COLOR);
+      }
       this.selection.push(shared3JSNode);
     }
 
@@ -1386,6 +1622,26 @@ class ThreeJsControl {
     for (const [id, obj] of Object.entries(this.scope.objects)) {
       if (obj.color && obj.node && obj.color.trim() !== "") {
         applyColorToObject(obj.node, obj.color);
+      }
+    }
+
+    // Apply colors to instanced objects via the color texture
+    if (this.scope.instanceGroups) {
+      for (const [assetKey, group] of this.scope.instanceGroups) {
+        for (const instance of group.instances) {
+          const { partNode } = instance;
+          if (
+            partNode.color &&
+            partNode.color.trim() !== "" &&
+            partNode.instanceID != null
+          ) {
+            this.scope.instanceManager.setInstanceColor(
+              assetKey,
+              partNode.instanceID,
+              partNode.color,
+            );
+          }
+        }
       }
     }
   }
@@ -1468,7 +1724,16 @@ class ThreeJsControl {
 
   clearSelection() {
     for (const sharedNode of this.selection) {
-      this.setColor(sharedNode.node, WHITE);
+      if (sharedNode.willBeInstanced) {
+        this.scope.instanceManager.setInstanceSelectionState(
+          sharedNode.assetKey,
+          sharedNode.instanceID,
+          false,
+        );
+        this.removeInstanceProxy(sharedNode);
+      } else {
+        this.setColor(sharedNode.node, WHITE);
+      }
     }
     this.selection.length = 0;
     if (this.areObjectsTransparent) {
@@ -1711,7 +1976,11 @@ class ThreeJsControl {
 
   clearObjectsTransparency() {
     this.scene.traverse((object) => {
-      if (object.material) {
+      if (
+        object.material &&
+        !object.userData.isInstancedMesh &&
+        !object.userData.isImpostorMesh
+      ) {
         this.getMaterials(object).forEach((material) => {
           if (material.transparent && material.opacity < 1.0) {
             this.setObjectTransparency(material, null);
@@ -1719,6 +1988,12 @@ class ThreeJsControl {
         });
       }
     });
+
+    // Reset all instanced mesh opacities to 1.0
+    for (const [assetKey] of this.scope.instanceManager.managedMeshes) {
+      if (assetKey.endsWith("_impostor")) continue;
+      this.scope.instanceManager.clearAllInstanceOpacity(assetKey);
+    }
   }
 
   setObjectsTransparency() {
@@ -1737,13 +2012,33 @@ class ThreeJsControl {
           object.material &&
           !selectedIds.has(object.id) &&
           object !== this.workplane &&
-          !this.isWorkplaneChild(object)
+          !this.isWorkplaneChild(object) &&
+          !object.userData.isInstancedMesh &&
+          !object.userData.isImpostorMesh
         ) {
           this.getMaterials(object).forEach((material) => {
             this.setObjectTransparency(material, TRANSPARENCY_LEVEL);
           });
         }
       });
+
+      // Handle instanced meshes via per-instance opacity in the state texture
+      const selectedInstanceNodes = new Set(
+        this.selection.filter((s) => s.willBeInstanced),
+      );
+      for (const [assetKey, data] of this.scope.instanceManager.managedMeshes) {
+        if (assetKey.endsWith("_impostor")) continue;
+        for (const instance of data.instanceData) {
+          if (!instance.partNode) continue;
+          const isSelected = selectedInstanceNodes.has(instance.partNode);
+          this.scope.instanceManager.setInstanceOpacity(
+            assetKey,
+            instance.id,
+            isSelected ? 1.0 : TRANSPARENCY_LEVEL,
+          );
+        }
+      }
+      this.renderManager.invalidate();
     }
   }
 

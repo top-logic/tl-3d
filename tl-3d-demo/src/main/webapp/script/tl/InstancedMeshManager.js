@@ -11,7 +11,9 @@
 import {
   Box3,
   BoxGeometry,
+  Color,
   Data3DTexture,
+  DataTexture,
   FloatType,
   FrontSide,
   InstancedBufferAttribute,
@@ -52,12 +54,85 @@ export class InstancedMeshManager {
   }
 
   /**
+   * Create per-instance state and color DataTextures.
+   * stateTexture: R=selectionFlag, G=opacity (default 1.0), B=0, A=0
+   * colorTexture: RGB=override color, A=hasColorOverride (0 or 1)
+   */
+  createStateTextures(maxInstances) {
+    const stateTextureData = new Float32Array(maxInstances * 4);
+    const colorTextureData = new Float32Array(maxInstances * 4);
+
+    // Default: not selected, fully opaque, no color override
+    for (let i = 0; i < maxInstances; i++) {
+      stateTextureData[i * 4 + 1] = 1.0; // G = opacity = 1.0
+    }
+
+    const stateTexture = new DataTexture(
+      stateTextureData,
+      maxInstances,
+      1,
+      RGBAFormat,
+      FloatType,
+    );
+    stateTexture.needsUpdate = true;
+
+    const colorTexture = new DataTexture(
+      colorTextureData,
+      maxInstances,
+      1,
+      RGBAFormat,
+      FloatType,
+    );
+    colorTexture.needsUpdate = true;
+
+    return { stateTexture, stateTextureData, colorTexture, colorTextureData };
+  }
+
+  /** Set/clear the selection highlight flag for one instance. */
+  setInstanceSelectionState(assetKey, instanceID, selected) {
+    const data = this.managedMeshes.get(assetKey);
+    if (!data) return;
+    data.stateTextureData[instanceID * 4 + 0] = selected ? 1.0 : 0.0;
+    data.stateTexture.needsUpdate = true;
+  }
+
+  /** Set the per-instance opacity channel (0.0 – 1.0). */
+  setInstanceOpacity(assetKey, instanceID, opacity) {
+    const data = this.managedMeshes.get(assetKey);
+    if (!data) return;
+    data.stateTextureData[instanceID * 4 + 1] = opacity;
+    data.stateTexture.needsUpdate = true;
+  }
+
+  /** Apply a color override to one instance (hex string or Three.js Color). */
+  setInstanceColor(assetKey, instanceID, colorValue) {
+    const data = this.managedMeshes.get(assetKey);
+    if (!data) return;
+    const c = new Color(colorValue);
+    data.colorTextureData[instanceID * 4 + 0] = c.r;
+    data.colorTextureData[instanceID * 4 + 1] = c.g;
+    data.colorTextureData[instanceID * 4 + 2] = c.b;
+    data.colorTextureData[instanceID * 4 + 3] = 1.0; // hasColorOverride = true
+    data.colorTexture.needsUpdate = true;
+  }
+
+  /** Reset all instance opacities to 1.0 for the given asset. */
+  clearAllInstanceOpacity(assetKey) {
+    const data = this.managedMeshes.get(assetKey);
+    if (!data) return;
+    for (let i = 0; i < data.maxInstances; i++) {
+      data.stateTextureData[i * 4 + 1] = 1.0;
+    }
+    data.stateTexture.needsUpdate = true;
+  }
+
+  /**
    * Create an instanced mesh with ID-based rendering
    * @param {string} assetKey - Unique key for this asset type
    * @param {BufferGeometry} geometry - The geometry to instance
    * @param {Material} baseMaterial - The base material (will be converted to shader material)
    * @param {number} maxInstances - Maximum number of instances
-   * @param {Array} instanceData - Array of {id, matrix} objects
+   * @param {Array} instanceData - Array of {id, matrix, partNode} objects
    */
   createInstancedMesh(
     assetKey,
@@ -86,6 +161,10 @@ export class InstancedMeshManager {
       instanceData,
     );
 
+    // Create per-instance state and color textures
+    const { stateTexture, stateTextureData, colorTexture, colorTextureData } =
+      this.createStateTextures(maxInstances);
+
     // Create InstancedBufferGeometry (gives us full control over instanced attributes)
     const instancedGeometry = new InstancedBufferGeometry().copy(geometry);
 
@@ -107,6 +186,9 @@ export class InstancedMeshManager {
       matrixTexture,
       textureWidth,
       textureHeight,
+      stateTexture,
+      colorTexture,
+      maxInstances,
     );
 
     // Create regular Mesh with instanced geometry (not InstancedMesh)
@@ -115,12 +197,16 @@ export class InstancedMeshManager {
     // Mark as instanced for identification
     mesh.userData.isInstancedMesh = true;
 
-    // Store management data
+    // Store management data (partNode preserved from input instanceData)
     this.managedMeshes.set(assetKey, {
       mesh,
       geometry: instancedGeometry,
       matrixTexture,
       matrixTextureData,
+      stateTexture,
+      stateTextureData,
+      colorTexture,
+      colorTextureData,
       instanceIDAttribute,
       instanceIDs,
       maxInstances,
@@ -129,6 +215,7 @@ export class InstancedMeshManager {
       instanceData: instanceData.map((d) => ({
         id: d.id,
         matrix: d.matrix.clone(),
+        partNode: d.partNode ?? null,
       })),
       triangleCount: triangleCount,
     });
@@ -190,14 +277,18 @@ export class InstancedMeshManager {
   }
 
   /**
-   * Patch the material's shader to use matrix lookup from Data3DTexture
-   * Uses onBeforeCompile to inject custom code into Three.js standard shaders
+   * Patch the material's shader to use matrix lookup from Data3DTexture.
+   * Also injects per-instance selection tint, opacity, and color override.
+   * Uses onBeforeCompile to inject custom code into Three.js standard shaders.
    */
   createMatrixLookupMaterial(
     baseMaterial,
     matrixTexture,
     textureWidth,
     textureHeight,
+    stateTexture,
+    colorTexture,
+    maxInstances,
   ) {
     // Clone the material to avoid modifying the original
     const material = baseMaterial.clone();
@@ -208,13 +299,17 @@ export class InstancedMeshManager {
       shader.uniforms.matrixTexture = { value: matrixTexture };
       shader.uniforms.textureWidth = { value: textureWidth };
       shader.uniforms.textureHeight = { value: textureHeight };
+      shader.uniforms.stateTexture = { value: stateTexture };
+      shader.uniforms.colorTexture = { value: colorTexture };
+      shader.uniforms.maxInstances = { value: maxInstances };
 
-      // Add custom attribute and uniforms at the top
+      // Add custom attribute, uniforms, and varying at the top of vertex shader
       shader.vertexShader = `
         attribute float instanceID;
         uniform sampler3D matrixTexture;
         uniform float textureWidth;
         uniform float textureHeight;
+        varying float vInstanceID;
 
         ${shader.vertexShader}
       `;
@@ -239,7 +334,52 @@ export class InstancedMeshManager {
           mat4 instanceMatrix = mat4(col0, col1, col2, col3);
         #endif
 
+        vInstanceID = instanceID;
+
         #include <beginnormal_vertex>
+        `,
+      );
+
+      // Add state/color uniforms and varying to fragment shader
+      shader.fragmentShader = `
+        uniform sampler2D stateTexture;
+        uniform sampler2D colorTexture;
+        uniform float maxInstances;
+        varying float vInstanceID;
+
+        ${shader.fragmentShader}
+      `;
+
+      // Inject after the very last fragment pipeline step so that tone mapping,
+      // color space conversion, fog etc. don't overwrite our state effects.
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <dithering_fragment>",
+        `
+        #include <dithering_fragment>
+
+        // Per-instance state lookup
+        float stateU = (vInstanceID + 0.5) / maxInstances;
+        vec2 stateUV = vec2(stateU, 0.5);
+        vec4 stateData = texture2D(stateTexture, stateUV);
+        float isSelected = stateData.r;
+        float instanceOpacity = stateData.g;
+
+        vec4 colorData = texture2D(colorTexture, stateUV);
+        float hasColorOverride = colorData.a;
+
+        // Apply color override
+        if (hasColorOverride > 0.5) {
+          gl_FragColor.rgb = mix(gl_FragColor.rgb, colorData.rgb, hasColorOverride);
+        }
+
+        // Apply selection tint (green)
+        if (isSelected > 0.5) {
+          gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.0, 1.0, 0.0), 0.7);
+        }
+
+        // Apply per-instance opacity
+        gl_FragColor.a *= instanceOpacity;
+        if (gl_FragColor.a < 0.01) discard;
         `,
       );
     };
@@ -247,6 +387,9 @@ export class InstancedMeshManager {
     // Enable instancing so Three.js includes the necessary shader code
     material.defines = material.defines || {};
     material.defines.USE_INSTANCING = "";
+
+    // Must be transparent so per-instance alpha blending works
+    material.transparent = true;
 
     return material;
   }
@@ -412,7 +555,13 @@ export class InstancedMeshManager {
       return null;
     }
 
-    const { matrixTexture, boundingBoxSize } = existingMeshData;
+    const {
+      matrixTexture,
+      boundingBoxSize,
+      stateTexture,
+      colorTexture: instanceColorTexture,
+      maxInstances: existingMaxInstances,
+    } = existingMeshData;
     const textureWidth = matrixTexture.image.width;
     const textureHeight = matrixTexture.image.height;
 
@@ -444,7 +593,7 @@ export class InstancedMeshManager {
       );
     }
 
-    // Create impostor material
+    // Create impostor material (shares state/color textures with the real mesh)
     const material = this.createImpostorMaterial(
       colorTexture,
       depthTexture,
@@ -456,6 +605,9 @@ export class InstancedMeshManager {
       captureOrientations,
       boundingBoxSize,
       faceCornerUVs,
+      stateTexture,
+      instanceColorTexture,
+      existingMaxInstances,
     );
 
     const mesh = new Mesh(instancedGeometry, material);
@@ -490,6 +642,9 @@ export class InstancedMeshManager {
     captureOrientations,
     boundingBoxSize,
     faceCornerUVs,
+    stateTexture = null,
+    instanceColorTexture = null,
+    maxInstances = 1,
   ) {
     return new ShaderMaterial({
       uniforms: {
@@ -502,6 +657,9 @@ export class InstancedMeshManager {
         boundingRadius: { value: boundingRadius },
         boundingBoxSize: { value: boundingBoxSize },
         faceCornerUVs: { value: faceCornerUVs },
+        stateTexture: { value: stateTexture },
+        instanceColorTexture: { value: instanceColorTexture },
+        maxInstances: { value: maxInstances },
       },
       vertexShader: `
         attribute float instanceID;
@@ -512,6 +670,7 @@ export class InstancedMeshManager {
         uniform vec3 centerOffset;
 
         flat varying int vCaptureIndex;
+        flat varying float vInstanceIDFlat;
         varying vec3 vModelPos;
         varying vec3 vWorldNormal;
         varying vec3 vLocalNormal;
@@ -599,6 +758,7 @@ export class InstancedMeshManager {
           }
 
           vCaptureIndex = captureIdx;
+          vInstanceIDFlat = instanceID;
 
           gl_Position = projectionMatrix * viewMatrix * worldPosition;
       }
@@ -608,8 +768,12 @@ export class InstancedMeshManager {
         uniform sampler2D colorAtlas;
         uniform vec2 faceCornerUVs[624]; // 26 captures * 6 faces * 4 corners
         uniform vec3 boundingBoxSize;
+        uniform sampler2D stateTexture;
+        uniform sampler2D instanceColorTexture;
+        uniform float maxInstances;
 
         flat varying int vCaptureIndex;
+        flat varying float vInstanceIDFlat;
         varying vec3 vModelPos;
         varying vec3 vWorldNormal;
         varying vec3 vLocalNormal;
@@ -673,9 +837,32 @@ export class InstancedMeshManager {
 
           color.rgb = LinearTosRGB(color.rgb);
           gl_FragColor = color;
+
+          // Per-instance state lookup
+          if (maxInstances > 0.0) {
+            float stateU = (vInstanceIDFlat + 0.5) / maxInstances;
+            vec2 stateUV = vec2(stateU, 0.5);
+            vec4 stateData = texture2D(stateTexture, stateUV);
+            float isSelected = stateData.r;
+            float instanceOpacity = stateData.g;
+
+            vec4 colorData = texture2D(instanceColorTexture, stateUV);
+            float hasColorOverride = colorData.a;
+
+            if (hasColorOverride > 0.5) {
+              gl_FragColor.rgb = mix(gl_FragColor.rgb, colorData.rgb, hasColorOverride);
+            }
+
+            if (isSelected > 0.5) {
+              gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.0, 1.0, 0.0), 0.7);
+            }
+
+            gl_FragColor.a *= instanceOpacity;
+            if (gl_FragColor.a < 0.01) discard;
+          }
         }
       `,
-      transparent: false,
+      transparent: true,
       side: FrontSide,
     });
   }
@@ -722,6 +909,8 @@ export class InstancedMeshManager {
   dispose() {
     for (const [assetKey, data] of this.managedMeshes) {
       data.matrixTexture?.dispose();
+      data.stateTexture?.dispose();
+      data.colorTexture?.dispose();
       data.mesh.geometry.dispose();
       data.mesh.material.dispose();
     }
