@@ -317,6 +317,28 @@ export class Scope {
     this.instanceManager.updateInstanceMatrix(assetKey, instanceID, newMatrix);
   }
 
+  /**
+   * Dispose and remove cached GLTF entries whose URLs are not in keepUrls.
+   * Called on scene reload to free CPU/GPU memory from the previous scene's assets.
+   */
+  clearStaleGltfs(keepUrls) {
+    for (const [url, gltf] of Object.entries(this.gltfs)) {
+      if (!keepUrls.has(url)) {
+        gltf.scene.traverse((obj) => {
+          if (obj.isMesh) {
+            obj.geometry.dispose();
+            if (Array.isArray(obj.material)) {
+              obj.material.forEach((m) => m.dispose());
+            } else {
+              obj.material?.dispose();
+            }
+          }
+        });
+        delete this.gltfs[url];
+      }
+    }
+  }
+
   getNode(id) {
     return this.objects[id];
   }
@@ -369,6 +391,10 @@ export class Scope {
     const loadUrl = (url) => {
       return gltfLoader.loadAsync(url).then(
         (gltf) => {
+          // Release the parser to free the raw ArrayBuffer data it retains.
+          // The parser is only needed during the initial parse and is never
+          // used after loadAsync resolves.
+          delete gltf.parser;
           // store gltf in the cache
           this.gltfs[url] = gltf;
         },
@@ -597,6 +623,57 @@ export class SceneGraph extends SharedObject {
   }
 
   reload(scope) {
+    // Collect the set of objects reachable from the NEW scene graph root
+    // before disposing, so we know what the new scene actually needs.
+    const reachableIds = new Set();
+    const collectReachable = (node) => {
+      if (!node) return;
+      reachableIds.add(node.id);
+      if (node instanceof PartNode) {
+        if (node.asset) {
+          reachableIds.add(node.asset.id);
+          if (node.asset.dynamicImage) reachableIds.add(node.asset.dynamicImage.id);
+          if (node.asset.layoutPoint) reachableIds.add(node.asset.layoutPoint.id);
+          node.asset.snappingPoints?.forEach((p) => reachableIds.add(p.id));
+        }
+      } else if (node instanceof GroupNode && node.contents) {
+        node.contents.forEach(collectReachable);
+      }
+    };
+    collectReachable(this.root);
+    reachableIds.add(this.id);
+
+    // Dispose GPU resources for OLD assets (those not in the new scene)
+    for (const obj of Object.values(scope.objects)) {
+      if (obj instanceof GltfAsset && !reachableIds.has(obj.id)) {
+        obj.dispose();
+      }
+    }
+    scope.instanceManager.dispose();
+    this.ctrl.impostorManager?.dispose();
+    this.ctrl.impostorManager = null;
+
+    // Compute needed URLs from the NEW scene's assets only
+    const neededUrls = new Set();
+    for (const id of reachableIds) {
+      const obj = scope.objects[id];
+      if (obj instanceof GltfAsset) {
+        if (obj.url) neededUrls.add(this.ctrl.contextPath + obj.url);
+        else if (obj.dynamicImage)
+          neededUrls.add(this.ctrl.imageUrl + "/" + obj.dynamicImage.imageID);
+      }
+    }
+    scope.clearStaleGltfs(neededUrls);
+
+    // Purge stale objects from scope.objects to prevent unbounded growth
+    for (const id of Object.keys(scope.objects)) {
+      // scope.objects keys are coerced to strings; IDs in reachableIds are numbers
+      const numId = Number(id);
+      if (!reachableIds.has(numId) && !isNaN(numId)) {
+        delete scope.objects[id];
+      }
+    }
+
     this.ctrl.zUpRoot.clear();
     this.ctrl.multiTransformGroup.clear();
 
@@ -666,6 +743,9 @@ export class ConnectionPoint extends SharedObject {
   }
 
   build(parentGroup, layoutPoint) {
+    this.pointGeometry?.dispose();
+    this.pointMaterial?.dispose();
+
     const group = new Group();
     parentGroup.add(group);
 
@@ -984,7 +1064,25 @@ export class GltfAsset extends SharedObject {
       return;
     }
 
-    this.group.remove(this.placeholder);
+    // Save colour before disposing the placeholder
+    const currentColor = this.placeholder?.material.color.clone();
+
+    // Dispose placeholder resources
+    if (this.placeholder) {
+      this.group.remove(this.placeholder);
+      this.placeholder.geometry.dispose();
+      this.placeholder.material.dispose();
+      this.placeholder = null;
+    }
+
+    // Dispose previous cloned model's materials (geometries are shared with the GLTF cache)
+    if (this._clonedModel) {
+      this._clonedModel.traverse((obj) => {
+        if (obj.isMesh) obj.material?.dispose();
+      });
+      this.group.remove(this._clonedModel);
+      this._clonedModel = null;
+    }
 
     const model = this.gltf.scene.clone();
     model.traverse((obj) => {
@@ -994,10 +1092,12 @@ export class GltfAsset extends SharedObject {
         obj.material.userData.originalColor = obj.material.color.clone();
       }
     });
+    this._clonedModel = model;
     this.group.add(model);
 
-    const currentColor = this.placeholder.material.color;
-    ctrl.setColor(this.group, currentColor);
+    if (currentColor) {
+      ctrl.setColor(this.group, currentColor);
+    }
   }
 
   loadJson(scope, json) {
@@ -1040,5 +1140,20 @@ export class GltfAsset extends SharedObject {
         this.snappingPoints.splice(idx, 1);
         break;
     }
+  }
+
+  dispose() {
+    if (this.placeholder) {
+      this.placeholder.geometry.dispose();
+      this.placeholder.material.dispose();
+      this.placeholder = null;
+    }
+    if (this._clonedModel) {
+      this._clonedModel.traverse((obj) => {
+        if (obj.isMesh) obj.material?.dispose();
+      });
+      this._clonedModel = null;
+    }
+    this.group = null;
   }
 }

@@ -181,6 +181,12 @@ export class ImpostorManager {
    * Generate impostor textures for a GLTF asset
    */
   generateImpostorForAsset(assetKey, gltf) {
+    // Dispose old render target (and its textures) if this asset was previously captured
+    const existingData = this.impostorData.get(assetKey);
+    if (existingData?.renderTarget) {
+      existingData.renderTarget.dispose();
+    }
+
     // Clone model
     const modelClone = gltf.scene.clone();
     modelClone.updateMatrixWorld(true);
@@ -356,12 +362,20 @@ export class ImpostorManager {
     this.impostorData.set(assetKey, {
       colorTexture: atlasTarget.texture,
       depthTexture: atlasTarget.depthTexture,
+      renderTarget: atlasTarget,
       boundingRadius: radius,
       centerOffset: center,
       captureOrientations,
       faceCornerUVData,
       resolution,
     });
+  }
+
+  dispose() {
+    for (const data of this.impostorData.values()) {
+      data.renderTarget?.dispose();
+    }
+    this.impostorData.clear();
   }
 
   /**
