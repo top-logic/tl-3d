@@ -67,6 +67,14 @@ export class InstancedMeshManager {
     instanceData,
     triangleCount = 100,
   ) {
+    // Dispose existing entry for this assetKey before overwriting
+    const existingData = this.managedMeshes.get(assetKey);
+    if (existingData) {
+      existingData.matrixTexture?.dispose();
+      existingData.geometry?.dispose();
+      existingData.mesh.material?.dispose();
+    }
+
     // Calculate optimal texture dimensions
     const { width: textureWidth, height: textureHeight } =
       this.calculateTextureDimensions(maxInstances);
@@ -486,7 +494,6 @@ export class InstancedMeshManager {
     return new ShaderMaterial({
       uniforms: {
         colorAtlas: { value: colorTexture },
-        depthAtlas: { value: depthTexture },
         matrixTexture: { value: matrixTexture },
         textureWidth: { value: textureWidth },
         textureHeight: { value: textureHeight },
@@ -714,7 +721,7 @@ export class InstancedMeshManager {
    */
   dispose() {
     for (const [assetKey, data] of this.managedMeshes) {
-      data.matrixTexture.dispose();
+      data.matrixTexture?.dispose();
       data.mesh.geometry.dispose();
       data.mesh.material.dispose();
     }
