@@ -7,7 +7,7 @@ import {
   Box3,
   BoxGeometry,
   Color,
-  DepthTexture,
+  DataTexture,
   FrontSide,
   Mesh,
   MeshBasicMaterial,
@@ -180,11 +180,39 @@ export class ImpostorManager {
   /**
    * Generate impostor textures for a GLTF asset
    */
+  /**
+   * Ensure the shared render target exists at the required size.
+   * A single target is reused across all assets to avoid allocating
+   * hundreds of GPU framebuffers simultaneously.
+   */
+  getSharedRenderTarget(width, height) {
+    if (
+      this._sharedTarget &&
+      this._sharedTarget.width === width &&
+      this._sharedTarget.height === height
+    ) {
+      return this._sharedTarget;
+    }
+    this._sharedTarget?.dispose();
+    this._sharedTarget = new WebGLRenderTarget(width, height, {
+      format: RGBAFormat,
+      type: UnsignedByteType,
+      depthBuffer: true,
+    });
+    return this._sharedTarget;
+  }
+
+  /** Dispose the shared render target when impostor generation is complete. */
+  disposeSharedRenderTarget() {
+    this._sharedTarget?.dispose();
+    this._sharedTarget = null;
+  }
+
   generateImpostorForAsset(assetKey, gltf) {
-    // Dispose old render target (and its textures) if this asset was previously captured
+    // Dispose old data if this asset was previously captured
     const existingData = this.impostorData.get(assetKey);
-    if (existingData?.renderTarget) {
-      existingData.renderTarget.dispose();
+    if (existingData?.colorTexture) {
+      existingData.colorTexture.dispose();
     }
 
     // Clone model
@@ -217,12 +245,7 @@ export class ImpostorManager {
     const atlasWidth = resolution * atlasColumns;
     const atlasHeight = resolution * atlasRows;
 
-    const atlasTarget = new WebGLRenderTarget(atlasWidth, atlasHeight, {
-      format: RGBAFormat,
-      type: UnsignedByteType,
-      depthBuffer: true,
-      depthTexture: new DepthTexture(atlasWidth, atlasHeight),
-    });
+    const atlasTarget = this.getSharedRenderTarget(atlasWidth, atlasHeight);
 
     const camera = new OrthographicCamera(
       -radius,
@@ -236,31 +259,6 @@ export class ImpostorManager {
     const scene = new Scene();
     scene.add(modelClone);
     SceneUtils.addImpostorCaptureLights(scene);
-
-    // Debug: add a colour-coded bounding box to verify face regions in captures
-    const DEBUG_FACE_COLOURS = false;
-    if (DEBUG_FACE_COLOURS) {
-      const { max, min } = boundingBox;
-      const boxGeometry = new BoxGeometry(
-        max.x - min.x,
-        max.y - min.y,
-        max.z - min.z,
-      );
-
-      // One material per face, matching BoxGeometry face order (+X,-X,+Y,-Y,+Z,-Z)
-      // which also matches the face index mapping in buildBoxFaceDefinitions
-      const boxMaterials = [
-        new MeshBasicMaterial({ color: 0xff0000, side: FrontSide }), // +X red
-        new MeshBasicMaterial({ color: 0x00ffff, side: FrontSide }), // -X cyan
-        new MeshBasicMaterial({ color: 0x00ff00, side: FrontSide }), // +Y green
-        new MeshBasicMaterial({ color: 0xff00ff, side: FrontSide }), // -Y magenta
-        new MeshBasicMaterial({ color: 0x0000ff, side: FrontSide }), // +Z blue
-        new MeshBasicMaterial({ color: 0xffff00, side: FrontSide }), // -Z yellow
-      ];
-
-      const boxMesh = new Mesh(boxGeometry, boxMaterials);
-      scene.add(boxMesh);
-    }
 
     const originalClearColor = this.renderer.getClearColor(new Color());
     const originalClearAlpha = this.renderer.getClearAlpha();
@@ -349,33 +347,54 @@ export class ImpostorManager {
     this.renderer.setClearColor(originalClearColor, originalClearAlpha);
     this.renderer.setRenderTarget(null);
 
-    /*
-    this.debugSaveAtlas(
+    // Read back the rendered atlas to a DataTexture so we can release the
+    // shared render target for the next asset instead of keeping one per asset.
+    const pixels = new Uint8Array(atlasWidth * atlasHeight * 4);
+    this.renderer.readRenderTargetPixels(
       atlasTarget,
-      assetKey,
+      0,
+      0,
       atlasWidth,
       atlasHeight,
-      faceCornerUVData,
+      pixels,
     );
-    */
+    const colorTexture = new DataTexture(
+      pixels,
+      atlasWidth,
+      atlasHeight,
+      RGBAFormat,
+      UnsignedByteType,
+    );
+    colorTexture.needsUpdate = true;
+
+    // Dispose the cloned model's materials so the renderer releases its internal
+    // cache entries. Geometries are shared with the source GLTF and not disposed here.
+    modelClone.traverse((obj) => {
+      if (obj.isMesh) {
+        if (Array.isArray(obj.material)) {
+          obj.material.forEach((m) => m.dispose());
+        } else {
+          obj.material?.dispose();
+        }
+      }
+    });
 
     this.impostorData.set(assetKey, {
-      colorTexture: atlasTarget.texture,
-      depthTexture: atlasTarget.depthTexture,
-      renderTarget: atlasTarget,
+      colorTexture,
+      depthTexture: null,
       boundingRadius: radius,
       centerOffset: center,
       captureOrientations,
       faceCornerUVData,
-      resolution,
     });
   }
 
   dispose() {
     for (const data of this.impostorData.values()) {
-      data.renderTarget?.dispose();
+      data.colorTexture?.dispose();
     }
     this.impostorData.clear();
+    this.disposeSharedRenderTarget();
   }
 
   /**

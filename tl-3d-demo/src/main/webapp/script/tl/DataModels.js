@@ -385,12 +385,28 @@ export class Scope {
     }
   }
 
+  /**
+   * Abort any in-flight asset loading from a previous scene.
+   * Called at the start of reload() to prevent old and new loading
+   * pipelines from running concurrently.
+   */
+  abortAssetLoading() {
+    this._loadAbortController?.abort();
+    this._loadAbortController = null;
+  }
+
   loadAssets(ctrl) {
+    // Abort any previous loading pipeline
+    this.abortAssetLoading();
+    const abortController = new AbortController();
+    this._loadAbortController = abortController;
+
     const gltfLoader = new GLTFLoader();
 
     const loadUrl = (url) => {
       return gltfLoader.loadAsync(url).then(
         (gltf) => {
+          if (abortController.signal.aborted) return;
           // Release the parser to free the raw ArrayBuffer data it retains.
           // The parser is only needed during the initial parse and is never
           // used after loadAsync resolves.
@@ -399,6 +415,7 @@ export class Scope {
           this.gltfs[url] = gltf;
         },
         (reason) => {
+          if (abortController.signal.aborted) return;
           const msg = "Failed to load '" + url + "': " + reason;
           console.error(msg);
         },
@@ -408,11 +425,13 @@ export class Scope {
     const loadURLs = (urls, assetsByURL) => {
       return Promise.all(urls.map(loadUrl))
         .then(() => {
+          if (abortController.signal.aborted) return;
           for (const url of urls) {
             this.setGLTF(ctrl, url, assetsByURL);
           }
         })
         .then(() => {
+          if (abortController.signal.aborted) return;
           ctrl.invalidate();
         });
     };
@@ -452,14 +471,20 @@ export class Scope {
 
     return batches
       .reduce((promise, batch) => {
+        if (abortController.signal.aborted) return Promise.resolve();
         return promise.then(() => loadURLs(batch, assetsByURL));
       }, Promise.resolve())
       .then(() => {
+        if (abortController.signal.aborted) return;
         return this.generateImpostors(ctrl);
       });
   }
 
-  generateImpostors(ctrl) {
+  async generateImpostors(ctrl) {
+    if (!this.instanceGroups || this.instanceGroups.size === 0) {
+      return;
+    }
+
     if (!ctrl.impostorManager) {
       ctrl.impostorManager = new ImpostorManager(
         ctrl.renderer,
@@ -467,9 +492,39 @@ export class Scope {
       );
     }
 
-    for (const [url, gltf] of Object.entries(this.gltfs)) {
-      ctrl.impostorManager.generateImpostorForAsset(url, gltf);
+    // Only generate impostors for instanced assets — non-instanced models
+    // don't use impostors and generating atlases for all of them is extremely
+    // expensive (26 render passes per model).
+    const entries = [];
+    for (const [assetKey, group] of this.instanceGroups) {
+      const asset = group.asset;
+      let gltfUrl;
+      if (asset.url) {
+        gltfUrl = ctrl.contextPath + asset.url;
+      } else if (asset.dynamicImage) {
+        gltfUrl = ctrl.imageUrl + "/" + asset.dynamicImage.imageID;
+      }
+      const gltf = gltfUrl ? this.gltfs[gltfUrl] : null;
+      if (gltf) {
+        entries.push([gltfUrl, gltf]);
+      }
     }
+
+    const batchSize = 10;
+
+    for (let i = 0; i < entries.length; i += batchSize) {
+      const batch = entries.slice(i, i + batchSize);
+      for (const [url, gltf] of batch) {
+        ctrl.impostorManager.generateImpostorForAsset(url, gltf);
+      }
+      // Yield to the browser between batches so GC can run and the UI stays responsive
+      if (i + batchSize < entries.length) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    }
+
+    // Shared render target is no longer needed after all impostors are generated
+    ctrl.impostorManager.disposeSharedRenderTarget();
   }
 
   setGLTF(ctrl, url, assetsByURL) {
@@ -623,6 +678,10 @@ export class SceneGraph extends SharedObject {
   }
 
   reload(scope) {
+    // Cancel any in-flight asset loading from the previous scene to prevent
+    // old and new loading pipelines from running concurrently.
+    scope.abortAssetLoading();
+
     // Collect the set of objects reachable from the NEW scene graph root
     // before disposing, so we know what the new scene actually needs.
     const reachableIds = new Set();

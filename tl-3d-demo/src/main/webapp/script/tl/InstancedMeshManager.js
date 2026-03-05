@@ -494,7 +494,6 @@ export class InstancedMeshManager {
     return new ShaderMaterial({
       uniforms: {
         colorAtlas: { value: colorTexture },
-        depthAtlas: { value: depthTexture },
         matrixTexture: { value: matrixTexture },
         textureWidth: { value: textureWidth },
         textureHeight: { value: textureHeight },
