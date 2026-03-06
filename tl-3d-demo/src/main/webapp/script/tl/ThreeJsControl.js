@@ -1368,6 +1368,17 @@ class ThreeJsControl {
   }
 
   /**
+   * Update the render manager's force-visible list from the current selection.
+   * Ensures selected instanced nodes are always rendered even if the octree
+   * hasn't been rebuilt yet after a transform.
+   */
+  syncForceVisibleInstances() {
+    this.renderManager.forceVisibleInstances = this.selection
+      .filter((s) => s.willBeInstanced && s.assetKey != null)
+      .map((s) => ({ assetKey: s.assetKey, instanceID: s.instanceID }));
+  }
+
+  /**
    * During multi-drag, sync all instanced proxy children of multiTransformGroup
    * to their instance textures for live preview.
    */
@@ -1578,6 +1589,8 @@ class ThreeJsControl {
     try {
       const changes = JSON.parse(changesString);
       let needsFullReload = false;
+      let hasTransformChanges = false;
+      const pendingInserts = [];
 
       for (const change of changes) {
         var command = change[0];
@@ -1603,19 +1616,65 @@ class ThreeJsControl {
           "hidden",
           "color",
           "selectable",
+          "transform",
         ];
 
+        if (cmdProps["p"] === "transform") {
+          hasTransformChanges = true;
+        }
+
         if (!safeIncrementalProperties.includes(cmdProps["p"])) {
-          needsFullReload = true;
+          if (
+            !needsFullReload &&
+            cmdProps["p"] === "contents"
+          ) {
+            if (cmd instanceof RemoveElement) {
+              const target = this.scope.getNode(cmdProps["id"]);
+              const removed = target?.contents?.[cmdProps["i"]];
+              if (!this.canHandleContentRemovalIncrementally(removed)) {
+                needsFullReload = true;
+              }
+            } else if (cmd instanceof InsertElement) {
+              // New node being inserted — handled after cmd.apply below.
+              // We flag it for post-processing to claim a spare instance
+              // slot or build a non-instanced node into the scene.
+              pendingInserts.push(cmd);
+            } else {
+              needsFullReload = true;
+            }
+          } else {
+            console.warn(
+              "[applySceneChanges] unsafe property triggers reload",
+              { cmd: command[0], prop: cmdProps["p"], id: cmdProps["id"] },
+            );
+            needsFullReload = true;
+          }
         }
         change.shift();
         cmd.loadJson(cmdProps, change);
         cmd.apply(this.scope);
       }
 
+      // Process newly inserted nodes that weren't handled by the
+      // Insert+Remove replacement pattern (i.e. truly new nodes).
+      if (!needsFullReload) {
+        for (const insertCmd of pendingInserts) {
+          const target = this.scope.getNode(insertCmd.id);
+          const inserted = target?.contents?.[insertCmd.idx];
+          if (inserted && !inserted.willBeInstanced && !inserted.node) {
+            this.handleNewContentInsert(inserted, target);
+          }
+        }
+      }
+
       if (needsFullReload) {
         this.sceneGraph.reload(this.scope);
       } else {
+        // If server echoed back transform changes and we're using octree
+        // culling, rebuild the octree so moved instances aren't lost.
+        if (hasTransformChanges && this.renderManager.useOctree) {
+          this.buildSceneOctree();
+        }
         this.applySelection(this.sceneGraph.selection);
         this.updateTransformControls();
         this.applyColors();
@@ -1624,6 +1683,124 @@ class ThreeJsControl {
     } catch (ex) {
       console.error(ex);
       throw ex;
+    }
+  }
+
+  /**
+   * Check whether a contents removal can be handled without a full reload.
+   * Instanced PartNodes are hidden as "void" instances; non-instanced nodes
+   * with a Three.js node are removed from the scene graph directly.
+   */
+  canHandleContentRemovalIncrementally(removed) {
+    if (!removed) return true;
+
+    if (removed.willBeInstanced && removed.assetKey != null) {
+      // Hide this instance and deselect if needed
+      this.scope.instanceManager.setInstanceHidden(
+        removed.assetKey,
+        removed.instanceID,
+        true,
+      );
+      if (this.selection.includes(removed)) {
+        this.setSelected(removed, false);
+      }
+      return true;
+    }
+
+    if (removed.node) {
+      // Non-instanced node: remove from scene
+      removed.node.parent?.remove(removed.node);
+      if (this.selection.includes(removed)) {
+        this.setSelected(removed, false);
+      }
+      removed.node = null;
+      return true;
+    }
+
+    // GroupNode containing children — check recursively
+    if (removed.contents) {
+      for (const child of removed.contents) {
+        if (!this.canHandleContentRemovalIncrementally(child)) {
+          return false;
+        }
+      }
+      // Remove the group's own Three.js node too
+      if (removed.node) {
+        removed.node.parent?.remove(removed.node);
+        removed.node = null;
+      }
+      return true;
+    }
+
+    // Bare node with no 3D representation (e.g. old node after an
+    // Insert transferred its annotations to the replacement) — safe to drop.
+    return true;
+  }
+
+  /**
+   * Handle a newly inserted node that wasn't part of a replacement pattern.
+   * If the node's asset matches an existing instanced group, claim a spare
+   * slot. Otherwise, build it into the scene as a non-instanced node.
+   */
+  handleNewContentInsert(inserted, parentGroupNode) {
+    // Check if this node's asset matches an existing instanced group
+    if (inserted.asset) {
+      const assetKey =
+        inserted.asset.url ||
+        (inserted.asset.dynamicImage
+          ? inserted.asset.dynamicImage.imageID
+          : null);
+
+      if (assetKey && this.scope.instanceGroups?.has(assetKey)) {
+        // Compute world transform for this new instance
+        const parentNode = parentGroupNode.node;
+        if (parentNode) {
+          parentNode.updateMatrixWorld(true);
+        }
+        const worldTransform = parentNode
+          ? parentNode.matrixWorld.clone()
+          : new Matrix4();
+        if (inserted.transform) {
+          worldTransform.multiply(toMatrix(inserted.transform));
+        }
+
+        // Claim a spare slot
+        const newID = this.scope.instanceManager.addInstance(
+          assetKey,
+          worldTransform,
+          inserted,
+        );
+        if (newID >= 0) {
+          inserted.willBeInstanced = true;
+          inserted.assetKey = assetKey;
+          inserted.instanceID = newID;
+
+          if (inserted.hidden) {
+            this.scope.instanceManager.setInstanceHidden(
+              assetKey,
+              newID,
+              true,
+            );
+          }
+          if (inserted.color && inserted.color.trim() !== "") {
+            this.scope.instanceManager.setInstanceColor(
+              assetKey,
+              newID,
+              inserted.color,
+            );
+          }
+
+          this.buildSceneOctree();
+          return;
+        }
+        // No spare slots — fall through to non-instanced build
+      }
+    }
+
+    // Build as a non-instanced node
+    const parentNode = parentGroupNode.node;
+    if (parentNode) {
+      inserted.build(parentNode);
     }
   }
 
@@ -1675,6 +1852,7 @@ class ThreeJsControl {
     }
 
     this.updateObjectsTransparency();
+    this.syncForceVisibleInstances();
     this.updateTransformControls();
     if (this.isEditMode) {
       this.updateConnectionPointsVisibility();
@@ -1719,6 +1897,7 @@ class ThreeJsControl {
     }
 
     this.updateObjectsTransparency();
+    this.syncForceVisibleInstances();
   }
 
   /**
@@ -1871,6 +2050,7 @@ class ThreeJsControl {
       }
     }
     this.selection.length = 0;
+    this.syncForceVisibleInstances();
     if (this.areObjectsTransparent) {
       this.clearObjectsTransparency();
     }

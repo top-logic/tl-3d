@@ -36,3 +36,6 @@ export const INSTANCING_BVH_MAX_TRIANGLES = 10_000_000;
 // Number of frames an instance can go undetected by BVH raycasting before
 // it gets pruned from the visible set.
 export const INSTANCING_BVH_STALE_FRAME_THRESHOLD = 30;
+// Extra instance slots allocated per asset for incremental additions
+// without needing to recreate the instanced mesh.
+export const INSTANCING_SPARE_SLOTS = 10;

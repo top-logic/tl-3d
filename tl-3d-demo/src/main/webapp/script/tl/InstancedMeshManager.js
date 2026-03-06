@@ -138,6 +138,57 @@ export class InstancedMeshManager {
     data.colorTexture.needsUpdate = true;
   }
 
+  /**
+   * Claim a spare (hidden) instance slot for a new PartNode.
+   * Returns the new instanceID, or -1 if no spare slots are available.
+   */
+  addInstance(assetKey, matrix, partNode) {
+    const data = this.managedMeshes.get(assetKey);
+    if (!data) return -1;
+
+    const activeCount = data.instanceData.length;
+    if (activeCount >= data.maxInstances) return -1;
+
+    const newID = activeCount;
+
+    // Add to instance data
+    data.instanceData.push({
+      id: newID,
+      matrix: matrix.clone(),
+      partNode: partNode ?? null,
+    });
+
+    // Write matrix into the texture
+    this.updateInstanceMatrix(assetKey, newID, matrix);
+
+    // Add to the visible ID buffer and bump the rendered instance count
+    data.instanceIDs[newID] = newID;
+    data.instanceIDAttribute.needsUpdate = true;
+    data.geometry.instanceCount = newID + 1;
+
+    // Start visible (not hidden) — caller can hide if needed
+    data.stateTextureData[newID * 4 + 1] = 1.0; // opacity
+    data.stateTexture.needsUpdate = true;
+
+    // Also add to the impostor mesh if one exists
+    const impostorKey = assetKey + "_impostor";
+    const impostorData = this.managedMeshes.get(impostorKey);
+    if (impostorData) {
+      const impostorActive = impostorData.instanceData.length;
+      if (impostorActive < impostorData.maxInstances) {
+        impostorData.instanceData.push({
+          id: newID,
+          matrix: matrix.clone(),
+        });
+        impostorData.instanceIDs[impostorActive] = newID;
+        impostorData.instanceIDAttribute.needsUpdate = true;
+        impostorData.geometry.instanceCount = impostorActive + 1;
+      }
+    }
+
+    return newID;
+  }
+
   /** Reset all instance opacities to 1.0 for the given asset. */
   clearAllInstanceOpacity(assetKey) {
     const data = this.managedMeshes.get(assetKey);

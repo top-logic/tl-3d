@@ -103,6 +103,23 @@ export class InsertElement extends ListUpdate {
       newSharedObject.node = oldSharedObject.node;
       oldSharedObject.node = null;
     }
+
+    // Transfer instancing annotations so the new object can control the
+    // same GPU instance slot as the old one.
+    if (oldSharedObject.willBeInstanced) {
+      newSharedObject.willBeInstanced = oldSharedObject.willBeInstanced;
+      newSharedObject.assetKey = oldSharedObject.assetKey;
+      newSharedObject.instanceID = oldSharedObject.instanceID;
+
+      // Update the partNode reference in the instance manager data
+      const data = scope.instanceManager.managedMeshes.get(
+        oldSharedObject.assetKey,
+      );
+      if (data?.instanceData[oldSharedObject.instanceID]) {
+        data.instanceData[oldSharedObject.instanceID].partNode =
+          newSharedObject;
+      }
+    }
   }
 
   extract() {

@@ -7,6 +7,7 @@ import {
   C_P_RADIUS,
   GREEN,
   HEIGHT_SEGMENTS,
+  INSTANCING_SPARE_SLOTS,
   RED,
   WIDTH_SEGMENTS,
 } from "./Constants.js";
@@ -148,12 +149,13 @@ export class Scope {
       // Create placeholder InstancedMesh using the manager
       const geometry = new BoxGeometry(500, 500, 500);
       const material = new MeshBasicMaterial({ wireframe: false });
+      const maxInstances = instances.length + INSTANCING_SPARE_SLOTS;
 
       const instancedMesh = this.instanceManager.createInstancedMesh(
         assetKey,
         geometry,
         material,
-        instances.length,
+        maxInstances,
         instanceData,
       );
 
@@ -278,11 +280,12 @@ export class Scope {
       });
 
       // Create new InstancedMesh with real geometry using the manager
+      const maxInstances = group.instances.length + INSTANCING_SPARE_SLOTS;
       const newInstancedMesh = this.instanceManager.createInstancedMesh(
         assetKey,
         templateMesh.geometry,
         templateMesh.material.clone(),
-        group.instances.length,
+        maxInstances,
         instanceData,
         triangleCount,
       );
@@ -324,7 +327,7 @@ export class Scope {
             depthTexture,
             boundingRadius,
             centerOffset,
-            group.instances.length,
+            maxInstances,
             instanceData,
             captureOrientations,
             faceCornerUVData,

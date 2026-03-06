@@ -235,54 +235,50 @@ export class SceneOctree {
     sceneBoundingBox = null,
     coordinateTransform = null,
   ) {
-    // Calculate bounding box if not provided
-    let bbox = sceneBoundingBox;
+    // Start from the provided scene bounding box (or empty) and always
+    // expand to include all current instance positions.  This ensures
+    // instances that have been moved outside the original scene bounds
+    // are still inserted into the octree.
+    let bbox = sceneBoundingBox ? sceneBoundingBox.clone() : new Box3();
     let totalInstances = 0;
 
-    if (!bbox) {
-      bbox = new Box3();
+    for (const [assetKey, data] of instanceManager.managedMeshes) {
+      const group = instanceGroups.get(assetKey);
+      if (!group) continue;
 
-      for (const [assetKey, data] of instanceManager.managedMeshes) {
-        const group = instanceGroups.get(assetKey);
-        if (!group) continue;
-
-        const baseBox = data.baseBoundingBox;
-        if (!baseBox) {
-          console.warn(`No base bounding box for ${assetKey}`);
-          continue;
-        }
-
-        // Expand bbox by all instance bounding boxes
-        for (const instance of data.instanceData) {
-          const instanceBox = baseBox.clone();
-          instanceBox.applyMatrix4(instance.matrix);
-
-          // Apply coordinate transform if provided
-          if (coordinateTransform) {
-            instanceBox.applyMatrix4(coordinateTransform);
-          }
-
-          bbox.union(instanceBox);
-          totalInstances++;
-        }
+      const baseBox = data.baseBoundingBox;
+      if (!baseBox) {
+        console.warn(`No base bounding box for ${assetKey}`);
+        continue;
       }
 
-      if (totalInstances === 0) {
-        console.warn("SceneOctree: No instances found in scene");
-        // Return octree with default bounds
-        return new SceneOctree(
-          new Box3(
-            new Vector3(-10000, -10000, -10000),
-            new Vector3(10000, 10000, 10000),
-          ),
-        );
-      }
+      for (const instance of data.instanceData) {
+        const instanceBox = baseBox.clone();
+        instanceBox.applyMatrix4(instance.matrix);
 
-      // Add some padding
-      const size = bbox.getSize(new Vector3());
-      const padding = size.length() * 0.1;
-      bbox.expandByScalar(padding);
+        if (coordinateTransform) {
+          instanceBox.applyMatrix4(coordinateTransform);
+        }
+
+        bbox.union(instanceBox);
+        totalInstances++;
+      }
     }
+
+    if (totalInstances === 0) {
+      console.warn("SceneOctree: No instances found in scene");
+      return new SceneOctree(
+        new Box3(
+          new Vector3(-10000, -10000, -10000),
+          new Vector3(10000, 10000, 10000),
+        ),
+      );
+    }
+
+    // Add some padding
+    const size = bbox.getSize(new Vector3());
+    const padding = size.length() * 0.1;
+    bbox.expandByScalar(padding);
 
     const octree = new SceneOctree(bbox);
 

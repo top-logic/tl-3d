@@ -36,6 +36,10 @@ export class RenderManager {
     this.sceneOctree = null;
     this.instanceManager = null;
 
+    // Instances that must always be rendered regardless of frustum culling
+    // (e.g. selected instances being dragged). Array of {assetKey, instanceID}.
+    this.forceVisibleInstances = [];
+
     // Camera tracking
     this.cameraIsMoving = false;
     this.cameraStopTimer = null;
@@ -168,6 +172,20 @@ export class RenderManager {
             frustum,
             cameraPos,
           );
+
+          // Force-include selected/dragged instances that the octree may
+          // miss because their bounding box hasn't been rebuilt yet.
+          if (this.forceVisibleInstances.length > 0) {
+            const seen = new Set(
+              visibleObjects.map((o) => o.assetKey + ":" + o.instanceID),
+            );
+            for (const forced of this.forceVisibleInstances) {
+              const key = forced.assetKey + ":" + forced.instanceID;
+              if (!seen.has(key)) {
+                visibleObjects.push(forced);
+              }
+            }
+          }
 
           // Split into full detail vs impostor buckets
           const { fullDetail, impostors } = this.useTriangleBudget
