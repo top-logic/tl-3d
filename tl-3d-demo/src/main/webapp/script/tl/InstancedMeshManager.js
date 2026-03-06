@@ -26,6 +26,8 @@ import {
   Vector3,
 } from "three";
 
+import { SELECTION_COLOR } from "./Constants.js";
+
 export class InstancedMeshManager {
   constructor() {
     // Map of assetKey -> InstancedMeshData
@@ -96,6 +98,14 @@ export class InstancedMeshManager {
     data.stateTexture.needsUpdate = true;
   }
 
+  /** Set/clear the hidden flag for one instance (B channel). */
+  setInstanceHidden(assetKey, instanceID, hidden) {
+    const data = this.managedMeshes.get(assetKey);
+    if (!data) return;
+    data.stateTextureData[instanceID * 4 + 2] = hidden ? 1.0 : 0.0;
+    data.stateTexture.needsUpdate = true;
+  }
+
   /** Set the per-instance opacity channel (0.0 – 1.0). */
   setInstanceOpacity(assetKey, instanceID, opacity) {
     const data = this.managedMeshes.get(assetKey);
@@ -113,6 +123,18 @@ export class InstancedMeshManager {
     data.colorTextureData[instanceID * 4 + 1] = c.g;
     data.colorTextureData[instanceID * 4 + 2] = c.b;
     data.colorTextureData[instanceID * 4 + 3] = 1.0; // hasColorOverride = true
+    data.colorTexture.needsUpdate = true;
+  }
+
+  /** Clear the color override for one instance. */
+  clearInstanceColor(assetKey, instanceID) {
+    const data = this.managedMeshes.get(assetKey);
+    if (!data) return;
+    const base = instanceID * 4;
+    data.colorTextureData[base] = 0;
+    data.colorTextureData[base + 1] = 0;
+    data.colorTextureData[base + 2] = 0;
+    data.colorTextureData[base + 3] = 0; // hasColorOverride = false
     data.colorTexture.needsUpdate = true;
   }
 
@@ -302,6 +324,7 @@ export class InstancedMeshManager {
       shader.uniforms.stateTexture = { value: stateTexture };
       shader.uniforms.colorTexture = { value: colorTexture };
       shader.uniforms.maxInstances = { value: maxInstances };
+      shader.uniforms.selectionColor = { value: new Color(SELECTION_COLOR) };
 
       // Add custom attribute, uniforms, and varying at the top of vertex shader
       shader.vertexShader = `
@@ -345,41 +368,53 @@ export class InstancedMeshManager {
         uniform sampler2D stateTexture;
         uniform sampler2D colorTexture;
         uniform float maxInstances;
+        uniform vec3 selectionColor;
         varying float vInstanceID;
 
         ${shader.fragmentShader}
       `;
 
-      // Inject after the very last fragment pipeline step so that tone mapping,
-      // color space conversion, fog etc. don't overwrite our state effects.
+      // Early injection: selection color, color override, and hidden check
+      // applied to diffuseColor BEFORE lighting so the color goes through the
+      // full PBR pipeline (matching non-instanced material.color.set behavior).
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <clipping_planes_fragment>",
+        `
+        #include <clipping_planes_fragment>
+
+        {
+          float stateU = (vInstanceID + 0.5) / maxInstances;
+          vec2 stateUV = vec2(stateU, 0.5);
+          vec4 stateData = texture2D(stateTexture, stateUV);
+
+          if (stateData.b > 0.5) discard; // hidden
+
+          if (stateData.r > 0.5) {
+            // Selection: replace diffuse color (like material.color.set)
+            diffuseColor.rgb = selectionColor;
+          } else {
+            vec4 colorData = texture2D(colorTexture, stateUV);
+            if (colorData.a > 0.5) {
+              // Color override: replace diffuse color (like applyColorToObject)
+              diffuseColor.rgb = colorData.rgb;
+            }
+          }
+        }
+        `,
+      );
+
+      // Late injection: per-instance opacity applied after all shading.
       shader.fragmentShader = shader.fragmentShader.replace(
         "#include <dithering_fragment>",
         `
         #include <dithering_fragment>
 
-        // Per-instance state lookup
-        float stateU = (vInstanceID + 0.5) / maxInstances;
-        vec2 stateUV = vec2(stateU, 0.5);
-        vec4 stateData = texture2D(stateTexture, stateUV);
-        float isSelected = stateData.r;
-        float instanceOpacity = stateData.g;
-
-        vec4 colorData = texture2D(colorTexture, stateUV);
-        float hasColorOverride = colorData.a;
-
-        // Apply color override
-        if (hasColorOverride > 0.5) {
-          gl_FragColor.rgb = mix(gl_FragColor.rgb, colorData.rgb, hasColorOverride);
+        {
+          float stateU = (vInstanceID + 0.5) / maxInstances;
+          float instanceOpacity = texture2D(stateTexture, vec2(stateU, 0.5)).g;
+          gl_FragColor.a *= instanceOpacity;
+          if (gl_FragColor.a < 0.01) discard;
         }
-
-        // Apply selection tint (green)
-        if (isSelected > 0.5) {
-          gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.0, 1.0, 0.0), 0.7);
-        }
-
-        // Apply per-instance opacity
-        gl_FragColor.a *= instanceOpacity;
-        if (gl_FragColor.a < 0.01) discard;
         `,
       );
     };
@@ -660,6 +695,7 @@ export class InstancedMeshManager {
         stateTexture: { value: stateTexture },
         instanceColorTexture: { value: instanceColorTexture },
         maxInstances: { value: maxInstances },
+        selectionColor: { value: new Color(SELECTION_COLOR) },
       },
       vertexShader: `
         attribute float instanceID;
@@ -771,6 +807,7 @@ export class InstancedMeshManager {
         uniform sampler2D stateTexture;
         uniform sampler2D instanceColorTexture;
         uniform float maxInstances;
+        uniform vec3 selectionColor;
 
         flat varying int vCaptureIndex;
         flat varying float vInstanceIDFlat;
@@ -845,16 +882,22 @@ export class InstancedMeshManager {
             vec4 stateData = texture2D(stateTexture, stateUV);
             float isSelected = stateData.r;
             float instanceOpacity = stateData.g;
+            float isHidden = stateData.b;
+
+            if (isHidden > 0.5) discard;
 
             vec4 colorData = texture2D(instanceColorTexture, stateUV);
             float hasColorOverride = colorData.a;
 
-            if (hasColorOverride > 0.5) {
-              gl_FragColor.rgb = mix(gl_FragColor.rgb, colorData.rgb, hasColorOverride);
-            }
+            // Preserve baked shading: extract luminance from the atlas texel
+            // and modulate the override/selection color by it, so light/dark
+            // variation from the baked lighting is retained.
+            float lum = dot(gl_FragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
 
             if (isSelected > 0.5) {
-              gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.0, 1.0, 0.0), 0.7);
+              gl_FragColor.rgb = selectionColor * lum;
+            } else if (hasColorOverride > 0.5) {
+              gl_FragColor.rgb = colorData.rgb * lum;
             }
 
             gl_FragColor.a *= instanceOpacity;

@@ -164,6 +164,33 @@ export class Scope {
 
       // Add to scene
       ctrl.zUpRoot.add(instancedMesh);
+
+      // Apply initial hidden and color states
+      for (const instance of instances) {
+        const pn = instance.partNode;
+        // Check own hidden flag and ancestor hidden state
+        let effectivelyHidden = pn.hidden;
+        if (!effectivelyHidden) {
+          let ancestor = pn.parent;
+          while (ancestor) {
+            if (ancestor.hidden) {
+              effectivelyHidden = true;
+              break;
+            }
+            ancestor = ancestor.parent;
+          }
+        }
+        if (effectivelyHidden) {
+          this.instanceManager.setInstanceHidden(assetKey, pn.instanceID, true);
+        }
+        if (pn.color && pn.color.trim() !== "") {
+          this.instanceManager.setInstanceColor(
+            assetKey,
+            pn.instanceID,
+            pn.color,
+          );
+        }
+      }
     }
   }
 
@@ -953,6 +980,8 @@ export class GroupNode extends SharedObject {
         if (this.node) {
           this.node.visible = !value;
         }
+        // Propagate hidden state to instanced children
+        this.setInstancedChildrenHidden(scope, value);
         break;
       case "selectable":
         this.selectable = value;
@@ -960,6 +989,24 @@ export class GroupNode extends SharedObject {
       default:
         super.setProperty(scope, property, value);
         break;
+    }
+  }
+
+  /** Recursively set hidden state on instanced PartNode descendants. */
+  setInstancedChildrenHidden(scope, hidden) {
+    if (!this.contents) return;
+    for (const child of this.contents) {
+      if (child instanceof PartNode) {
+        if (child.willBeInstanced && child.assetKey != null) {
+          scope.instanceManager.setInstanceHidden(
+            child.assetKey,
+            child.instanceID,
+            hidden || child.hidden,
+          );
+        }
+      } else if (child instanceof GroupNode) {
+        child.setInstancedChildrenHidden(scope, hidden || child.hidden);
+      }
     }
   }
 
@@ -1050,15 +1097,32 @@ export class PartNode extends SharedObject {
         break;
       case "color":
         this.color = value;
-        // Update 3D object colour
-        if (this.node && value) {
+        if (this.willBeInstanced && this.assetKey != null) {
+          if (value && value.trim() !== "") {
+            scope.instanceManager.setInstanceColor(
+              this.assetKey,
+              this.instanceID,
+              value,
+            );
+          } else {
+            scope.instanceManager.clearInstanceColor(
+              this.assetKey,
+              this.instanceID,
+            );
+          }
+        } else if (this.node && value) {
           applyColorToObject(this.node, value);
         }
         break;
       case "hidden": {
         this.hidden = value;
-        // Update 3D object visibility
-        if (this.node) {
+        if (this.willBeInstanced && this.assetKey != null) {
+          scope.instanceManager.setInstanceHidden(
+            this.assetKey,
+            this.instanceID,
+            value,
+          );
+        } else if (this.node) {
           this.node.visible = !value;
         }
         break;

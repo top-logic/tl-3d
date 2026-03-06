@@ -356,11 +356,42 @@ class ThreeJsControl {
           }
 
           // re-map multiTransformGroup children to array of commands
+          let hasInstancedMoves = false;
           const commands = outer.multiTransformGroup.children
             .map((node) => {
               // find the shared node in selection that corresponds to this Three.js node
               const sharedNode = outer.selection.find((s) => s.node === node);
               if (!sharedNode) return;
+
+              if (
+                sharedNode.willBeInstanced &&
+                node.userData.isInstanceProxy
+              ) {
+                hasInstancedMoves = true;
+                // Sync proxy world matrix to instance texture (zUpRoot-local)
+                const zUpLocalMatrix = getLocalMatrix(
+                  node.matrixWorld,
+                  outer.zUpRoot.matrixWorld,
+                );
+                outer.scope.instanceManager.updateInstanceMatrix(
+                  node.userData.assetKey,
+                  node.userData.instanceID,
+                  zUpLocalMatrix,
+                );
+                // Compute diff in PartNode-local space for server sync
+                const newLocalMatrix = node.userData.parentWorldMatrix
+                  .clone()
+                  .invert()
+                  .multiply(zUpLocalMatrix);
+                const currentLocalMatrix = sharedNode.transform
+                  ? toMatrix(sharedNode.transform)
+                  : new Matrix4();
+                const localDiff = currentLocalMatrix
+                  .clone()
+                  .invert()
+                  .multiply(newLocalMatrix);
+                return sharedNode.notifyTransform(localDiff);
+              }
 
               if (!node.previousParent) {
                 console.error("node.previousParent is undefined!");
@@ -384,6 +415,10 @@ class ThreeJsControl {
               // delete undefined if sharedNode is not found
             })
             .filter(Boolean);
+
+          if (hasInstancedMoves) {
+            outer.buildSceneOctree();
+          }
 
           outer.sendSceneChanges(commands);
         } else {
@@ -463,8 +498,18 @@ class ThreeJsControl {
         this.snapObjectToWorkplane(selectedObject);
 
         if (selectedObject === this.multiTransformGroup) {
+          this.syncInstancedProxiesDuringDrag();
           this.invalidate();
           return;
+        }
+
+        // Live preview: sync proxy matrix to instance texture
+        if (selectedObject.userData.isInstanceProxy) {
+          this.scope.instanceManager.updateInstanceMatrix(
+            selectedObject.userData.assetKey,
+            selectedObject.userData.instanceID,
+            selectedObject.matrix,
+          );
         }
 
         const { closestSnappingPoint } =
@@ -516,8 +561,18 @@ class ThreeJsControl {
         }
 
         if (selectedObject === this.multiTransformGroup) {
+          this.syncInstancedProxiesDuringDrag();
           this.invalidate();
           return;
+        }
+
+        // Live preview: sync proxy matrix to instance texture
+        if (selectedObject.userData.isInstanceProxy) {
+          this.scope.instanceManager.updateInstanceMatrix(
+            selectedObject.userData.assetKey,
+            selectedObject.userData.instanceID,
+            selectedObject.matrix,
+          );
         }
       }
 
@@ -1313,6 +1368,27 @@ class ThreeJsControl {
   }
 
   /**
+   * During multi-drag, sync all instanced proxy children of multiTransformGroup
+   * to their instance textures for live preview.
+   */
+  syncInstancedProxiesDuringDrag() {
+    for (const node of this.multiTransformGroup.children) {
+      if (node.userData.isInstanceProxy) {
+        node.updateMatrixWorld(true);
+        const zUpLocalMatrix = getLocalMatrix(
+          node.matrixWorld,
+          this.zUpRoot.matrixWorld,
+        );
+        this.scope.instanceManager.updateInstanceMatrix(
+          node.userData.assetKey,
+          node.userData.instanceID,
+          zUpLocalMatrix,
+        );
+      }
+    }
+  }
+
+  /**
    * Handle selection of an instanced PartNode (from raycastInstancedMeshes).
    */
   updateSelectionInstanced(partNode, toggleMode) {
@@ -1355,23 +1431,48 @@ class ThreeJsControl {
   }
 
   zoomToSelection() {
-    const selectedObject = this.selection[0]?.node;
+    const selectedShared = this.selection[0];
+    if (!selectedShared) return;
+
+    const selectedObject = selectedShared.node;
     if (!selectedObject) return;
 
-    const boundingBox = new Box3().setFromObject(selectedObject);
+    let boundingBox;
+    if (
+      selectedShared.willBeInstanced &&
+      selectedObject.userData.isInstanceProxy
+    ) {
+      // Proxy is an empty Group — compute BB from instance geometry + matrix
+      const data = this.scope.instanceManager.managedMeshes.get(
+        selectedShared.assetKey,
+      );
+      if (data?.baseBoundingBox) {
+        const instanceMatrix =
+          data.instanceData[selectedShared.instanceID]?.matrix;
+        if (instanceMatrix) {
+          this.zUpRoot.updateMatrixWorld(true);
+          boundingBox = data.baseBoundingBox
+            .clone()
+            .applyMatrix4(instanceMatrix)
+            .applyMatrix4(this.zUpRoot.matrixWorld);
+        }
+      }
+      if (!boundingBox) return;
+    } else {
+      boundingBox = new Box3().setFromObject(selectedObject);
+    }
+
     const center = new Vector3();
     boundingBox.getCenter(center);
 
     const size = new Vector3();
     boundingBox.getSize(size);
 
-    const objectPosition = selectedObject.getWorldPosition(new Vector3());
-
     const maxSize = Math.max(size.x, size.y);
     const fov = this.camera.fov * (Math.PI / 180);
     let targetDistance = maxSize / 2 / Math.tan(fov / 2);
 
-    const targetPositionZ = targetDistance + objectPosition.z;
+    const targetPositionZ = targetDistance + center.z;
     const offset = new Vector3(0, 0, 0);
     const targetZoomInPosition = center.clone().add(offset);
 
@@ -1599,8 +1700,11 @@ class ThreeJsControl {
     }
     this.selection = [];
 
+    // Expand group nodes to include instanced children
+    const expanded = this.expandInstancedChildren(selectedSharedNodes);
+
     // Apply selection to new objects
-    for (const shared3JSNode of selectedSharedNodes) {
+    for (const shared3JSNode of expanded) {
       if (shared3JSNode.willBeInstanced) {
         this.createInstanceProxy(shared3JSNode);
         this.scope.instanceManager.setInstanceSelectionState(
@@ -1615,6 +1719,37 @@ class ThreeJsControl {
     }
 
     this.updateObjectsTransparency();
+  }
+
+  /**
+   * Expand a selection list: for any GroupNode whose instanced PartNode
+   * descendants aren't directly in the list, add them so they get
+   * per-instance selection highlights.
+   */
+  expandInstancedChildren(selectedSharedNodes) {
+    const result = [...selectedSharedNodes];
+    const seen = new Set(result);
+
+    const collectInstanced = (node) => {
+      if (!node) return;
+      if (node.willBeInstanced && node.assetKey != null && !seen.has(node)) {
+        result.push(node);
+        seen.add(node);
+      }
+      if (node.contents) {
+        for (const child of node.contents) {
+          collectInstanced(child);
+        }
+      }
+    };
+
+    for (const node of selectedSharedNodes) {
+      if (node.contents) {
+        collectInstanced(node);
+      }
+    }
+
+    return result;
   }
 
   // Apply colours to all objects that have colour and 3D node
