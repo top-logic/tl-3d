@@ -288,9 +288,10 @@ export class InstancedMeshManager {
 
         // Sample layer 4: R=selection, G=opacity, B=hidden
         vec4 instanceState = texture(matrixTexture, vec3(vInstanceUV, 4.0));
-        float isSelected = instanceState.r;
 
-        if (isSelected > 0.5) {
+        if (instanceState.b > 0.5) discard;
+
+        if (instanceState.r > 0.5) {
           diffuseColor.rgb = selectionColor;
         }
         `,
@@ -842,8 +843,10 @@ export class InstancedMeshManager {
 
           color.rgb = LinearTosRGB(color.rgb);
 
-          // Selection highlight: multiply selection color by luminance to preserve shading
+          // Per-instance state: selection and hidden
           vec4 instanceState = texture(matrixTexture, vec3(vInstanceUV, 4.0));
+          if (instanceState.b > 0.5) discard;
+
           if (instanceState.r > 0.5) {
             float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
             color.rgb = selectionColor * luminance;
