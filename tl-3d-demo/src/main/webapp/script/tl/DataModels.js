@@ -134,12 +134,16 @@ export class Scope {
     for (const [assetKey, group] of this.instanceGroups) {
       const { asset, instances } = group;
 
-      // Prepare instance data with IDs and matrices
-      const instanceData = instances.map((instance, index) => ({
-        id: index, // Use index as ID for now (could be partNode.id)
-        matrix: instance.worldTransform,
-        partNode: instance.partNode,
-      }));
+      // Prepare instance data with IDs and matrices, annotate partNodes
+      const instanceData = instances.map((instance, index) => {
+        instance.partNode.instanceID = index;
+        instance.partNode.assetKey = assetKey;
+        return {
+          id: index,
+          matrix: instance.worldTransform,
+          partNode: instance.partNode,
+        };
+      });
 
       // Create placeholder InstancedMesh using the manager
       const geometry = new BoxGeometry(500, 500, 500);
@@ -160,6 +164,40 @@ export class Scope {
 
       // Add to scene
       ctrl.zUpRoot.add(instancedMesh);
+
+      // Apply initial per-instance state
+      this.applyInitialInstanceState(assetKey, instances);
+    }
+  }
+
+  /**
+   * Apply initial per-instance GPU state (hidden, color) from the data model.
+   * Called after creating or recreating instanced mesh textures.
+   */
+  applyInitialInstanceState(assetKey, instances) {
+    for (const instance of instances) {
+      const partNode = instance.partNode;
+
+      // Hidden: check own flag + ancestor chain
+      let hidden = partNode.hidden;
+      if (!hidden) {
+        let ancestor = partNode.parent;
+        while (ancestor) {
+          if (ancestor.hidden) {
+            hidden = true;
+            break;
+          }
+          ancestor = ancestor.parent;
+        }
+      }
+      if (hidden) {
+        this.instanceManager.setInstanceHidden(assetKey, partNode.instanceID, true);
+      }
+
+      // Color: apply if set (will be used by Step 4)
+      if (partNode.color && partNode.color.trim() !== "") {
+        this.instanceManager.setInstanceColor(assetKey, partNode.instanceID, partNode.color);
+      }
     }
   }
 
@@ -298,6 +336,9 @@ export class Scope {
           ctrl.zUpRoot.add(impostorMesh);
         }
       }
+
+      // Re-apply per-instance state after texture recreation
+      this.applyInitialInstanceState(assetKey, group.instances);
     }
   }
 
@@ -945,6 +986,7 @@ export class GroupNode extends SharedObject {
         if (this.node) {
           this.node.visible = !value;
         }
+        this.setInstancedChildrenHidden(scope, value);
         break;
       case "selectable":
         this.selectable = value;
@@ -952,6 +994,25 @@ export class GroupNode extends SharedObject {
       default:
         super.setProperty(scope, property, value);
         break;
+    }
+  }
+
+  /**
+   * Recursively set hidden state on instanced PartNode descendants.
+   * The effective hidden state is the OR of the node's own hidden flag
+   * and any ancestor's hidden flag.
+   */
+  setInstancedChildrenHidden(scope, parentHidden) {
+    if (!this.contents) return;
+    for (const child of this.contents) {
+      if (child instanceof PartNode && child.willBeInstanced && child.assetKey != null) {
+        const effectiveHidden = parentHidden || child.hidden;
+        scope.instanceManager.setInstanceHidden(child.assetKey, child.instanceID, effectiveHidden);
+      } else if (child instanceof GroupNode) {
+        // If this child group is also hidden, its descendants stay hidden regardless
+        const effectiveHidden = parentHidden || child.hidden;
+        child.setInstancedChildrenHidden(scope, effectiveHidden);
+      }
     }
   }
 
@@ -1049,8 +1110,9 @@ export class PartNode extends SharedObject {
         break;
       case "hidden": {
         this.hidden = value;
-        // Update 3D object visibility
-        if (this.node) {
+        if (this.willBeInstanced && this.assetKey != null) {
+          scope.instanceManager.setInstanceHidden(this.assetKey, this.instanceID, value);
+        } else if (this.node) {
           this.node.visible = !value;
         }
         break;

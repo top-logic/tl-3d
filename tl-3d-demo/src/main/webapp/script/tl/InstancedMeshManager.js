@@ -11,6 +11,7 @@
 import {
   Box3,
   BoxGeometry,
+  Color,
   DataArrayTexture,
   FloatType,
   FrontSide,
@@ -23,6 +24,8 @@ import {
   Vector2,
   Vector3,
 } from "three";
+
+import { SELECTION_COLOR } from "./Constants.js";
 
 export class InstancedMeshManager {
   constructor() {
@@ -102,11 +105,13 @@ export class InstancedMeshManager {
     instancedGeometry.instanceCount = instanceData.length;
 
     // Convert material to use our matrix lookup shader
+    const selectionColor = new Color(SELECTION_COLOR);
     const customMaterial = this.createMatrixLookupMaterial(
       baseMaterial,
       matrixTexture,
       textureWidth,
       textureHeight,
+      selectionColor,
     );
 
     // Create regular Mesh with instanced geometry (not InstancedMesh)
@@ -129,6 +134,7 @@ export class InstancedMeshManager {
       instanceData: instanceData.map((d) => ({
         id: d.id,
         matrix: d.matrix.clone(),
+        partNode: d.partNode || null,
       })),
       triangleCount: triangleCount,
     });
@@ -213,6 +219,7 @@ export class InstancedMeshManager {
     matrixTexture,
     textureWidth,
     textureHeight,
+    selectionColor,
   ) {
     // Clone the material to avoid modifying the original
     const material = baseMaterial.clone();
@@ -223,6 +230,7 @@ export class InstancedMeshManager {
       shader.uniforms.matrixTexture = { value: matrixTexture };
       shader.uniforms.textureWidth = { value: textureWidth };
       shader.uniforms.textureHeight = { value: textureHeight };
+      shader.uniforms.selectionColor = { value: selectionColor };
 
       // Add custom attribute and uniforms at the top
       shader.vertexShader = `
@@ -230,6 +238,8 @@ export class InstancedMeshManager {
         uniform mediump sampler2DArray matrixTexture;
         uniform float textureWidth;
         uniform float textureHeight;
+
+        varying vec2 vInstanceUV;
 
         ${shader.vertexShader}
       `;
@@ -245,6 +255,9 @@ export class InstancedMeshManager {
           // Normalise to [0, 1] range and centre on pixel
           vec2 uv = (vec2(x, y) + 0.5) / vec2(textureWidth, textureHeight);
 
+          // Pass instance UV to fragment shader for state lookup
+          vInstanceUV = uv;
+
           // Look up 4 columns from layers 0-3 (6 layers total)
           vec4 col0 = texture(matrixTexture, vec3(uv, 0.0));
           vec4 col1 = texture(matrixTexture, vec3(uv, 1.0));
@@ -255,6 +268,32 @@ export class InstancedMeshManager {
         #endif
 
         #include <beginnormal_vertex>
+        `,
+      );
+
+      // Add fragment shader declarations
+      shader.fragmentShader = `
+        uniform mediump sampler2DArray matrixTexture;
+        uniform vec3 selectionColor;
+        varying vec2 vInstanceUV;
+
+        ${shader.fragmentShader}
+      `;
+
+      // Inject selection color logic after clipping_planes_fragment (before PBR lighting)
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <clipping_planes_fragment>",
+        `
+        #include <clipping_planes_fragment>
+
+        // Sample layer 4: R=selection, G=opacity, B=hidden
+        vec4 instanceState = texture(matrixTexture, vec3(vInstanceUV, 4.0));
+
+        if (instanceState.b > 0.5) discard;
+
+        if (instanceState.r > 0.5) {
+          diffuseColor.rgb = selectionColor;
+        }
         `,
       );
     };
@@ -613,6 +652,7 @@ export class InstancedMeshManager {
     boundingBoxSize,
     faceCornerUVs,
   ) {
+    const selectionColor = new Color(SELECTION_COLOR);
     return new ShaderMaterial({
       uniforms: {
         colorAtlas: { value: colorTexture },
@@ -624,6 +664,7 @@ export class InstancedMeshManager {
         boundingRadius: { value: boundingRadius },
         boundingBoxSize: { value: boundingBoxSize },
         faceCornerUVs: { value: faceCornerUVs },
+        selectionColor: { value: selectionColor },
       },
       vertexShader: `
         attribute float instanceID;
@@ -637,12 +678,16 @@ export class InstancedMeshManager {
         varying vec3 vModelPos;
         varying vec3 vWorldNormal;
         varying vec3 vLocalNormal;
+        varying vec2 vInstanceUV;
 
         void main() {
           // ---- Matrix lookup ----
           float tx = mod(instanceID, textureWidth);
           float ty = floor(instanceID / textureWidth);
           vec2 tuv = (vec2(tx, ty) + 0.5) / vec2(textureWidth, textureHeight);
+
+          // Pass instance UV to fragment shader for state lookup
+          vInstanceUV = tuv;
 
           vec4 col0 = texture(matrixTexture, vec3(tuv, 0.0));
           vec4 col1 = texture(matrixTexture, vec3(tuv, 1.0));
@@ -728,13 +773,16 @@ export class InstancedMeshManager {
 
       fragmentShader: `
         uniform sampler2D colorAtlas;
+        uniform mediump sampler2DArray matrixTexture;
         uniform vec2 faceCornerUVs[624]; // 26 captures * 6 faces * 4 corners
         uniform vec3 boundingBoxSize;
+        uniform vec3 selectionColor;
 
         flat varying int vCaptureIndex;
         varying vec3 vModelPos;
         varying vec3 vWorldNormal;
         varying vec3 vLocalNormal;
+        varying vec2 vInstanceUV;
 
         // Maps a world-space normal to one of 6 face indices:
         //   0 = +X, 1 = -X, 2 = +Y, 3 = -Y, 4 = +Z, 5 = -Z
@@ -794,6 +842,16 @@ export class InstancedMeshManager {
           if (color.a < 0.5) discard;
 
           color.rgb = LinearTosRGB(color.rgb);
+
+          // Per-instance state: selection and hidden
+          vec4 instanceState = texture(matrixTexture, vec3(vInstanceUV, 4.0));
+          if (instanceState.b > 0.5) discard;
+
+          if (instanceState.r > 0.5) {
+            float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+            color.rgb = selectionColor * luminance;
+          }
+
           gl_FragColor = color;
         }
       `,

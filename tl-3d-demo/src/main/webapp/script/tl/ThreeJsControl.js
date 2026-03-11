@@ -23,7 +23,7 @@ import { OrbitControls } from "OrbitControls";
 import { TransformControls } from "TransformControls";
 import { gsap } from "gsap";
 import { InsertElement, RemoveElement, SetProperty } from "./Commands.js";
-import { Scope, SharedObject } from "./DataModels.js";
+import { Scope, SharedObject, GroupNode, PartNode } from "./DataModels.js";
 import { NavigationCube } from "./NavigationCube.js";
 import { RenderManager } from "./RenderManager.js";
 import { SceneOctree } from "./SceneOctree.js";
@@ -1133,8 +1133,138 @@ class ThreeJsControl {
     const visibleObjects = this.scene.children.filter((obj) => obj.visible);
     const intersects = raycaster.intersectObjects(visibleObjects, true);
 
-    this.updateSelection(intersects, event.ctrlKey);
+    // Check if any regular selectable hit was found
+    const hasSelectableHit = intersects.some((hit) => {
+      let candidate = hit.object;
+      while (candidate != null) {
+        const sharedNode = candidate.userData?.nodeRef;
+        if (sharedNode instanceof SharedObject && sharedNode.selectable) {
+          return true;
+        }
+        candidate = candidate.parent;
+      }
+      return false;
+    });
+
+    const toggleMode = event.ctrlKey || event.metaKey;
+    if (hasSelectableHit) {
+      this.updateSelection(intersects, toggleMode);
+    } else {
+      // Fall back to instanced mesh raycasting
+      const instancedHit = this.raycastInstancedMeshes(raycaster);
+      if (instancedHit) {
+        this.updateSelectionInstanced(instancedHit.partNode, toggleMode);
+      } else {
+        // Clicked empty space — clear selection
+        this.updateSelection([], toggleMode);
+      }
+    }
     this.invalidate();
+  }
+
+  /**
+   * Raycast against instanced meshes using octree (if available) or linear scan.
+   * Returns {partNode, assetKey, instanceID} for closest hit, or null.
+   */
+  raycastInstancedMeshes(raycaster) {
+    const instanceManager = this.scope.instanceManager;
+    if (!instanceManager || instanceManager.managedMeshes.size === 0) {
+      return null;
+    }
+
+    // Get candidates from octree or linear scan
+    let candidates;
+    if (this.sceneOctree) {
+      candidates = this.sceneOctree.queryRay(raycaster.ray);
+    } else {
+      // Linear scan over all instances
+      candidates = [];
+      for (const [assetKey, data] of instanceManager.managedMeshes) {
+        if (assetKey.endsWith("_impostor")) continue;
+        const baseBox = data.baseBoundingBox;
+        if (!baseBox) continue;
+
+        this.zUpRoot.updateMatrixWorld(true);
+        const zUpTransform = this.zUpRoot.matrixWorld;
+
+        for (const instance of data.instanceData) {
+          const instanceBox = baseBox.clone();
+          instanceBox.applyMatrix4(instance.matrix);
+          instanceBox.applyMatrix4(zUpTransform);
+
+          if (raycaster.ray.intersectsBox(instanceBox)) {
+            candidates.push({
+              type: "instance",
+              assetKey,
+              instanceID: instance.id,
+              boundingBox: instanceBox,
+              partNode: instance.partNode,
+            });
+          }
+        }
+      }
+    }
+
+    if (candidates.length === 0) return null;
+
+    // Find closest hit by distance to bounding box center
+    let closest = null;
+    let closestDist = Infinity;
+    const origin = raycaster.ray.origin;
+
+    for (const candidate of candidates) {
+      const center = new Vector3();
+      candidate.boundingBox.getCenter(center);
+      const dist = center.distanceTo(origin);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closest = candidate;
+      }
+    }
+
+    return closest;
+  }
+
+  /**
+   * Update selection from an instanced mesh click.
+   */
+  updateSelectionInstanced(partNode, toggleMode) {
+    const changes = [];
+
+    if (!toggleMode) {
+      const clearCmd = this.clearSelection();
+      if (clearCmd != null) {
+        changes.push(clearCmd);
+      }
+    }
+
+    if (partNode instanceof SharedObject && partNode.selectable) {
+      const doSelect = toggleMode
+        ? !this.selection.includes(partNode)
+        : true;
+      const setCmd = this.setSelected(partNode, doSelect);
+      if (setCmd != null) {
+        changes.push(setCmd);
+      }
+    }
+
+    if (changes.length > 0) {
+      this.sendSceneChanges(changes);
+    }
+  }
+
+  /**
+   * Walk a node's descendants and call fn(partNode) for each instanced PartNode found.
+   */
+  forEachInstancedDescendant(node, fn) {
+    if (node instanceof PartNode && node.willBeInstanced && node.assetKey != null) {
+      fn(node);
+    }
+    if (node instanceof GroupNode && node.contents) {
+      for (const child of node.contents) {
+        this.forEachInstancedDescendant(child, fn);
+      }
+    }
   }
 
   onMouseWheel(event) {
@@ -1339,7 +1469,18 @@ class ThreeJsControl {
         // Do not select again
         return;
       }
-      this.setColor(sharedNode.node, WHITE);
+
+      // Clear selection visual
+      if (sharedNode.willBeInstanced) {
+        this.setInstancedSelectionState(sharedNode, false);
+      } else if (sharedNode instanceof GroupNode) {
+        this.setColor(sharedNode.node, WHITE);
+        this.forEachInstancedDescendant(sharedNode, (pn) => {
+          this.scope.instanceManager.setInstanceSelectionState(pn.assetKey, pn.instanceID, false);
+        });
+      } else {
+        this.setColor(sharedNode.node, WHITE);
+      }
       this.selection.splice(index, 1);
 
       command = this.sceneGraph.removeSelected(sharedNode);
@@ -1349,7 +1490,18 @@ class ThreeJsControl {
         // Cannot remove from selection
         return;
       }
-      this.setColor(sharedNode.node, SELECTION_COLOR);
+
+      // Apply selection visual
+      if (sharedNode.willBeInstanced) {
+        this.setInstancedSelectionState(sharedNode, true);
+      } else if (sharedNode instanceof GroupNode) {
+        this.setColor(sharedNode.node, SELECTION_COLOR);
+        this.forEachInstancedDescendant(sharedNode, (pn) => {
+          this.scope.instanceManager.setInstanceSelectionState(pn.assetKey, pn.instanceID, true);
+        });
+      } else {
+        this.setColor(sharedNode.node, SELECTION_COLOR);
+      }
       this.selection.push(sharedNode);
 
       command = this.sceneGraph.addSelected(sharedNode);
@@ -1364,17 +1516,44 @@ class ThreeJsControl {
     return command;
   }
 
-  // applies red colour to selected shared objects from the graphScene
+  /** Set GPU selection state for an instanced PartNode */
+  setInstancedSelectionState(partNode, selected) {
+    this.scope.instanceManager.setInstanceSelectionState(
+      partNode.assetKey, partNode.instanceID, selected,
+    );
+  }
+
+  // applies selection colour to selected shared objects from the sceneGraph
   applySelection(selectedSharedNodes) {
     // remove selection from the previously selected objects
     for (const shared3JSNode of this.selection) {
-      this.setColor(shared3JSNode.node, WHITE);
+      if (shared3JSNode.willBeInstanced) {
+        this.setInstancedSelectionState(shared3JSNode, false);
+      } else {
+        this.setColor(shared3JSNode.node, WHITE);
+      }
+      // Clear instanced descendants of GroupNodes
+      if (shared3JSNode instanceof GroupNode) {
+        this.forEachInstancedDescendant(shared3JSNode, (pn) => {
+          this.scope.instanceManager.setInstanceSelectionState(pn.assetKey, pn.instanceID, false);
+        });
+      }
     }
     this.selection = [];
 
     // apply selection to new objects that have to be selected
     for (const shared3JSNode of selectedSharedNodes) {
-      this.setColor(shared3JSNode.node, SELECTION_COLOR);
+      if (shared3JSNode.willBeInstanced) {
+        this.setInstancedSelectionState(shared3JSNode, true);
+      } else if (shared3JSNode.node) {
+        this.setColor(shared3JSNode.node, SELECTION_COLOR);
+      }
+      // Highlight instanced descendants of GroupNodes
+      if (shared3JSNode instanceof GroupNode) {
+        this.forEachInstancedDescendant(shared3JSNode, (pn) => {
+          this.scope.instanceManager.setInstanceSelectionState(pn.assetKey, pn.instanceID, true);
+        });
+      }
       this.selection.push(shared3JSNode);
     }
 
@@ -1468,7 +1647,17 @@ class ThreeJsControl {
 
   clearSelection() {
     for (const sharedNode of this.selection) {
-      this.setColor(sharedNode.node, WHITE);
+      if (sharedNode.willBeInstanced) {
+        this.setInstancedSelectionState(sharedNode, false);
+      } else {
+        this.setColor(sharedNode.node, WHITE);
+      }
+      // Clear instanced descendants of GroupNodes
+      if (sharedNode instanceof GroupNode) {
+        this.forEachInstancedDescendant(sharedNode, (pn) => {
+          this.scope.instanceManager.setInstanceSelectionState(pn.assetKey, pn.instanceID, false);
+        });
+      }
     }
     this.selection.length = 0;
     if (this.areObjectsTransparent) {
@@ -1526,6 +1715,10 @@ class ThreeJsControl {
 
       // Build octree after all instances are loaded
       this.buildSceneOctree();
+
+      // Re-apply selection now that instanced meshes are fully set up
+      // (the initial applySelection in buildGraph runs before instancing annotations exist)
+      this.applySelection(this.sceneGraph.selection);
     });
 
     this.camera.position.applyMatrix4(this.scene.matrix);
