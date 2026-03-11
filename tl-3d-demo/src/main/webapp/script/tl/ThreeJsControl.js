@@ -313,6 +313,11 @@ class ThreeJsControl {
     const updateRenderTransform = (function () {
       let lastMatrix = new Matrix4();
       let lastWorldMatrixes = {};
+      // Snapshots of instanced descendant GPU matrices at drag start,
+      // keyed by Three.js node id (or "_single" for single-select).
+      // Each value is a Map from snapshotInstancedDescendantMatrices.
+      // Stored on the instance so objectChange handlers can access it.
+      outer._instanceSnapshots = {};
 
       return (event) => {
         // disable/enable orbit controls when drag starts/ends
@@ -328,12 +333,20 @@ class ThreeJsControl {
           // drag started when event.value is true
           if (event.value) {
             lastWorldMatrixes = {};
+            outer._instanceSnapshots = {};
 
             for (const node of outer.multiTransformGroup.children) {
               lastWorldMatrixes[node.id] = node.matrixWorld.clone();
               // Store starting position and rotation for incremental snapping
               node.userData.dragStartPosition = node.position.clone();
               node.userData.dragStartRotation = node.rotation.clone();
+
+              // Snapshot instanced descendant matrices for GroupNodes
+              const sharedNode = outer.selection.find((s) => s.node === node);
+              if (sharedNode instanceof GroupNode && outer.hasInstancedDescendants(sharedNode)) {
+                node.userData.dragStartMatrix = node.matrixWorld.clone();
+                outer._instanceSnapshots[node.id] = outer.snapshotInstancedDescendantMatrices(sharedNode);
+              }
             }
 
             return;
@@ -385,7 +398,22 @@ class ThreeJsControl {
             })
             .filter(Boolean);
 
+          // Recompute GPU matrices for instanced descendants of any GroupNodes
+          // (notifyTransform has already updated the data model transforms)
+          for (const node of outer.multiTransformGroup.children) {
+            const sharedNode = outer.selection.find((s) => s.node === node);
+            if (sharedNode instanceof GroupNode && outer.hasInstancedDescendants(sharedNode)) {
+              outer.recomputeInstanceMatrices(sharedNode);
+            }
+          }
+
           outer.sendSceneChanges(commands);
+
+          // Rebuild octree if any instanced matrices changed
+          if (Object.keys(outer._instanceSnapshots).length > 0) {
+            outer.buildSceneOctree();
+          }
+          outer._instanceSnapshots = {};
         } else {
           // SINGLE OBJECT MODE
           object.updateMatrixWorld(true);
@@ -396,6 +424,14 @@ class ThreeJsControl {
             // Store starting position and rotation for incremental snapping
             object.userData.dragStartPosition = object.position.clone();
             object.userData.dragStartRotation = object.rotation.clone();
+
+            // Snapshot instanced descendant matrices for GroupNodes
+            const sharedObject = outer.selection[0];
+            outer._instanceSnapshots = {};
+            if (sharedObject instanceof GroupNode && outer.hasInstancedDescendants(sharedObject)) {
+              object.userData.dragStartMatrix = object.matrix.clone();
+              outer._instanceSnapshots._single = outer.snapshotInstancedDescendantMatrices(sharedObject);
+            }
             return;
           }
 
@@ -435,8 +471,16 @@ class ThreeJsControl {
             if (sharedObject) {
               const commands = [sharedObject.notifyTransform(diffMatrix)];
               outer.sendSceneChanges(commands);
+
+              // Recompute GPU matrices for instanced descendants of GroupNodes
+              if (sharedObject instanceof GroupNode && outer.hasInstancedDescendants(sharedObject)) {
+                outer.recomputeInstanceMatrices(sharedObject);
+                outer.buildSceneOctree();
+              }
             }
           }
+
+          outer._instanceSnapshots = {};
         }
 
         outer.invalidate();
@@ -459,6 +503,8 @@ class ThreeJsControl {
         this.snapObjectToWorkplane(selectedObject);
 
         if (selectedObject === this.multiTransformGroup) {
+          // Live preview: update instanced descendants for GroupNodes in the multi-select
+          this._livePreviewInstancedDescendants(selectedObject, this._instanceSnapshots);
           this.invalidate();
           return;
         }
@@ -471,6 +517,9 @@ class ThreeJsControl {
             selectedObject.matrix,
           );
         }
+
+        // Live preview: update instanced descendants for a single GroupNode
+        this._livePreviewInstancedDescendants(selectedObject, this._instanceSnapshots);
 
         const { closestSnappingPoint } =
           this.throttledFindClosestSnappingPoint(selectedObject);
@@ -521,6 +570,8 @@ class ThreeJsControl {
         }
 
         if (selectedObject === this.multiTransformGroup) {
+          // Live preview: update instanced descendants for GroupNodes in the multi-select
+          this._livePreviewInstancedDescendants(selectedObject, this._instanceSnapshots);
           this.invalidate();
           return;
         }
@@ -533,6 +584,9 @@ class ThreeJsControl {
             selectedObject.matrix,
           );
         }
+
+        // Live preview: update instanced descendants for a single GroupNode
+        this._livePreviewInstancedDescendants(selectedObject, this._instanceSnapshots);
       }
 
       this.invalidate();
@@ -583,13 +637,34 @@ class ThreeJsControl {
     // update matrixWorld for all nodes in the sceneGraph including selected ones
     this.zUpRoot.updateMatrixWorld(true);
 
-    // get actual Three.js nodes from selection
-    const selectedNodes = this.selection.map((s) => s.node);
+    // Collect the GroupNodes in selection (needed for data-model ancestor filtering)
+    const selectedGroupNodes = this.selection.filter(
+      (s) => s instanceof GroupNode,
+    );
+
+    // Filter out instanced PartNodes whose ancestor GroupNode is also selected.
+    // Proxies are NOT Three.js descendants of the GroupNode, so isDescendantOfAny
+    // won't catch them — we must check the data model parent chain instead.
+    const filteredSelection = this.selection.filter((s) => {
+      if (!s.willBeInstanced) return true;
+      // Walk data model parent chain to see if any selected GroupNode is an ancestor
+      let ancestor = s.parent;
+      while (ancestor) {
+        if (selectedGroupNodes.includes(ancestor)) return false;
+        ancestor = ancestor.parent;
+      }
+      return true;
+    });
+
+    // get actual Three.js nodes from filtered selection
+    const selectedNodes = filteredSelection.map((s) => s.node);
 
     // filter out nodes that are descendants of others to avoid duplicates in the transform group
     const topLevelNodes = selectedNodes.filter(
-      (node) => !isDescendantOfAny(node, selectedNodes),
+      (node) => node && !isDescendantOfAny(node, selectedNodes),
     );
+
+    if (topLevelNodes.length === 0) return;
 
     const firstNode = topLevelNodes[0];
 
@@ -1369,6 +1444,130 @@ class ThreeJsControl {
       for (const child of node.contents) {
         this.forEachInstancedDescendant(child, fn);
       }
+    }
+  }
+
+  /**
+   * Check if a node (typically a GroupNode) has any instanced PartNode descendants.
+   */
+  hasInstancedDescendants(node) {
+    if (node instanceof PartNode && node.willBeInstanced && node.assetKey != null) {
+      return true;
+    }
+    if (node instanceof GroupNode && node.contents) {
+      for (const child of node.contents) {
+        if (this.hasInstancedDescendants(child)) return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Compute a node's world transform from the data model by walking up the parent chain.
+   * This includes the node's own transform.
+   */
+  computeDataModelWorldTransform(node) {
+    const transforms = [];
+    let current = node;
+    while (current) {
+      if (current.transform) {
+        transforms.unshift(current.transform);
+      }
+      current = current.parent;
+    }
+    const result = new Matrix4();
+    for (const t of transforms) {
+      result.multiply(toMatrix(t));
+    }
+    return result;
+  }
+
+  /**
+   * Recompute GPU instance matrices for all instanced PartNode descendants of a GroupNode.
+   * Walks the data model tree, accumulating transforms, and updates each instance's
+   * GPU matrix. Used after a GroupNode's transform has been updated (drag-end, server update).
+   */
+  recomputeInstanceMatrices(groupNode) {
+    const worldTransform = this.computeDataModelWorldTransform(groupNode);
+    this._recomputeDescendantMatrices(groupNode, worldTransform);
+  }
+
+  _recomputeDescendantMatrices(node, parentWorldTransform) {
+    if (!node.contents) return;
+    for (const child of node.contents) {
+      let childWorld = parentWorldTransform.clone();
+      if (child.transform) {
+        childWorld.multiply(toMatrix(child.transform));
+      }
+
+      if (child instanceof PartNode && child.willBeInstanced && child.assetKey != null) {
+        this.scope.instanceManager.updateInstanceMatrix(child.assetKey, child.instanceID, childWorld);
+      }
+
+      if (child instanceof GroupNode && child.contents) {
+        this._recomputeDescendantMatrices(child, childWorld);
+      }
+    }
+  }
+
+  /**
+   * Snapshot the current GPU matrices of all instanced descendants of a node.
+   * Returns a Map of "assetKey:instanceID" -> Matrix4.
+   * Used at drag start for delta-based live preview.
+   */
+  snapshotInstancedDescendantMatrices(node) {
+    const snapshots = new Map();
+    this.forEachInstancedDescendant(node, (pn) => {
+      const data = this.scope.instanceManager.managedMeshes.get(pn.assetKey);
+      if (data && data.instanceData[pn.instanceID]) {
+        snapshots.set(
+          pn.assetKey + ":" + pn.instanceID,
+          { assetKey: pn.assetKey, instanceID: pn.instanceID, matrix: data.instanceData[pn.instanceID].matrix.clone() },
+        );
+      }
+    });
+    return snapshots;
+  }
+
+  /**
+   * Apply a delta transform to all snapshotted instance matrices.
+   * Used during drag for live preview of GroupNode movement on instanced descendants.
+   */
+  applyDeltaToInstanceSnapshots(delta, snapshots) {
+    for (const { assetKey, instanceID, matrix } of snapshots.values()) {
+      const newMatrix = delta.clone().multiply(matrix);
+      this.scope.instanceManager.updateInstanceMatrix(assetKey, instanceID, newMatrix);
+    }
+  }
+
+  /**
+   * Live preview: apply delta transforms to instanced descendants during a drag.
+   * Handles both single-select (one node) and multi-select (multiTransformGroup).
+   * @param {Object3D} object - The dragged object (a single node or multiTransformGroup)
+   * @param {Object} snapshots - Map of node.id or "_single" -> snapshot from snapshotInstancedDescendantMatrices
+   */
+  _livePreviewInstancedDescendants(object, snapshots) {
+    if (!snapshots || Object.keys(snapshots).length === 0) return;
+
+    if (object === this.multiTransformGroup) {
+      // Multi-select: each child of multiTransformGroup may be a GroupNode
+      for (const node of this.multiTransformGroup.children) {
+        const snap = snapshots[node.id];
+        if (!snap) continue;
+        const startMatrix = node.userData.dragStartMatrix;
+        if (!startMatrix) continue;
+        node.updateMatrixWorld(true);
+        const delta = node.matrixWorld.clone().multiply(startMatrix.clone().invert());
+        this.applyDeltaToInstanceSnapshots(delta, snap);
+      }
+    } else {
+      // Single-select
+      const snap = snapshots._single;
+      if (!snap) return;
+      const startMatrix = object.userData.dragStartMatrix;
+      if (!startMatrix) return;
+      const delta = object.matrix.clone().multiply(startMatrix.clone().invert());
+      this.applyDeltaToInstanceSnapshots(delta, snap);
     }
   }
 

@@ -975,6 +975,8 @@ export class GroupNode extends SharedObject {
       }
       case "transform":
         this.transform = value;
+        // Recompute GPU matrices for instanced descendants (e.g., server undo/cancel)
+        this.recomputeInstancedChildrenMatrices(scope);
         break;
       case "color":
         this.color = value;
@@ -1038,6 +1040,51 @@ export class GroupNode extends SharedObject {
       } else if (child instanceof GroupNode) {
         const effectiveColor = child.color || parentColor;
         child.setInstancedChildrenColor(scope, effectiveColor);
+      }
+    }
+  }
+
+  /**
+   * Recompute GPU instance matrices for all instanced PartNode descendants.
+   * Walks up the parent chain to compute this node's world transform, then
+   * walks down through descendants, accumulating transforms.
+   */
+  recomputeInstancedChildrenMatrices(scope) {
+    // Compute this GroupNode's world transform by walking up the parent chain
+    const worldTransform = this._computeWorldTransform();
+    this._recomputeDescendantMatrices(scope, worldTransform);
+  }
+
+  _computeWorldTransform() {
+    const transforms = [];
+    let current = this;
+    while (current) {
+      if (current.transform) {
+        transforms.unshift(current.transform);
+      }
+      current = current.parent;
+    }
+    const result = new Matrix4();
+    for (const t of transforms) {
+      result.multiply(toMatrix(t));
+    }
+    return result;
+  }
+
+  _recomputeDescendantMatrices(scope, parentWorldTransform) {
+    if (!this.contents) return;
+    for (const child of this.contents) {
+      let childWorld = parentWorldTransform.clone();
+      if (child.transform) {
+        childWorld.multiply(toMatrix(child.transform));
+      }
+
+      if (child instanceof PartNode && child.willBeInstanced && child.assetKey != null) {
+        scope.instanceManager.updateInstanceMatrix(child.assetKey, child.instanceID, childWorld);
+      }
+
+      if (child instanceof GroupNode && child.contents) {
+        child._recomputeDescendantMatrices(scope, childWorld);
       }
     }
   }
