@@ -134,12 +134,16 @@ export class Scope {
     for (const [assetKey, group] of this.instanceGroups) {
       const { asset, instances } = group;
 
-      // Prepare instance data with IDs and matrices
-      const instanceData = instances.map((instance, index) => ({
-        id: index, // Use index as ID for now (could be partNode.id)
-        matrix: instance.worldTransform,
-        partNode: instance.partNode,
-      }));
+      // Prepare instance data with IDs and matrices, annotate partNodes
+      const instanceData = instances.map((instance, index) => {
+        instance.partNode.instanceID = index;
+        instance.partNode.assetKey = assetKey;
+        return {
+          id: index,
+          matrix: instance.worldTransform,
+          partNode: instance.partNode,
+        };
+      });
 
       // Create placeholder InstancedMesh using the manager
       const geometry = new BoxGeometry(500, 500, 500);
