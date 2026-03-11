@@ -975,6 +975,18 @@ export class GroupNode extends SharedObject {
       }
       case "transform":
         this.transform = value;
+        // Update the Three.js node's matrix to match the new transform
+        if (this.node) {
+          this.node.matrix.identity();
+          this.node.position.set(0, 0, 0);
+          this.node.rotation.set(0, 0, 0);
+          this.node.scale.set(1, 1, 1);
+          if (value && value.length > 0) {
+            this.node.applyMatrix4(toMatrix(value));
+          }
+        }
+        // Recompute GPU matrices for instanced descendants (e.g., server undo/cancel)
+        this.recomputeInstancedChildrenMatrices(scope);
         break;
       case "color":
         this.color = value;
@@ -1038,6 +1050,51 @@ export class GroupNode extends SharedObject {
       } else if (child instanceof GroupNode) {
         const effectiveColor = child.color || parentColor;
         child.setInstancedChildrenColor(scope, effectiveColor);
+      }
+    }
+  }
+
+  /**
+   * Recompute GPU instance matrices for all instanced PartNode descendants.
+   * Walks up the parent chain to compute this node's world transform, then
+   * walks down through descendants, accumulating transforms.
+   */
+  recomputeInstancedChildrenMatrices(scope) {
+    // Compute this GroupNode's world transform by walking up the parent chain
+    const worldTransform = this._computeWorldTransform();
+    this._recomputeDescendantMatrices(scope, worldTransform);
+  }
+
+  _computeWorldTransform() {
+    const transforms = [];
+    let current = this;
+    while (current) {
+      if (current.transform) {
+        transforms.unshift(current.transform);
+      }
+      current = current.parent;
+    }
+    const result = new Matrix4();
+    for (const t of transforms) {
+      result.multiply(toMatrix(t));
+    }
+    return result;
+  }
+
+  _recomputeDescendantMatrices(scope, parentWorldTransform) {
+    if (!this.contents) return;
+    for (const child of this.contents) {
+      let childWorld = parentWorldTransform.clone();
+      if (child.transform) {
+        childWorld.multiply(toMatrix(child.transform));
+      }
+
+      if (child instanceof PartNode && child.willBeInstanced && child.assetKey != null) {
+        scope.instanceManager.updateInstanceMatrix(child.assetKey, child.instanceID, childWorld);
+      }
+
+      if (child instanceof GroupNode && child.contents) {
+        child._recomputeDescendantMatrices(scope, childWorld);
       }
     }
   }
@@ -1124,9 +1181,47 @@ export class PartNode extends SharedObject {
       case "asset":
         this.asset = scope.loadJson(value);
         break;
-      case "transform":
-        this.transform = value;
+      case "transform": {
+        if (this.willBeInstanced && this.assetKey != null) {
+          // Recompute the full instance matrix (which has ancestor transforms
+          // baked in). Derive parentWorldMatrix from the current instance matrix
+          // by stripping the old local transform, then apply the new one.
+          const oldLocal = toMatrix(this.transform);
+          this.transform = value;
+          const newLocal = toMatrix(this.transform);
+
+          const data = scope.instanceManager.managedMeshes.get(this.assetKey);
+          if (data && data.instanceData[this.instanceID]) {
+            const instanceMatrix = data.instanceData[this.instanceID].matrix;
+            const parentWorld = instanceMatrix.clone().multiply(oldLocal.clone().invert());
+            const newInstanceMatrix = parentWorld.clone().multiply(newLocal);
+            scope.instanceManager.updateInstanceMatrix(this.assetKey, this.instanceID, newInstanceMatrix);
+
+            // Update proxy position if one exists (e.g., during cancel/undo)
+            if (this.node && this.node.userData.isInstanceProxy) {
+              this.node.position.set(0, 0, 0);
+              this.node.rotation.set(0, 0, 0);
+              this.node.scale.set(1, 1, 1);
+              this.node.updateMatrix();
+              this.node.applyMatrix4(newInstanceMatrix);
+              // Update stored parentWorldMatrix for future drag calculations
+              this.node.userData.parentWorldMatrix = parentWorld;
+            }
+          }
+        } else {
+          this.transform = value;
+          if (this.node) {
+            this.node.matrix.identity();
+            this.node.position.set(0, 0, 0);
+            this.node.rotation.set(0, 0, 0);
+            this.node.scale.set(1, 1, 1);
+            if (value && value.length > 0) {
+              this.node.applyMatrix4(toMatrix(value));
+            }
+          }
+        }
         break;
+      }
       case "color":
         this.color = value;
         // Update 3D object colour
