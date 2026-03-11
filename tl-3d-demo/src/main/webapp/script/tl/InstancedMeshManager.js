@@ -1,7 +1,7 @@
 /**
  * InstancedMeshManager.js
  *
- * Manages instanced meshes using ID-based rendering with Data3DTexture matrix storage.
+ * Manages instanced meshes using ID-based rendering with DataArrayTexture matrix storage.
  * Uses custom instanceID attribute (more efficient than gl_InstanceID + mapping texture).
  *
  * This allows fast per-frame swapping of which instances to render by only changing
@@ -11,7 +11,7 @@
 import {
   Box3,
   BoxGeometry,
-  Data3DTexture,
+  DataArrayTexture,
   FloatType,
   FrontSide,
   InstancedBufferAttribute,
@@ -79,7 +79,7 @@ export class InstancedMeshManager {
     const { width: textureWidth, height: textureHeight } =
       this.calculateTextureDimensions(maxInstances);
 
-    // Create Data3DTexture to store transformation matrices
+    // Create DataArrayTexture to store transformation matrices
     const { matrixTexture, matrixTextureData } = this.createMatrixTexture(
       textureWidth,
       textureHeight,
@@ -140,11 +140,11 @@ export class InstancedMeshManager {
   }
 
   /**
-   * Create the matrix texture using Data3DTexture
-   * Depth dimension contains the 4 columns of each matrix
+   * Create the matrix texture using DataArrayTexture
+   * Each layer stores one piece of per-instance data (matrix columns, state, color)
    */
   createMatrixTexture(textureWidth, textureHeight, instanceData) {
-    const textureDepth = 4; // 4 columns per matrix
+    const textureDepth = 6; // 4 matrix columns + state layer + color layer
 
     // Each layer is width * height, each pixel stores 4 floats (RGBA)
     const layerSize = textureWidth * textureHeight * 4; // RGBA
@@ -152,7 +152,7 @@ export class InstancedMeshManager {
 
     const matrixTextureData = new Float32Array(textureSize);
 
-    // Populate texture with matrices
+    // Populate texture with matrices (layers 0-3)
     instanceData.forEach((instance) => {
       const matrix = instance.matrix;
       const matrixArray = matrix.elements; // Column-major order
@@ -176,7 +176,22 @@ export class InstancedMeshManager {
       }
     });
 
-    const matrixTexture = new Data3DTexture(
+    // Initialize layer 4: per-instance state (R=selection, G=opacity, B=hidden, A=reserved)
+    // Default: selection=0, opacity=1.0, hidden=0
+    const layer4Offset = 4 * layerSize;
+    for (let i = 0; i < textureWidth * textureHeight; i++) {
+      const baseIndex = layer4Offset + i * 4;
+      matrixTextureData[baseIndex + 0] = 0.0; // selection
+      matrixTextureData[baseIndex + 1] = 1.0; // opacity
+      matrixTextureData[baseIndex + 2] = 0.0; // hidden
+      matrixTextureData[baseIndex + 3] = 0.0; // reserved
+    }
+
+    // Layer 5: per-instance color override (R, G, B, A=hasColorOverride)
+    // Default: all zeros (no override)
+    // Float32Array is zero-initialized, so no action needed for layer 5
+
+    const matrixTexture = new DataArrayTexture(
       matrixTextureData,
       textureWidth,
       textureHeight,
@@ -190,7 +205,7 @@ export class InstancedMeshManager {
   }
 
   /**
-   * Patch the material's shader to use matrix lookup from Data3DTexture
+   * Patch the material's shader to use matrix lookup from DataArrayTexture
    * Uses onBeforeCompile to inject custom code into Three.js standard shaders
    */
   createMatrixLookupMaterial(
@@ -212,7 +227,7 @@ export class InstancedMeshManager {
       // Add custom attribute and uniforms at the top
       shader.vertexShader = `
         attribute float instanceID;
-        uniform sampler3D matrixTexture;
+        uniform mediump sampler2DArray matrixTexture;
         uniform float textureWidth;
         uniform float textureHeight;
 
@@ -230,11 +245,11 @@ export class InstancedMeshManager {
           // Normalise to [0, 1] range and centre on pixel
           vec2 uv = (vec2(x, y) + 0.5) / vec2(textureWidth, textureHeight);
 
-          // Look up 4 columns from the 4 depth layers
-          vec4 col0 = texture(matrixTexture, vec3(uv, 0.125));
-          vec4 col1 = texture(matrixTexture, vec3(uv, 0.375));
-          vec4 col2 = texture(matrixTexture, vec3(uv, 0.625));
-          vec4 col3 = texture(matrixTexture, vec3(uv, 0.875));
+          // Look up 4 columns from layers 0-3 (6 layers total)
+          vec4 col0 = texture(matrixTexture, vec3(uv, 0.0));
+          vec4 col1 = texture(matrixTexture, vec3(uv, 1.0));
+          vec4 col2 = texture(matrixTexture, vec3(uv, 2.0));
+          vec4 col3 = texture(matrixTexture, vec3(uv, 3.0));
 
           mat4 instanceMatrix = mat4(col0, col1, col2, col3);
         #endif
@@ -386,6 +401,113 @@ export class InstancedMeshManager {
   }
 
   /**
+   * Helper: get the pixel offset into matrixTextureData for a given instance and layer
+   */
+  _getLayerPixelOffset(data, instanceID, layer) {
+    const { textureWidth, textureHeight } = data;
+    const layerSize = textureWidth * textureHeight * 4;
+    const x = instanceID % textureWidth;
+    const y = Math.floor(instanceID / textureWidth);
+    const pixelIndex = y * textureWidth + x;
+    return layer * layerSize + pixelIndex * 4;
+  }
+
+  /**
+   * Set selection highlight state for an instance (layer 4, R channel)
+   */
+  setInstanceSelectionState(assetKey, instanceID, selected) {
+    const data = this.managedMeshes.get(assetKey);
+    if (!data) return;
+    const offset = this._getLayerPixelOffset(data, instanceID, 4);
+    data.matrixTextureData[offset + 0] = selected ? 1.0 : 0.0;
+    data.matrixTexture.needsUpdate = true;
+  }
+
+  /**
+   * Set opacity for an instance (layer 4, G channel)
+   */
+  setInstanceOpacity(assetKey, instanceID, opacity) {
+    const data = this.managedMeshes.get(assetKey);
+    if (!data) return;
+    const offset = this._getLayerPixelOffset(data, instanceID, 4);
+    data.matrixTextureData[offset + 1] = opacity;
+    data.matrixTexture.needsUpdate = true;
+  }
+
+  /**
+   * Set hidden state for an instance (layer 4, B channel)
+   */
+  setInstanceHidden(assetKey, instanceID, hidden) {
+    const data = this.managedMeshes.get(assetKey);
+    if (!data) return;
+    const offset = this._getLayerPixelOffset(data, instanceID, 4);
+    data.matrixTextureData[offset + 2] = hidden ? 1.0 : 0.0;
+    data.matrixTexture.needsUpdate = true;
+  }
+
+  /**
+   * Set color override for an instance (layer 5, RGBA)
+   * @param {string} assetKey
+   * @param {number} instanceID
+   * @param {number|string} colorValue - hex color value (e.g. 0xff0000 or "#ff0000")
+   */
+  setInstanceColor(assetKey, instanceID, colorValue) {
+    const data = this.managedMeshes.get(assetKey);
+    if (!data) return;
+    const offset = this._getLayerPixelOffset(data, instanceID, 5);
+
+    // Parse color to RGB floats
+    let r, g, b;
+    if (typeof colorValue === "number") {
+      r = ((colorValue >> 16) & 0xff) / 255;
+      g = ((colorValue >> 8) & 0xff) / 255;
+      b = (colorValue & 0xff) / 255;
+    } else if (typeof colorValue === "string") {
+      const hex = colorValue.replace("#", "");
+      r = parseInt(hex.substring(0, 2), 16) / 255;
+      g = parseInt(hex.substring(2, 4), 16) / 255;
+      b = parseInt(hex.substring(4, 6), 16) / 255;
+    } else {
+      return;
+    }
+
+    data.matrixTextureData[offset + 0] = r;
+    data.matrixTextureData[offset + 1] = g;
+    data.matrixTextureData[offset + 2] = b;
+    data.matrixTextureData[offset + 3] = 1.0; // hasColorOverride
+    data.matrixTexture.needsUpdate = true;
+  }
+
+  /**
+   * Clear color override for an instance (layer 5)
+   */
+  clearInstanceColor(assetKey, instanceID) {
+    const data = this.managedMeshes.get(assetKey);
+    if (!data) return;
+    const offset = this._getLayerPixelOffset(data, instanceID, 5);
+    data.matrixTextureData[offset + 0] = 0.0;
+    data.matrixTextureData[offset + 1] = 0.0;
+    data.matrixTextureData[offset + 2] = 0.0;
+    data.matrixTextureData[offset + 3] = 0.0; // no override
+    data.matrixTexture.needsUpdate = true;
+  }
+
+  /**
+   * Reset opacity to 1.0 for all instances of an asset (layer 4, G channel)
+   */
+  clearAllInstanceOpacity(assetKey) {
+    const data = this.managedMeshes.get(assetKey);
+    if (!data) return;
+    const { textureWidth, textureHeight, matrixTextureData } = data;
+    const layerSize = textureWidth * textureHeight * 4;
+    const layer4Offset = 4 * layerSize;
+    for (let i = 0; i < textureWidth * textureHeight; i++) {
+      matrixTextureData[layer4Offset + i * 4 + 1] = 1.0;
+    }
+    data.matrixTexture.needsUpdate = true;
+  }
+
+  /**
    * Create instanced billboard quads for impostors
    * @param {string} assetKey - Unique key for this asset type
    * @param {Texture} colorTexture - Atlas texture with 26 views
@@ -506,7 +628,7 @@ export class InstancedMeshManager {
       vertexShader: `
         attribute float instanceID;
 
-        uniform sampler3D matrixTexture;
+        uniform mediump sampler2DArray matrixTexture;
         uniform float textureWidth;
         uniform float textureHeight;
         uniform vec3 centerOffset;
@@ -522,10 +644,10 @@ export class InstancedMeshManager {
           float ty = floor(instanceID / textureWidth);
           vec2 tuv = (vec2(tx, ty) + 0.5) / vec2(textureWidth, textureHeight);
 
-          vec4 col0 = texture(matrixTexture, vec3(tuv, 0.125));
-          vec4 col1 = texture(matrixTexture, vec3(tuv, 0.375));
-          vec4 col2 = texture(matrixTexture, vec3(tuv, 0.625));
-          vec4 col3 = texture(matrixTexture, vec3(tuv, 0.875));
+          vec4 col0 = texture(matrixTexture, vec3(tuv, 0.0));
+          vec4 col1 = texture(matrixTexture, vec3(tuv, 1.0));
+          vec4 col2 = texture(matrixTexture, vec3(tuv, 2.0));
+          vec4 col3 = texture(matrixTexture, vec3(tuv, 3.0));
 
           mat4 instanceMatrix = mat4(col0, col1, col2, col3);
 
@@ -694,7 +816,7 @@ export class InstancedMeshManager {
         assetKey,
         maxInstances: data.maxInstances,
         currentlyVisible: data.geometry.instanceCount,
-        textureSize: `${data.textureWidth}x${data.textureHeight}x4`,
+        textureSize: `${data.textureWidth}x${data.textureHeight}x6`,
       });
     }
 
