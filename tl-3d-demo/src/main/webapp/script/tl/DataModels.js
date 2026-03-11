@@ -792,6 +792,7 @@ export class SceneGraph extends SharedObject {
       // Re-evaluate whether octree is needed now that real geometry is loaded
       this.ctrl.buildSceneOctree();
 
+      this.ctrl.applyColors();
       this.ctrl.applySelection(this.selection);
       this.ctrl.updateTransformControls();
       this.ctrl.invalidate();
@@ -977,9 +978,13 @@ export class GroupNode extends SharedObject {
         break;
       case "color":
         this.color = value;
-        if (this.node && value) {
-          applyColorToObject(this.node, value);
+        if (this.node) {
+          this.node.userData.color = value || null;
+          if (value) {
+            applyColorToObject(this.node, value);
+          }
         }
+        this.setInstancedChildrenColor(scope, value);
         break;
       case "hidden":
         this.hidden = value;
@@ -1012,6 +1017,27 @@ export class GroupNode extends SharedObject {
         // If this child group is also hidden, its descendants stay hidden regardless
         const effectiveHidden = parentHidden || child.hidden;
         child.setInstancedChildrenHidden(scope, effectiveHidden);
+      }
+    }
+  }
+
+  /**
+   * Recursively set color on instanced PartNode descendants.
+   * A child's own color takes priority over the parent's color.
+   */
+  setInstancedChildrenColor(scope, parentColor) {
+    if (!this.contents) return;
+    for (const child of this.contents) {
+      if (child instanceof PartNode && child.willBeInstanced && child.assetKey != null) {
+        const effectiveColor = child.color || parentColor;
+        if (effectiveColor) {
+          scope.instanceManager.setInstanceColor(child.assetKey, child.instanceID, effectiveColor);
+        } else {
+          scope.instanceManager.clearInstanceColor(child.assetKey, child.instanceID);
+        }
+      } else if (child instanceof GroupNode) {
+        const effectiveColor = child.color || parentColor;
+        child.setInstancedChildrenColor(scope, effectiveColor);
       }
     }
   }
@@ -1104,8 +1130,17 @@ export class PartNode extends SharedObject {
       case "color":
         this.color = value;
         // Update 3D object colour
-        if (this.node && value) {
-          applyColorToObject(this.node, value);
+        if (this.willBeInstanced && this.assetKey != null) {
+          if (value) {
+            scope.instanceManager.setInstanceColor(this.assetKey, this.instanceID, value);
+          } else {
+            scope.instanceManager.clearInstanceColor(this.assetKey, this.instanceID);
+          }
+        } else if (this.node) {
+          this.node.userData.color = value || null;
+          if (value) {
+            applyColorToObject(this.node, value);
+          }
         }
         break;
       case "hidden": {

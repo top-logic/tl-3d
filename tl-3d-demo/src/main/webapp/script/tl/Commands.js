@@ -96,6 +96,29 @@ export class InsertElement extends ListUpdate {
       return;
     }
 
+    // Transfer instancing annotations if present
+    if (oldSharedObject.willBeInstanced) {
+      newSharedObject.willBeInstanced = true;
+      newSharedObject.assetKey = oldSharedObject.assetKey;
+      newSharedObject.instanceID = oldSharedObject.instanceID;
+
+      // Update the partNode reference in instanceData
+      const data = scope.instanceManager.managedMeshes.get(oldSharedObject.assetKey);
+      if (data) {
+        const instanceEntry = data.instanceData[oldSharedObject.instanceID];
+        if (instanceEntry) {
+          instanceEntry.partNode = newSharedObject;
+        }
+      }
+    }
+
+    // Recursively transfer instancing annotations for GroupNode children
+    if (oldSharedObject.contents && newSharedObject.contents) {
+      for (let i = 0; i < oldSharedObject.contents.length && i < newSharedObject.contents.length; i++) {
+        this.updateNodeReferences(scope, oldSharedObject.contents[i], newSharedObject.contents[i]);
+      }
+    }
+
     // Update the nodeRef in the 3D object's userData
     if (oldSharedObject.node && oldSharedObject.node.userData) {
       oldSharedObject.node.userData.nodeRef = newSharedObject;

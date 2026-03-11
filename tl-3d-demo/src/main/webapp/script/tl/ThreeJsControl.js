@@ -1427,17 +1427,20 @@ class ThreeJsControl {
             break;
         }
 
-        // Only allow known safe incremental properties
-        const safeIncrementalProperties = [
-          "selection",
-          "parent",
-          "hidden",
-          "color",
-          "selectable",
-        ];
+        // Only allow known safe incremental properties for SetProperty commands.
+        // Insert/Remove commands don't have a "p" key and are handled separately.
+        if (command[0] === "S") {
+          const safeIncrementalProperties = [
+            "selection",
+            "parent",
+            "hidden",
+            "color",
+            "selectable",
+          ];
 
-        if (!safeIncrementalProperties.includes(cmdProps["p"])) {
-          needsFullReload = true;
+          if (!safeIncrementalProperties.includes(cmdProps["p"])) {
+            needsFullReload = true;
+          }
         }
         change.shift();
         cmd.loadJson(cmdProps, change);
@@ -1447,9 +1450,9 @@ class ThreeJsControl {
       if (needsFullReload) {
         this.sceneGraph.reload(this.scope);
       } else {
+        this.applyColors();
         this.applySelection(this.sceneGraph.selection);
         this.updateTransformControls();
-        this.applyColors();
         this.invalidate();
       }
     } catch (ex) {
@@ -1563,8 +1566,16 @@ class ThreeJsControl {
   // Apply colours to all objects that have colour and 3D node
   applyColors() {
     for (const [id, obj] of Object.entries(this.scope.objects)) {
-      if (obj.color && obj.node && obj.color.trim() !== "") {
-        applyColorToObject(obj.node, obj.color);
+      if (obj.color && obj.color.trim() !== "") {
+        if (obj.willBeInstanced && obj.assetKey != null) {
+          this.scope.instanceManager.setInstanceColor(obj.assetKey, obj.instanceID, obj.color);
+        } else if (obj.node) {
+          applyColorToObject(obj.node, obj.color);
+        }
+        // Cascade to instanced descendants of GroupNodes
+        if (obj instanceof GroupNode) {
+          obj.setInstancedChildrenColor(this.scope, obj.color);
+        }
       }
     }
   }
@@ -1711,6 +1722,7 @@ class ThreeJsControl {
       // Update instanced meshes with real GLTF geometry
       this.scope.updateInstancedMeshesWithGLTF(this);
 
+      this.applyColors();
       this.updateObjectsTransparency();
 
       // Build octree after all instances are loaded
