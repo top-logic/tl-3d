@@ -223,6 +223,7 @@ export class InstancedMeshManager {
   ) {
     // Clone the material to avoid modifying the original
     const material = baseMaterial.clone();
+    material.transparent = true;
 
     // Patch the shader using onBeforeCompile
     material.onBeforeCompile = (shader) => {
@@ -276,6 +277,7 @@ export class InstancedMeshManager {
         uniform mediump sampler2DArray matrixTexture;
         uniform vec3 selectionColor;
         varying vec2 vInstanceUV;
+        float instanceOpacity;
 
         ${shader.fragmentShader}
       `;
@@ -288,6 +290,7 @@ export class InstancedMeshManager {
 
         // Sample layer 4: R=selection, G=opacity, B=hidden
         vec4 instanceState = texture(matrixTexture, vec3(vInstanceUV, 4.0));
+        instanceOpacity = instanceState.g;
 
         if (instanceState.b > 0.5) discard;
 
@@ -300,6 +303,15 @@ export class InstancedMeshManager {
             diffuseColor.rgb = colorOverride.rgb;
           }
         }
+        `,
+      );
+      // Apply per-instance opacity after all lighting/tonemapping
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <dithering_fragment>",
+        `
+        #include <dithering_fragment>
+        gl_FragColor.a *= instanceOpacity;
+        if (gl_FragColor.a < 0.01) discard;
         `,
       );
     };
@@ -865,10 +877,13 @@ export class InstancedMeshManager {
             }
           }
 
+          color.a *= instanceState.g;
+          if (color.a < 0.01) discard;
+
           gl_FragColor = color;
         }
       `,
-      transparent: false,
+      transparent: true,
       side: FrontSide,
     });
   }
