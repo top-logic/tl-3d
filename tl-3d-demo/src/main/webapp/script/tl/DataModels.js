@@ -1124,9 +1124,38 @@ export class PartNode extends SharedObject {
       case "asset":
         this.asset = scope.loadJson(value);
         break;
-      case "transform":
-        this.transform = value;
+      case "transform": {
+        if (this.willBeInstanced && this.assetKey != null) {
+          // Recompute the full instance matrix (which has ancestor transforms
+          // baked in). Derive parentWorldMatrix from the current instance matrix
+          // by stripping the old local transform, then apply the new one.
+          const oldLocal = toMatrix(this.transform);
+          this.transform = value;
+          const newLocal = toMatrix(this.transform);
+
+          const data = scope.instanceManager.managedMeshes.get(this.assetKey);
+          if (data && data.instanceData[this.instanceID]) {
+            const instanceMatrix = data.instanceData[this.instanceID].matrix;
+            const parentWorld = instanceMatrix.clone().multiply(oldLocal.clone().invert());
+            const newInstanceMatrix = parentWorld.clone().multiply(newLocal);
+            scope.instanceManager.updateInstanceMatrix(this.assetKey, this.instanceID, newInstanceMatrix);
+
+            // Update proxy position if one exists (e.g., during cancel/undo)
+            if (this.node && this.node.userData.isInstanceProxy) {
+              this.node.position.set(0, 0, 0);
+              this.node.rotation.set(0, 0, 0);
+              this.node.scale.set(1, 1, 1);
+              this.node.updateMatrix();
+              this.node.applyMatrix4(newInstanceMatrix);
+              // Update stored parentWorldMatrix for future drag calculations
+              this.node.userData.parentWorldMatrix = parentWorld;
+            }
+          }
+        } else {
+          this.transform = value;
+        }
         break;
+      }
       case "color":
         this.color = value;
         // Update 3D object colour

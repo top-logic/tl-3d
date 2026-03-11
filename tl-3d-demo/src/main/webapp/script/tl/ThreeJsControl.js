@@ -401,14 +401,41 @@ class ThreeJsControl {
 
           outer.snapObject(object);
 
-          const updatedMatrix = object.matrix.clone();
-          const diffMatrix = new Matrix4();
-          diffMatrix.copy(lastMatrix.clone().invert()).multiply(updatedMatrix);
-
           const sharedObject = outer.selection[0];
-          if (sharedObject) {
+
+          if (sharedObject && sharedObject.willBeInstanced && object.userData.isInstanceProxy) {
+            // INSTANCED PROXY MODE
+            // Sync the final proxy matrix to the GPU texture for visual update
+            outer.scope.instanceManager.updateInstanceMatrix(
+              object.userData.assetKey,
+              object.userData.instanceID,
+              object.matrix,
+            );
+
+            // Convert the proxy's new position back to the PartNode's local
+            // coordinate space. The instance matrix has all ancestor transforms
+            // baked in, so we use parentWorldMatrix (computed at proxy creation)
+            // to isolate the PartNode's own local transform.
+            const parentWorldMatrix = object.userData.parentWorldMatrix;
+            const newLocalMatrix = parentWorldMatrix.clone().invert().multiply(object.matrix);
+            const oldLocalMatrix = toMatrix(sharedObject.transform);
+            const diffMatrix = oldLocalMatrix.clone().invert().multiply(newLocalMatrix);
+
             const commands = [sharedObject.notifyTransform(diffMatrix)];
             outer.sendSceneChanges(commands);
+
+            // Rebuild the octree since instance positions have changed
+            outer.buildSceneOctree();
+          } else {
+            // REGULAR (non-instanced) SINGLE OBJECT MODE
+            const updatedMatrix = object.matrix.clone();
+            const diffMatrix = new Matrix4();
+            diffMatrix.copy(lastMatrix.clone().invert()).multiply(updatedMatrix);
+
+            if (sharedObject) {
+              const commands = [sharedObject.notifyTransform(diffMatrix)];
+              outer.sendSceneChanges(commands);
+            }
           }
         }
 
@@ -434,6 +461,15 @@ class ThreeJsControl {
         if (selectedObject === this.multiTransformGroup) {
           this.invalidate();
           return;
+        }
+
+        // Live preview: sync proxy matrix to GPU texture during drag
+        if (selectedObject.userData.isInstanceProxy) {
+          this.scope.instanceManager.updateInstanceMatrix(
+            selectedObject.userData.assetKey,
+            selectedObject.userData.instanceID,
+            selectedObject.matrix,
+          );
         }
 
         const { closestSnappingPoint } =
@@ -487,6 +523,15 @@ class ThreeJsControl {
         if (selectedObject === this.multiTransformGroup) {
           this.invalidate();
           return;
+        }
+
+        // Live preview: sync proxy matrix to GPU texture during drag
+        if (selectedObject.userData.isInstanceProxy) {
+          this.scope.instanceManager.updateInstanceMatrix(
+            selectedObject.userData.assetKey,
+            selectedObject.userData.instanceID,
+            selectedObject.matrix,
+          );
         }
       }
 
@@ -675,6 +720,12 @@ class ThreeJsControl {
   }
 
   enableEditing() {
+    // Create proxies for any already-selected instanced nodes
+    for (const s of this.selection) {
+      if (s.willBeInstanced && !s.node) {
+        this.createInstanceProxy(s);
+      }
+    }
     this.updateTransformControls();
   }
 
@@ -687,6 +738,13 @@ class ThreeJsControl {
     if (this.rotateControls) {
       this.rotateControls.detach();
       this.rotateControls.enabled = false;
+    }
+
+    // Remove proxies — they're only needed in edit mode
+    for (const s of this.selection) {
+      if (s.willBeInstanced) {
+        this.removeInstanceProxy(s);
+      }
     }
 
     this.updateTransformControls();
@@ -1254,6 +1312,53 @@ class ThreeJsControl {
   }
 
   /**
+   * Create a proxy Object3D for an instanced PartNode so that TransformControls
+   * can attach to it. The proxy is positioned at the instance's current world
+   * location (derived from its GPU matrix in zUpRoot-local space). Setting
+   * partNode.node = proxy allows the existing updateTransformControls() path
+   * to work unchanged — it just calls activateControl(selection[0].node).
+   */
+  createInstanceProxy(partNode) {
+    const data = this.scope.instanceManager.managedMeshes.get(partNode.assetKey);
+    if (!data || !data.instanceData[partNode.instanceID]) {
+      console.warn("Cannot create proxy: instance data not found");
+      return;
+    }
+
+    const instanceMatrix = data.instanceData[partNode.instanceID].matrix.clone();
+    const localTransform = toMatrix(partNode.transform);
+
+    const proxy = new Group();
+    proxy.name = `instanceProxy_${partNode.assetKey}_${partNode.instanceID}`;
+    proxy.userData.isInstanceProxy = true;
+    proxy.userData.assetKey = partNode.assetKey;
+    proxy.userData.instanceID = partNode.instanceID;
+
+    // parentWorldMatrix is the accumulated ancestor transforms (everything
+    // baked into the instance matrix EXCEPT the PartNode's own local transform).
+    // Stored at creation time for coordinate conversion during drag-end.
+    proxy.userData.parentWorldMatrix = instanceMatrix.clone().multiply(
+      localTransform.clone().invert(),
+    );
+
+    // Position the proxy at the instance's location in zUpRoot-local space
+    proxy.applyMatrix4(instanceMatrix);
+    this.zUpRoot.add(proxy);
+
+    partNode.node = proxy;
+  }
+
+  /**
+   * Remove a previously created instance proxy and clear the partNode.node ref.
+   */
+  removeInstanceProxy(partNode) {
+    if (partNode.node && partNode.node.userData.isInstanceProxy) {
+      partNode.node.removeFromParent();
+      partNode.node = null;
+    }
+  }
+
+  /**
    * Walk a node's descendants and call fn(partNode) for each instanced PartNode found.
    */
   forEachInstancedDescendant(node, fn) {
@@ -1436,6 +1541,7 @@ class ThreeJsControl {
             "hidden",
             "color",
             "selectable",
+            "transform",
           ];
 
           if (!safeIncrementalProperties.includes(cmdProps["p"])) {
@@ -1476,6 +1582,7 @@ class ThreeJsControl {
       // Clear selection visual
       if (sharedNode.willBeInstanced) {
         this.setInstancedSelectionState(sharedNode, false);
+        this.removeInstanceProxy(sharedNode);
       } else if (sharedNode instanceof GroupNode) {
         this.setColor(sharedNode.node, WHITE);
         this.forEachInstancedDescendant(sharedNode, (pn) => {
@@ -1497,6 +1604,10 @@ class ThreeJsControl {
       // Apply selection visual
       if (sharedNode.willBeInstanced) {
         this.setInstancedSelectionState(sharedNode, true);
+        // Create a proxy in edit mode so TransformControls can attach to it
+        if (this.isEditMode) {
+          this.createInstanceProxy(sharedNode);
+        }
       } else if (sharedNode instanceof GroupNode) {
         this.setColor(sharedNode.node, SELECTION_COLOR);
         this.forEachInstancedDescendant(sharedNode, (pn) => {
@@ -1755,10 +1866,14 @@ class ThreeJsControl {
       this.zUpRoot.updateMatrixWorld(true);
       const zUpTransform = this.zUpRoot.matrixWorld.clone();
 
+      // Pass null for sceneBoundingBox so the octree computes its own bounds
+      // from actual instance positions. Using this.boundingBox (computed from
+      // mesh geometry at load time) is too tight — it doesn't account for the
+      // spread of instance positions and can exclude moved instances.
       this.sceneOctree = SceneOctree.fromInstanceManager(
         this.scope.instanceManager,
         this.scope.instanceGroups,
-        this.boundingBox,
+        null,
         zUpTransform, // Pass the zUpRoot transform
       );
 
