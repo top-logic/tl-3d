@@ -1916,6 +1916,7 @@ class ThreeJsControl {
 
   clearObjectsTransparency() {
     this.scene.traverse((object) => {
+      if (object.userData.isInstancedMesh || object.userData.isImpostorMesh) return;
       if (object.material) {
         this.getMaterials(object).forEach((material) => {
           if (material.transparent && material.opacity < 1.0) {
@@ -1924,10 +1925,19 @@ class ThreeJsControl {
         });
       }
     });
+
+    // Reset all instance opacities to 1.0 (skip impostors — they share the base asset's texture)
+    if (this.scope.instanceManager.managedMeshes.size > 0) {
+      for (const [assetKey] of this.scope.instanceManager.managedMeshes) {
+        if (assetKey.endsWith("_impostor")) continue;
+        this.scope.instanceManager.clearAllInstanceOpacity(assetKey);
+      }
+    }
   }
 
   setObjectsTransparency() {
     if (this.selection.length > 0) {
+      // Collect Three.js object IDs for selected non-instanced objects
       const selectedIds = new Set();
       this.selection.forEach((sharedNode) => {
         if (sharedNode.node) {
@@ -1937,7 +1947,9 @@ class ThreeJsControl {
         }
       });
 
+      // Make non-instanced objects transparent
       this.scene.traverse((object) => {
+        if (object.userData.isInstancedMesh || object.userData.isImpostorMesh) return;
         if (
           object.material &&
           !selectedIds.has(object.id) &&
@@ -1949,6 +1961,31 @@ class ThreeJsControl {
           });
         }
       });
+
+      // Collect selected instanced PartNode keys for quick lookup
+      const selectedInstanceKeys = new Set();
+      for (const sharedNode of this.selection) {
+        if (sharedNode.willBeInstanced && sharedNode.assetKey != null) {
+          selectedInstanceKeys.add(sharedNode.assetKey + ":" + sharedNode.instanceID);
+        }
+        if (sharedNode instanceof GroupNode) {
+          this.forEachInstancedDescendant(sharedNode, (pn) => {
+            selectedInstanceKeys.add(pn.assetKey + ":" + pn.instanceID);
+          });
+        }
+      }
+
+      // Apply per-instance opacity via GPU texture (skip impostors — they share the base asset's texture)
+      for (const [assetKey, meshData] of this.scope.instanceManager.managedMeshes) {
+        if (assetKey.endsWith("_impostor")) continue;
+        if (!meshData.instanceData) continue;
+        for (const instance of meshData.instanceData) {
+          const isSelected = selectedInstanceKeys.has(assetKey + ":" + instance.id);
+          this.scope.instanceManager.setInstanceOpacity(
+            assetKey, instance.id, isSelected ? 1.0 : TRANSPARENCY_LEVEL,
+          );
+        }
+      }
     }
   }
 
