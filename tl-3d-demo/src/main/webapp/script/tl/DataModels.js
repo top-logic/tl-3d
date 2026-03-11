@@ -792,6 +792,7 @@ export class SceneGraph extends SharedObject {
       // Re-evaluate whether octree is needed now that real geometry is loaded
       this.ctrl.buildSceneOctree();
 
+      this.ctrl.applyColors();
       this.ctrl.applySelection(this.selection);
       this.ctrl.updateTransformControls();
       this.ctrl.invalidate();
@@ -977,8 +978,11 @@ export class GroupNode extends SharedObject {
         break;
       case "color":
         this.color = value;
-        if (this.node && value) {
-          applyColorToObject(this.node, value);
+        if (this.node) {
+          this.node.userData.color = value || null;
+          if (value) {
+            applyColorToObject(this.node, value);
+          }
         }
         break;
       case "hidden":
@@ -1104,8 +1108,11 @@ export class PartNode extends SharedObject {
       case "color":
         this.color = value;
         // Update 3D object colour
-        if (this.node && value) {
-          applyColorToObject(this.node, value);
+        if (this.node) {
+          this.node.userData.color = value || null;
+          if (value) {
+            applyColorToObject(this.node, value);
+          }
         }
         break;
       case "hidden": {

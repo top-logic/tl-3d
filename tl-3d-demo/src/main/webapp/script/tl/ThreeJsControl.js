@@ -1447,9 +1447,9 @@ class ThreeJsControl {
       if (needsFullReload) {
         this.sceneGraph.reload(this.scope);
       } else {
+        this.applyColors();
         this.applySelection(this.sceneGraph.selection);
         this.updateTransformControls();
-        this.applyColors();
         this.invalidate();
       }
     } catch (ex) {
@@ -1711,6 +1711,7 @@ class ThreeJsControl {
       // Update instanced meshes with real GLTF geometry
       this.scope.updateInstancedMeshesWithGLTF(this);
 
+      this.applyColors();
       this.updateObjectsTransparency();
 
       // Build octree after all instances are loaded
