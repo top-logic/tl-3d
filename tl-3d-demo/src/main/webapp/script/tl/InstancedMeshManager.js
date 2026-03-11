@@ -293,6 +293,12 @@ export class InstancedMeshManager {
 
         if (instanceState.r > 0.5) {
           diffuseColor.rgb = selectionColor;
+        } else {
+          // Sample layer 5: RGB=color override, A=hasOverride
+          vec4 colorOverride = texture(matrixTexture, vec3(vInstanceUV, 5.0));
+          if (colorOverride.a > 0.5) {
+            diffuseColor.rgb = colorOverride.rgb;
+          }
         }
         `,
       );
@@ -850,6 +856,13 @@ export class InstancedMeshManager {
           if (instanceState.r > 0.5) {
             float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
             color.rgb = selectionColor * luminance;
+          } else {
+            // Color override (layer 5), preserving baked shading
+            vec4 colorOverride = texture(matrixTexture, vec3(vInstanceUV, 5.0));
+            if (colorOverride.a > 0.5) {
+              float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+              color.rgb = colorOverride.rgb * luminance;
+            }
           }
 
           gl_FragColor = color;
