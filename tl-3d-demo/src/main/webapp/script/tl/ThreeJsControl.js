@@ -1596,24 +1596,73 @@ class ThreeJsControl {
     this.renderManager.onCameraMove();
   }
 
-  zoomToSelection() {
-    const selectedObject = this.selection[0]?.node;
-    if (!selectedObject) return;
+  /**
+   * Compute a world-space bounding box for a selected node.
+   * Handles instanced PartNodes, GroupNodes with instanced descendants,
+   * and regular nodes with Three.js scene objects.
+   */
+  computeSelectionBoundingBox(node) {
+    const instanceManager = this.scope.instanceManager;
+    this.zUpRoot.updateMatrixWorld(true);
+    const zUpTransform = this.zUpRoot.matrixWorld;
 
-    const boundingBox = new Box3().setFromObject(selectedObject);
+    if (node.willBeInstanced && node.assetKey != null) {
+      // Single instanced PartNode
+      const data = instanceManager.managedMeshes.get(node.assetKey);
+      if (!data || !data.baseBoundingBox) return null;
+      const instance = data.instanceData.find((d) => d.id === node.instanceID);
+      if (!instance) return null;
+      const box = data.baseBoundingBox.clone();
+      box.applyMatrix4(instance.matrix);
+      box.applyMatrix4(zUpTransform);
+      return box;
+    }
+
+    if (node instanceof GroupNode && this.hasInstancedDescendants(node)) {
+      // GroupNode: union of instanced descendants + any non-instanced node
+      const box = new Box3();
+      this.forEachInstancedDescendant(node, (pn) => {
+        const data = instanceManager.managedMeshes.get(pn.assetKey);
+        if (!data || !data.baseBoundingBox) return;
+        const instance = data.instanceData.find((d) => d.id === pn.instanceID);
+        if (!instance) return;
+        const instanceBox = data.baseBoundingBox.clone();
+        instanceBox.applyMatrix4(instance.matrix);
+        instanceBox.applyMatrix4(zUpTransform);
+        box.union(instanceBox);
+      });
+      // Also include the non-instanced Three.js node if it exists
+      if (node.node) {
+        box.union(new Box3().setFromObject(node.node));
+      }
+      return box.isEmpty() ? null : box;
+    }
+
+    // Non-instanced: use Three.js node directly
+    if (node.node) {
+      return new Box3().setFromObject(node.node);
+    }
+    return null;
+  }
+
+  zoomToSelection() {
+    const selected = this.selection[0];
+    if (!selected) return;
+
+    const boundingBox = this.computeSelectionBoundingBox(selected);
+    if (!boundingBox || boundingBox.isEmpty()) return;
+
     const center = new Vector3();
     boundingBox.getCenter(center);
 
     const size = new Vector3();
     boundingBox.getSize(size);
 
-    const objectPosition = selectedObject.getWorldPosition(new Vector3());
-
     const maxSize = Math.max(size.x, size.y);
     const fov = this.camera.fov * (Math.PI / 180);
     let targetDistance = maxSize / 2 / Math.tan(fov / 2);
 
-    const targetPositionZ = targetDistance + objectPosition.z;
+    const targetPositionZ = targetDistance + center.z;
     const offset = new Vector3(0, 0, 0);
     const targetZoomInPosition = center.clone().add(offset);
 
@@ -1639,7 +1688,7 @@ class ThreeJsControl {
           this.invalidate();
         },
         onComplete: () => {
-          this.lastSelectedObject = selectedObject;
+          this.lastSelectedObject = selected.node;
           this.controls.enableDamping = true;
           this.controls.update();
           this.invalidate();
@@ -1834,6 +1883,7 @@ class ThreeJsControl {
     }
 
     this.updateObjectsTransparency();
+
     this.updateTransformControls();
     if (this.isEditMode) {
       this.updateConnectionPointsVisibility();
@@ -1888,6 +1938,7 @@ class ThreeJsControl {
     }
 
     this.updateObjectsTransparency();
+
   }
 
   // Apply colours to all objects that have colour and 3D node
@@ -1998,6 +2049,7 @@ class ThreeJsControl {
       }
     }
     this.selection.length = 0;
+
     if (this.areObjectsTransparent) {
       this.clearObjectsTransparency();
     }
