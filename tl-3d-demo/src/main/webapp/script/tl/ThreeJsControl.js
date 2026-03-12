@@ -1756,6 +1756,10 @@ class ThreeJsControl {
         change.shift();
         cmd.loadJson(cmdProps, change);
         cmd.apply(this.scope);
+
+        if (cmd.needsFullReload) {
+          needsFullReload = true;
+        }
       }
 
       if (needsFullReload) {
