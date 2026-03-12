@@ -429,7 +429,10 @@ class ThreeJsControl {
             const sharedObject = outer.selection[0];
             outer._instanceSnapshots = {};
             if (sharedObject instanceof GroupNode && outer.hasInstancedDescendants(sharedObject)) {
-              object.userData.dragStartMatrix = object.matrix.clone();
+              // Store start matrix in zUpRoot-local space (matching instance matrix space)
+              outer.zUpRoot.updateMatrixWorld(true);
+              object.updateMatrixWorld(true);
+              object.userData.dragStartMatrix = outer.zUpRoot.matrixWorld.clone().invert().multiply(object.matrixWorld);
               outer._instanceSnapshots._single = outer.snapshotInstancedDescendantMatrices(sharedObject);
             }
             return;
@@ -1566,7 +1569,10 @@ class ThreeJsControl {
       if (!snap) return;
       const startMatrix = object.userData.dragStartMatrix;
       if (!startMatrix) return;
-      const delta = object.matrix.clone().multiply(startMatrix.clone().invert());
+      // Compute delta in zUpRoot-local space (matching instance matrix space)
+      object.updateMatrixWorld(true);
+      const currentZUpLocal = this.zUpRoot.matrixWorld.clone().invert().multiply(object.matrixWorld);
+      const delta = currentZUpLocal.multiply(startMatrix.clone().invert());
       this.applyDeltaToInstanceSnapshots(delta, snap);
     }
   }
@@ -1842,6 +1848,7 @@ class ThreeJsControl {
     for (const shared3JSNode of this.selection) {
       if (shared3JSNode.willBeInstanced) {
         this.setInstancedSelectionState(shared3JSNode, false);
+        this.removeInstanceProxy(shared3JSNode);
       } else {
         this.setColor(shared3JSNode.node, WHITE);
       }
@@ -1858,6 +1865,9 @@ class ThreeJsControl {
     for (const shared3JSNode of selectedSharedNodes) {
       if (shared3JSNode.willBeInstanced) {
         this.setInstancedSelectionState(shared3JSNode, true);
+        if (this.isEditMode) {
+          this.createInstanceProxy(shared3JSNode);
+        }
       } else if (shared3JSNode.node) {
         this.setColor(shared3JSNode.node, SELECTION_COLOR);
       }

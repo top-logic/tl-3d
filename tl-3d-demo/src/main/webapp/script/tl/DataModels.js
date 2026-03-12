@@ -975,6 +975,16 @@ export class GroupNode extends SharedObject {
       }
       case "transform":
         this.transform = value;
+        // Update the Three.js node's matrix to match the new transform
+        if (this.node) {
+          this.node.matrix.identity();
+          this.node.position.set(0, 0, 0);
+          this.node.rotation.set(0, 0, 0);
+          this.node.scale.set(1, 1, 1);
+          if (value && value.length > 0) {
+            this.node.applyMatrix4(toMatrix(value));
+          }
+        }
         // Recompute GPU matrices for instanced descendants (e.g., server undo/cancel)
         this.recomputeInstancedChildrenMatrices(scope);
         break;
@@ -1200,6 +1210,15 @@ export class PartNode extends SharedObject {
           }
         } else {
           this.transform = value;
+          if (this.node) {
+            this.node.matrix.identity();
+            this.node.position.set(0, 0, 0);
+            this.node.rotation.set(0, 0, 0);
+            this.node.scale.set(1, 1, 1);
+            if (value && value.length > 0) {
+              this.node.applyMatrix4(toMatrix(value));
+            }
+          }
         }
         break;
       }
