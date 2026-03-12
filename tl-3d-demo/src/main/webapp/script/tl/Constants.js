@@ -36,3 +36,6 @@ export const INSTANCING_BVH_MAX_TRIANGLES = 10_000_000;
 // Number of frames an instance can go undetected by BVH raycasting before
 // it gets pruned from the visible set.
 export const INSTANCING_BVH_STALE_FRAME_THRESHOLD = 30;
+// When an incremental update adds more children than this, trigger a full
+// reload so analyzeForInstancing can fold them into instanced groups.
+export const INCREMENTAL_ADD_RELOAD_THRESHOLD = 25;

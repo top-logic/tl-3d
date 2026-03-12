@@ -1768,6 +1768,9 @@ class ThreeJsControl {
         this.applyColors();
         this.applySelection(this.sceneGraph.selection);
         this.updateTransformControls();
+        if (this.sceneOctree) {
+          this.buildSceneOctree();
+        }
         this.invalidate();
       }
     } catch (ex) {

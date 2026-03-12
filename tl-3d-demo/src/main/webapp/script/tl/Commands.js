@@ -2,6 +2,27 @@
  * Command Classes for ThreeJS Control
  * Contains all command classes used for scene modifications
  */
+import { INCREMENTAL_ADD_RELOAD_THRESHOLD } from "./Constants.js";
+
+/**
+ * Recursively cleans up a removed node: detaches non-instanced Three.js nodes
+ * from the scene and hides instanced nodes in the GPU texture.
+ */
+function cleanUpRemovedNode(scope, node) {
+  if (node.willBeInstanced) {
+    scope.instanceManager.setInstanceHidden(node.assetKey, node.instanceID, true);
+  } else if (node.node) {
+    if (node.node.parent) {
+      node.node.parent.remove(node.node);
+    }
+    node.node = null;
+  }
+  if (node.contents) {
+    for (const child of node.contents) {
+      cleanUpRemovedNode(scope, child);
+    }
+  }
+}
 
 class Command {
   constructor(id) {
@@ -167,6 +188,13 @@ export class InsertElement extends ListUpdate {
     const newContents = newGroupNode.contents;
     const parentThreeJsNode = oldGroupNode.node;
 
+    // If many children were added, fall back to a full reload so
+    // analyzeForInstancing can fold them into instanced groups.
+    const addedCount = Math.max(0, newContents.length - oldContents.length);
+    if (addedCount > INCREMENTAL_ADD_RELOAD_THRESHOLD) {
+      return false;
+    }
+
     let i = 0; // old pointer
     let j = 0; // new pointer
 
@@ -221,14 +249,7 @@ export class InsertElement extends ListUpdate {
   }
 
   cleanUpRemovedChild(scope, oldChild) {
-    if (oldChild.willBeInstanced) {
-      scope.instanceManager.setInstanceHidden(oldChild.assetKey, oldChild.instanceID, true);
-    } else if (oldChild.node) {
-      if (oldChild.node.parent) {
-        oldChild.node.parent.remove(oldChild.node);
-      }
-      oldChild.node = null;
-    }
+    cleanUpRemovedNode(scope, oldChild);
   }
 
   buildAddedChild(newChild, parentThreeJsNode) {
@@ -274,7 +295,9 @@ export class RemoveElement extends ListUpdate {
 
     target.removeElementAt(scope, this.property, this.idx);
 
-    // Remove the 3D node from the scene if this was a non-instanced PartNode
+    // Remove the 3D node from the scene if this was a non-instanced node.
+    // Instanced cleanup is handled by InsertElement.matchChildren when the
+    // server replaces the parent via a Remove+Insert pair.
     if (this.property === "contents" && removedElement && removedElement.node) {
       if (removedElement.node.parent) {
         removedElement.node.parent.remove(removedElement.node);
