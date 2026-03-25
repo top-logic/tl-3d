@@ -403,7 +403,7 @@ class ThreeJsControl {
           for (const node of outer.multiTransformGroup.children) {
             const sharedNode = outer.selection.find((s) => s.node === node);
             if (sharedNode instanceof GroupNode && outer.hasInstancedDescendants(sharedNode)) {
-              outer.recomputeInstanceMatrices(sharedNode);
+              sharedNode.recomputeInstancedChildrenMatrices(outer.scope);
             }
           }
 
@@ -477,7 +477,7 @@ class ThreeJsControl {
 
               // Recompute GPU matrices for instanced descendants of GroupNodes
               if (sharedObject instanceof GroupNode && outer.hasInstancedDescendants(sharedObject)) {
-                outer.recomputeInstanceMatrices(sharedObject);
+                sharedObject.recomputeInstancedChildrenMatrices(outer.scope);
                 outer.buildSceneOctree();
               }
             }
@@ -770,8 +770,6 @@ class ThreeJsControl {
         object.visible = this.isEditMode;
       }
       if (object.userData.isLayoutPoint) {
-        // object.visible = false; // always hide layout points
-        // only show layout points for selected objects
         const parentObject = findParentObject(object);
         object.visible =
           this.isEditMode && selectedNodes.includes(parentObject);
@@ -870,7 +868,6 @@ class ThreeJsControl {
 
     // find all other objects in the scene that have snapping points
     const snappableObjects = [];
-    // const snappableObjectsPoints = [];
 
     this.zUpRoot.traverse((node) => {
       // Check for snapping points either directly or through nodeRef
@@ -883,7 +880,6 @@ class ThreeJsControl {
         nodeAsset.snappingPoints.length > 0
       ) {
         snappableObjects.push(node);
-        // snappableObjectsPoints.push(node.matrixWorld.clone());
       }
     });
 
@@ -1085,22 +1081,11 @@ class ThreeJsControl {
 
     // Find all objects near this connection point
     const nearbyObjects = [];
-    let totalObjectsChecked = 0;
-    let objectsWithAssets = 0;
 
     this.zUpRoot.traverse((node) => {
-      totalObjectsChecked++;
-
       // Skip the object being moved
       if (node === excludeObject) {
         return;
-      }
-
-      // Check if has asset
-      if (node.userData?.asset) {
-        objectsWithAssets++;
-      } else if (node.userData?.nodeRef?.asset) {
-        objectsWithAssets++;
       }
 
       // Skip spheres and other non-snappable objects
@@ -1466,54 +1451,6 @@ class ThreeJsControl {
   }
 
   /**
-   * Compute a node's world transform from the data model by walking up the parent chain.
-   * This includes the node's own transform.
-   */
-  computeDataModelWorldTransform(node) {
-    const transforms = [];
-    let current = node;
-    while (current) {
-      if (current.transform) {
-        transforms.unshift(current.transform);
-      }
-      current = current.parent;
-    }
-    const result = new Matrix4();
-    for (const t of transforms) {
-      result.multiply(toMatrix(t));
-    }
-    return result;
-  }
-
-  /**
-   * Recompute GPU instance matrices for all instanced PartNode descendants of a GroupNode.
-   * Walks the data model tree, accumulating transforms, and updates each instance's
-   * GPU matrix. Used after a GroupNode's transform has been updated (drag-end, server update).
-   */
-  recomputeInstanceMatrices(groupNode) {
-    const worldTransform = this.computeDataModelWorldTransform(groupNode);
-    this._recomputeDescendantMatrices(groupNode, worldTransform);
-  }
-
-  _recomputeDescendantMatrices(node, parentWorldTransform) {
-    if (!node.contents) return;
-    for (const child of node.contents) {
-      let childWorld = parentWorldTransform.clone();
-      if (child.transform) {
-        childWorld.multiply(toMatrix(child.transform));
-      }
-
-      if (child instanceof PartNode && child.willBeInstanced && child.assetKey != null) {
-        this.scope.instanceManager.updateInstanceMatrix(child.assetKey, child.instanceID, childWorld);
-      }
-
-      if (child instanceof GroupNode && child.contents) {
-        this._recomputeDescendantMatrices(child, childWorld);
-      }
-    }
-  }
-
-  /**
    * Snapshot the current GPU matrices of all instanced descendants of a node.
    * Returns a Map of "assetKey:instanceID" -> Matrix4.
    * Used at drag start for delta-based live preview.
@@ -1715,7 +1652,6 @@ class ThreeJsControl {
       return;
     }
 
-    // this.addBoxHelpers();
     const center = new Vector3();
     this.boundingBox.getCenter(center);
 
@@ -1745,7 +1681,6 @@ class ThreeJsControl {
     });
 
     gsap.to(this.controls.target, {
-      // x: 0, y: 0, z: 0,
       x: center.x,
       y: center.y,
       z: center.z,
@@ -1770,10 +1705,10 @@ class ThreeJsControl {
       let needsFullReload = false;
 
       for (const change of changes) {
-        var command = change[0];
-        var cmdProps = command[1];
+        const command = change[0];
+        const cmdProps = command[1];
 
-        var cmd;
+        let cmd;
         switch (command[0]) {
           case "R":
             cmd = new RemoveElement(cmdProps["id"]);
@@ -1944,7 +1879,7 @@ class ThreeJsControl {
   // Apply colours to all objects that have colour and 3D node
   applyColors() {
     for (const [id, obj] of Object.entries(this.scope.objects)) {
-      if (obj.color && obj.color.trim() !== "") {
+      if ((obj instanceof PartNode || obj instanceof GroupNode) && obj.color && obj.color.trim() !== "") {
         if (obj.willBeInstanced && obj.assetKey != null) {
           this.scope.instanceManager.setInstanceColor(obj.assetKey, obj.instanceID, obj.color);
         } else if (obj.node) {
@@ -2017,8 +1952,6 @@ class ThreeJsControl {
           if (setCmd != null) {
             changes.push(setCmd);
           }
-          // this.addBoxHelpers();
-
           this.invalidate();
 
           this.sendSceneChanges(changes);
@@ -2242,9 +2175,6 @@ class ThreeJsControl {
 
       this.scene.add(debugGroup);
 
-      // Log statistics
-      const stats = this.sceneOctree.getStats();
-      console.log("Octree Statistics:", stats);
     }
 
     this.invalidate();

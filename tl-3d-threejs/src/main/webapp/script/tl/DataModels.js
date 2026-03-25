@@ -194,7 +194,7 @@ export class Scope {
         this.instanceManager.setInstanceHidden(assetKey, partNode.instanceID, true);
       }
 
-      // Color: apply if set (will be used by Step 4)
+      // Color: apply if set
       if (partNode.color && partNode.color.trim() !== "") {
         this.instanceManager.setInstanceColor(assetKey, partNode.instanceID, partNode.color);
       }
@@ -394,7 +394,7 @@ export class Scope {
     }
     if (json instanceof Array) {
       const id = json[1];
-      var obj;
+      let obj;
       switch (json[0]) {
         case "SceneGraph":
           obj = new SceneGraph(id);
@@ -631,7 +631,7 @@ export class SceneGraph extends SharedObject {
   }
 
   removeSelected(node) {
-    var idx = this.selection.indexOf(node);
+    const idx = this.selection.indexOf(node);
     if (idx < 0) {
       return null;
     }
@@ -640,7 +640,7 @@ export class SceneGraph extends SharedObject {
   }
 
   addSelected(node) {
-    var idx = this.selection.indexOf(node);
+    const idx = this.selection.indexOf(node);
     if (idx >= 0) {
       return null;
     }

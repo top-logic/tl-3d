@@ -52,7 +52,7 @@ export class SetProperty extends Command {
   }
 
   apply(scope) {
-    var target = this.resolveTarget(scope);
+    const target = this.resolveTarget(scope);
     if (target == null) {
       return;
     }
@@ -90,7 +90,7 @@ export class InsertElement extends ListUpdate {
   }
 
   apply(scope) {
-    var target = this.resolveTarget(scope);
+    const target = this.resolveTarget(scope);
     if (target == null) {
       return;
     }
@@ -284,7 +284,7 @@ export class RemoveElement extends ListUpdate {
   }
 
   apply(scope) {
-    var target = this.resolveTarget(scope);
+    const target = this.resolveTarget(scope);
     if (target == null) {
       return;
     }
