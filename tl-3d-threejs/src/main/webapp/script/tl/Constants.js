@@ -1,5 +1,9 @@
 /**
  * Constants used in the application
+ *
+ * Color format convention:
+ *   - Numeric hex (0xffffff) for colors passed to Three.js Color/material APIs
+ *   - CSS strings ("#cccccc") for colors used in HTML/CSS contexts (SkyboxManager)
  */
 
 export const WHITE = 0xffffff;
@@ -36,6 +40,11 @@ export const INSTANCING_BVH_MAX_TRIANGLES = 10_000_000;
 // Number of frames an instance can go undetected by BVH raycasting before
 // it gets pruned from the visible set.
 export const INSTANCING_BVH_STALE_FRAME_THRESHOLD = 30;
+// Maximum triangles to render per frame when triangle budgeting is active.
+export const MAX_TRIANGLES_PER_FRAME = 10_000_000;
+// Minimum number of copies of a GLTF asset required before it is
+// consolidated into an InstancedMesh.
+export const INSTANCING_MIN_COPIES = 10;
 // When an incremental update adds more children than this, trigger a full
 // reload so analyzeForInstancing can fold them into instanced groups.
 export const INCREMENTAL_ADD_RELOAD_THRESHOLD = 25;

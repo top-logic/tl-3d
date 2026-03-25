@@ -4,6 +4,7 @@
  */
 
 import { Frustum, Matrix4 } from "three";
+import { MAX_TRIANGLES_PER_FRAME } from "./Constants.js";
 
 export class RenderManager {
   constructor(renderer, scene, camera) {
@@ -19,7 +20,7 @@ export class RenderManager {
     this.sortVisibleInstances = true; // Enable by default for triangle budgeting
 
     // Triangle budget settings
-    this.maxTrianglesPerFrame = 10_000_000; // 10M triangles per frame
+    this.maxTrianglesPerFrame = MAX_TRIANGLES_PER_FRAME;
     this.useTriangleBudget = true; // Enable/disable budget system
 
     this.renderTargets = [];

@@ -812,17 +812,17 @@ export class InstancedMeshManager {
         }
 
         vec3 LinearTosRGB(vec3 color) {
-                 vec3 a = vec3(0.055);
-                 vec3 ap1 = vec3(1.0) + a;
-                 vec3 g = vec3(2.4);
-                 vec3 ginv = vec3(1.0) / g;
+          vec3 a = vec3(0.055);
+          vec3 ap1 = vec3(1.0) + a;
+          vec3 g = vec3(2.4);
+          vec3 ginv = vec3(1.0) / g;
 
-                 return mix(
-                   color * 12.92,
-                   ap1 * pow(color, ginv) - a,
-                   step(vec3(0.0031308), color)
-                 );
-               }
+          return mix(
+            color * 12.92,
+            ap1 * pow(color, ginv) - a,
+            step(vec3(0.0031308), color)
+          );
+        }
 
         void main() {
           // ---- Determine which bounding box face this fragment is on ----

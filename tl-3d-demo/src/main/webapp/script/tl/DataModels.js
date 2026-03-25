@@ -7,6 +7,7 @@ import {
   C_P_RADIUS,
   GREEN,
   HEIGHT_SEGMENTS,
+  INSTANCING_MIN_COPIES,
   RED,
   WIDTH_SEGMENTS,
 } from "./Constants.js";
@@ -102,10 +103,10 @@ export class Scope {
       collectPartNodes(sceneGraph.root);
     }
 
-    // Filter to only assets with 10+ instances
+    // Filter to only assets with enough copies to benefit from instancing
     const result = new Map();
     for (const [assetKey, group] of instanceGroups) {
-      if (group.instances.length >= 10) {
+      if (group.instances.length >= INSTANCING_MIN_COPIES) {
         result.set(assetKey, group);
       }
     }

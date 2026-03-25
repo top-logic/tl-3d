@@ -2088,7 +2088,9 @@ class ThreeJsControl {
   }
 
   /**
-   * Toggle octree debug visualisation
+   * Toggle octree debug visualisation.
+   * Intentionally available in production via window.services.threejs.toggleOctreeDebug
+   * for browser-console diagnostics.
    * @param {boolean} visible - Show or hide visualisation
    * @param {Object} options - Visualisation options
    *   - showNodes: Show octree node boundaries (default: true)

@@ -201,6 +201,15 @@ export class SceneOctree {
   }
 
   /**
+   * Release references held by the octree.
+   * The octree holds no GPU resources, but clearing the root allows the
+   * node tree and its object references to be garbage-collected.
+   */
+  dispose() {
+    this.root = null;
+  }
+
+  /**
    * Create debug visualisation of octree structure.
    * @param {Scene} scene - Three.js scene to add visualisation to
    * @returns {Group} Debug helper group
