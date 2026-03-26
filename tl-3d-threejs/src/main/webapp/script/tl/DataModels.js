@@ -62,7 +62,7 @@ export class Scope {
       if (!node) return;
 
       let worldTransform = parentTransform.clone();
-      if (node.transform) {
+      if (node.transform && node.transform.length > 0) {
         worldTransform.multiply(toMatrix(node.transform));
       }
 
@@ -1086,7 +1086,7 @@ export class GroupNode extends SharedObject {
     if (!this.contents) return;
     for (const child of this.contents) {
       let childWorld = parentWorldTransform.clone();
-      if (child.transform) {
+      if (child.transform && child.transform.length > 0) {
         childWorld.multiply(toMatrix(child.transform));
       }
 
