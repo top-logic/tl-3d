@@ -33,6 +33,7 @@ import { InstancedMeshManager } from "./InstancedMeshManager.js";
 import { ImpostorManager } from "./ImpostorManager.js";
 
 import { GLTFLoader } from "GLTFLoader";
+import { DRACOLoader } from "DRACOLoader";
 import { InsertElement, RemoveElement, SetProperty } from "./Commands.js";
 
 export class Scope {
@@ -437,6 +438,19 @@ export class Scope {
     this._loadAbortController = null;
   }
 
+  newDracoLoader() {
+    const dracoLoader = new DRACOLoader();
+    
+    // The decoder path is relative to the DracoLoader path. Since the
+    // DracoLoader path includes the version number and this is dynamic,
+    // the path must be calculated dynamically. 
+    const dracoModuleUrl = import.meta.resolve("DRACOLoader");
+    const decoderPath = new URL('../libs/draco/', dracoModuleUrl).pathname;
+	dracoLoader.setDecoderPath(decoderPath);
+	
+	return dracoLoader;
+  }
+
   loadAssets(ctrl) {
     // Abort any previous loading pipeline
     this.abortAssetLoading();
@@ -444,6 +458,7 @@ export class Scope {
     this._loadAbortController = abortController;
 
     const gltfLoader = new GLTFLoader();
+    gltfLoader.setDRACOLoader(this.newDracoLoader());
 
     const loadUrl = (url) => {
       return gltfLoader.loadAsync(url).then(
