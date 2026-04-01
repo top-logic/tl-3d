@@ -245,8 +245,11 @@ export class InstancedMeshManager {
         ${shader.vertexShader}
       `;
 
+      // Inject instance matrix texture lookup before <begin_vertex>.
+      // This must run before <project_vertex> (which applies instanceMatrix
+      // to the position).
       shader.vertexShader = shader.vertexShader.replace(
-        "#include <beginnormal_vertex>",
+        "#include <begin_vertex>",
         `
         #ifdef USE_INSTANCING
           // Calculate 2D texture coordinates from instanceID
@@ -268,7 +271,7 @@ export class InstancedMeshManager {
           mat4 instanceMatrix = mat4(col0, col1, col2, col3);
         #endif
 
-        #include <beginnormal_vertex>
+        #include <begin_vertex>
         `,
       );
 
