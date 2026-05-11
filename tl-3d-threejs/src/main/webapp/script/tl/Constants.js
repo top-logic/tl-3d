@@ -1,12 +1,11 @@
 /**
  * Constants used in the application
+ *
+ * Color format convention:
+ *   - Numeric hex (0xffffff) for colors passed to Three.js Color/material APIs
+ *   - CSS strings ("#cccccc") for colors used in HTML/CSS contexts (SkyboxManager)
  */
 
-export const LOD_MEDIUM_DISTANCE = 500;
-export const LOD_LOW_DISTANCE = 2000;
-export const LOD_HIGH = 'high';
-export const LOD_MEDIUM = 'medium';
-export const LOD_LOW = 'low';   
 export const WHITE = 0xffffff;
 export const LIGHT_GREY = "#cccccc";
 export const DARK_GREY = "#333333";
@@ -31,3 +30,21 @@ export const GRID_SNAP_THRESHOLD = 200;
 export const FLOOR_PADDING = 20000;
 // Make non-selected objects 30% transparent
 export const TRANSPARENCY_LEVEL = 0.3;
+// Total instanced triangle budget (sum of triangleCount * instanceCount across
+// all managed meshes) above which BVH-accelerated visibility culling kicks in.
+// Below this, all instances are rendered every frame unconditionally.
+export const INSTANCING_BVH_TRIANGLE_THRESHOLD = 8_000_000;
+// Maximum triangles the BVH is allowed to accumulate in its visible set
+// before it starts rejecting new hits. Should be higher than the threshold above.
+export const INSTANCING_BVH_MAX_TRIANGLES = 10_000_000;
+// Number of frames an instance can go undetected by BVH raycasting before
+// it gets pruned from the visible set.
+export const INSTANCING_BVH_STALE_FRAME_THRESHOLD = 30;
+// Maximum triangles to render per frame when triangle budgeting is active.
+export const MAX_TRIANGLES_PER_FRAME = 10_000_000;
+// Minimum number of copies of a GLTF asset required before it is
+// consolidated into an InstancedMesh.
+export const INSTANCING_MIN_COPIES = 10;
+// When an incremental update adds more children than this, trigger a full
+// reload so analyzeForInstancing can fold them into instanced groups.
+export const INCREMENTAL_ADD_RELOAD_THRESHOLD = 25;

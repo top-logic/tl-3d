@@ -19,8 +19,13 @@ import {
 
 import { OrbitControls } from "OrbitControls";
 import { gsap } from "gsap";
-import { CameraUtils, SceneUtils, getRaycaster, throttle } from "./ThreeJsUtils.js";
-import { CAMERA_MOVE_DURATION, DARK_GREY, LIGHT_GREY, _90_DEGREE } from './Constants.js';
+import {
+  CAMERA_MOVE_DURATION,
+  DARK_GREY,
+  LIGHT_GREY,
+  _90_DEGREE,
+} from "./Constants.js";
+import { CameraUtils, SceneUtils, getRaycaster } from "./ThreeJsUtils.js";
 
 /**
  * NavigationCube class handles the 3D navigation cube functionality.
@@ -30,7 +35,7 @@ export class NavigationCube {
   /**
    * Creates a new NavigationCube instance.
    * @param {HTMLElement} container - The container element to attach the cube canvas to
-   * @param {Function} onRender - Callback function to trigger main scene re-render
+   * @param {Object} renderManager - Reference to the render manager for triggering main scene re-render
    * @param {Object} mainCamera - Reference to the main camera for synchronization
    * @param {Object} mainControls - Reference to the main camera controls for synchronization
    * @param {Object} options - Optional configuration object
@@ -38,27 +43,33 @@ export class NavigationCube {
    * @param {number} options.size - Size of the cube canvas (default: 100)
    * @param {number} options.padding - Padding from container edge (default: 10)
    */
-  constructor(container, onRender, mainCamera, mainControls, options = {}) {
+  constructor(
+    container,
+    renderManager,
+    mainCamera,
+    mainControls,
+    options = {},
+  ) {
     this.container = container;
-    this.onRender = onRender;
+    this.renderManager = renderManager;
     this.mainCamera = mainCamera;
     this.mainControls = mainControls;
-    
+
     // Configuration options
     this.options = {
-      position: options.position || 'top-left',
+      position: options.position || "top-left",
       size: options.size || 100,
-      padding: options.padding || 10
+      padding: options.padding || 10,
     };
-    
+
     // Internal state
     this.controlsIsUpdating = false;
     this.cubeControlsIsUpdating = false;
     this.originalMaterials = [];
-    this._throttledCubeHover = null;
     this.clickStart = 0;
-    
+
     this.init();
+    this.renderManager.registerRenderTarget(this);
   }
 
   init() {
@@ -89,12 +100,30 @@ export class NavigationCube {
     const cubeSize = 6;
     const cubeGeometry = new BoxGeometry(cubeSize, cubeSize, cubeSize);
     const cubeMaterials = [
-      new MeshStandardMaterial({ map: this.createTextTexture("Right"), side: FrontSide }),
-      new MeshStandardMaterial({ map: this.createTextTexture("Left"), side: FrontSide }),    
-      new MeshStandardMaterial({ map: this.createTextTexture("Back"), side: FrontSide }),
-      new MeshStandardMaterial({ map: this.createTextTexture("Front"), side: FrontSide }),
-      new MeshStandardMaterial({ map: this.createTextTexture("Top"), side: FrontSide }), 
-      new MeshStandardMaterial({ map: this.createTextTexture("Bottom"), side: FrontSide }),    
+      new MeshStandardMaterial({
+        map: this.createTextTexture("Right"),
+        side: FrontSide,
+      }),
+      new MeshStandardMaterial({
+        map: this.createTextTexture("Left"),
+        side: FrontSide,
+      }),
+      new MeshStandardMaterial({
+        map: this.createTextTexture("Back"),
+        side: FrontSide,
+      }),
+      new MeshStandardMaterial({
+        map: this.createTextTexture("Front"),
+        side: FrontSide,
+      }),
+      new MeshStandardMaterial({
+        map: this.createTextTexture("Top"),
+        side: FrontSide,
+      }),
+      new MeshStandardMaterial({
+        map: this.createTextTexture("Bottom"),
+        side: FrontSide,
+      }),
     ];
 
     const cube = new Mesh(cubeGeometry, cubeMaterials);
@@ -136,13 +165,17 @@ export class NavigationCube {
     context.translate(size / 2, size / 2);
 
     switch (text) {
-      case "Right": context.rotate(-_90_DEGREE);
+      case "Right":
+        context.rotate(-_90_DEGREE);
         break;
-      case "Left": context.rotate(_90_DEGREE);
+      case "Left":
+        context.rotate(_90_DEGREE);
         break;
-      case "Back": context.rotate(Math.PI);
+      case "Back":
+        context.rotate(Math.PI);
         break;
-      case "Bottom": context.rotate(Math.PI);
+      case "Bottom":
+        context.rotate(Math.PI);
         break;
     }
     context.fillText(text, 0, 0);
@@ -155,21 +188,33 @@ export class NavigationCube {
     this.cubeRenderer.shadowMap.enabled = true;
     this.cubeRenderer.setSize(this.options.size, this.options.size);
     this.cubeRenderer.setPixelRatio(window.devicePixelRatio);
-    
+
     this.cubeCanvas = this.cubeRenderer.domElement;
     this.cubeCanvas.style.position = "absolute";
     this.cubeCanvas.style.zIndex = "1000"; // Ensure cube is always on top
-    
+
     this.updateCubePosition();
     this.container.append(this.cubeCanvas);
-    
+
     this.setupEventListeners();
   }
 
   setupEventListeners() {
-    this.cubeCanvas.addEventListener("mousemove", (event) => this.onCubeHover(event), false);
-    this.cubeCanvas.addEventListener("mousedown", (event) => this.onCubeMouseDown(event), false);
-    this.cubeCanvas.addEventListener("click", (event) => this.onCubeClick(event), false);
+    this.cubeCanvas.addEventListener(
+      "mousemove",
+      (event) => this.handleCubeHover(event),
+      false,
+    );
+    this.cubeCanvas.addEventListener(
+      "mousedown",
+      (event) => this.onCubeMouseDown(event),
+      false,
+    );
+    this.cubeCanvas.addEventListener(
+      "click",
+      (event) => this.onCubeClick(event),
+      false,
+    );
   }
 
   initControls() {
@@ -183,21 +228,28 @@ export class NavigationCube {
         this.cubeControlsIsUpdating = true;
         this.mainCamera.quaternion.copy(this.cubeCamera.quaternion);
         this.mainCamera.position.copy(
-          CameraUtils.calculateMainCameraPosition(this.cubeCamera.position, this.mainCamera.position, this.mainControls.target)
+          CameraUtils.calculateMainCameraPosition(
+            this.cubeCamera.position,
+            this.mainCamera.position,
+            this.mainControls.target,
+          ),
         );
         this.mainControls.update();
         this.cubeControlsIsUpdating = false;
-        this.onRender();
+        this.renderManager.invalidate();
       }
     });
   }
 
   updateFromMainCamera() {
     if (!this.cubeControlsIsUpdating) {
-      this.controlsIsUpdating = true;        
+      this.controlsIsUpdating = true;
       this.cubeCamera.quaternion.copy(this.mainCamera.quaternion);
       this.cubeCamera.position.copy(
-        CameraUtils.calculateCubeCameraPosition(this.mainCamera.position, this.mainControls.target)
+        CameraUtils.calculateCubeCameraPosition(
+          this.mainCamera.position,
+          this.mainControls.target,
+        ),
       );
       this.cubeControls.update();
       this.controlsIsUpdating = false;
@@ -210,30 +262,30 @@ export class NavigationCube {
     const { position, padding } = this.options;
 
     switch (position) {
-      case 'top-right':
+      case "top-right":
         this.cubeCanvas.style.right = `${padding}px`;
         this.cubeCanvas.style.top = `${padding}px`;
-        this.cubeCanvas.style.left = 'auto';
-        this.cubeCanvas.style.bottom = 'auto';
+        this.cubeCanvas.style.left = "auto";
+        this.cubeCanvas.style.bottom = "auto";
         break;
-      case 'bottom-left':
+      case "bottom-left":
         this.cubeCanvas.style.left = `${padding}px`;
         this.cubeCanvas.style.bottom = `${padding}px`;
-        this.cubeCanvas.style.right = 'auto';
-        this.cubeCanvas.style.top = 'auto';
+        this.cubeCanvas.style.right = "auto";
+        this.cubeCanvas.style.top = "auto";
         break;
-      case 'bottom-right':
+      case "bottom-right":
         this.cubeCanvas.style.right = `${padding}px`;
         this.cubeCanvas.style.bottom = `${padding}px`;
-        this.cubeCanvas.style.left = 'auto';
-        this.cubeCanvas.style.top = 'auto';
+        this.cubeCanvas.style.left = "auto";
+        this.cubeCanvas.style.top = "auto";
         break;
-      case 'top-left':
+      case "top-left":
       default:
         this.cubeCanvas.style.left = `${padding}px`;
         this.cubeCanvas.style.top = `${padding}px`;
-        this.cubeCanvas.style.right = 'auto';
-        this.cubeCanvas.style.bottom = 'auto';
+        this.cubeCanvas.style.right = "auto";
+        this.cubeCanvas.style.bottom = "auto";
         break;
     }
   }
@@ -243,7 +295,7 @@ export class NavigationCube {
 
     // Update cube position in case container moved
     this.updateCubePosition();
-    
+
     // Update pixel ratio if device pixel ratio changed
     const newPixelRatio = window.devicePixelRatio;
     if (this.cubeRenderer.getPixelRatio() !== newPixelRatio) {
@@ -263,27 +315,32 @@ export class NavigationCube {
    * Handles mouse hover events on the cube for face highlighting.
    * @param {MouseEvent} event - The mouse event
    */
-  onCubeHover(event) {
-    if (!this._throttledCubeHover) {
-      this._throttledCubeHover = throttle((event) => {
-        const raycaster = getRaycaster(event, this.cubeCamera, this.cubeCanvas);
-        const intersects = raycaster.intersectObject(this.axesCube.children[0], true);
+  handleCubeHover(event) {
+    if (!this.axesCube?.children[0]?.material) return;
 
-        const materials = this.axesCube.children[0].material;
-        materials.forEach((material, index) => {
-          material.color.copy(this.originalMaterials[index].color);
-          material.map = this.originalMaterials[index].map;
-        });
+    const raycaster = getRaycaster(event, this.cubeCamera, this.cubeCanvas);
+    const cubeMesh = this.axesCube.children[0];
+    const intersects = raycaster.intersectObject(cubeMesh, true);
 
-        if (intersects.length > 0) {
-          const intersectedFace = intersects[0].face;
-          materials[intersectedFace.materialIndex].color.set("#66bbff");
-        }
+    const materials = Array.isArray(cubeMesh.material)
+      ? cubeMesh.material
+      : [cubeMesh.material];
 
-        this.onRender();
-      }, 100); 
+    materials.forEach((material, index) => {
+      if (this.originalMaterials[index]) {
+        material.color.copy(this.originalMaterials[index].color);
+        material.map = this.originalMaterials[index].map;
+      }
+    });
+
+    if (intersects.length > 0) {
+      const intersectedFace = intersects[0].face;
+      if (intersectedFace && materials[intersectedFace.materialIndex]) {
+        materials[intersectedFace.materialIndex].color.set("#66bbff");
+      }
     }
-    this._throttledCubeHover(event);
+
+    this.renderManager.invalidate();
   }
 
   /**
@@ -294,11 +351,11 @@ export class NavigationCube {
     if (Date.now() - this.clickStart > 500) {
       return; // Not a click
     }
-    
+
     const raycaster = getRaycaster(event, this.cubeCamera, this.cubeCanvas);
     const intersects = raycaster.intersectObjects(
       this.cubeScene.children,
-      true
+      true,
     );
     const intersectedFace = intersects.find((i) => !!i.face)?.face;
 
@@ -325,10 +382,10 @@ export class NavigationCube {
       ease: "power2.out",
       onUpdate: () => {
         this.cubeControls.update();
-        this.onRender();
+        this.renderManager.invalidate();
       },
       onComplete: () => {
-        this.onRender();
+        this.renderManager.invalidate();
       },
     });
   }
@@ -353,7 +410,17 @@ export class NavigationCube {
     }
   }
 
+  shouldRender() {
+    // Always render when main scene renders
+    return true;
+  }
+
   render() {
     this.cubeRenderer.render(this.cubeScene, this.cubeCamera);
+  }
+
+  dispose() {
+    // Unregister from render manager
+    this.renderManager.unregisterRenderTarget(this);
   }
 }
