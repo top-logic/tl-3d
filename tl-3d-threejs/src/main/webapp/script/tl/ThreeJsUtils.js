@@ -107,6 +107,9 @@ export function matrix(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p) {
 
 export function toMatrix(tx) {
   switch (tx.length) {
+    case 0:
+      // Treat empty transformation as identity (for safety)
+      return matrix(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
     case 3:
       return matrix(1, 0, 0, tx[0], 0, 1, 0, tx[1], 0, 0, 1, tx[2], 0, 0, 0, 1);
     case 9:

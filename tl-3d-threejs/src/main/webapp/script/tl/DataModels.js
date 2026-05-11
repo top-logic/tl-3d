@@ -1085,7 +1085,7 @@ export class GroupNode extends SharedObject {
     const transforms = [];
     let current = this;
     while (current) {
-      if (current.transform) {
+      if (current.transform && current.transform.length > 0) {
         transforms.unshift(current.transform);
       }
       current = current.parent;
