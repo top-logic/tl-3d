@@ -1,2 +1,3 @@
 db-default.xml
 tl.threed.demo.conf.xml
+tl.threed.demo.security.config.xml
