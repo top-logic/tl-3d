@@ -3,7 +3,7 @@ package com.top_logic.threed.threejs.scene;
 /**
  * An atomic {@link SceneNode} displaying an {@link Asset}.
  */
-public class PartNode extends SceneNode {
+public class PartNode extends com.top_logic.threed.threejs.scene.SceneNode {
 
 	/**
 	 * Creates a {@link com.top_logic.threed.threejs.scene.PartNode} instance.
