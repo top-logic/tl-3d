@@ -127,7 +127,7 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 
 	@Override
 	protected Object processInternal(ActionContext context, Object argument) throws Throwable {
-		_tx = PersistencyLayer.getKnowledgeBase().beginTransaction();
+		_tx = PersistencyLayer.getKnowledgeBase().beginTransaction(I18NConstants.CREATED_COMPLEX_SCENE);
 		TlThreedDemoFactory factory = TlThreedDemoFactory.getInstance();
 		createAssets(factory);
 		createScene(factory);
@@ -138,7 +138,7 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 
 	private void intermediateCommit() {
 		_tx.commit();
-		_tx = PersistencyLayer.getKnowledgeBase().beginTransaction();
+		_tx = PersistencyLayer.getKnowledgeBase().beginTransaction(I18NConstants.CREATED_COMPLEX_SCENE);
 	}
 
 	private void createAssets(TlThreedDemoFactory factory) {

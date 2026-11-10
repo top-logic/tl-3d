@@ -3,7 +3,7 @@ package com.top_logic.threed.threejs.scene;
 /**
  * Base class for a node in a {@link SceneGraph}.
  */
-public abstract class SceneNode extends ScenePart {
+public abstract class SceneNode extends com.top_logic.threed.threejs.scene.ScenePart {
 
 	/** Visitor interface for the {@link com.top_logic.threed.threejs.scene.SceneNode} hierarchy.*/
 	public interface Visitor<R,A,E extends Throwable> {
@@ -200,17 +200,30 @@ public abstract class SceneNode extends ScenePart {
 		_listener.afterChanged(this, COLOR__PROP);
 	}
 
-	private static java.util.List<String> PROPERTIES = java.util.Collections.unmodifiableList(
-		java.util.Arrays.asList(
+	@SuppressWarnings("hiding")
+	static final java.util.List<String> PROPERTIES;
+	static {
+		java.util.List<String> local = java.util.Arrays.asList(
 			USER_DATA__PROP, 
 			SELECTABLE__PROP, 
 			TRANSFORM__PROP, 
 			HIDDEN__PROP, 
-			COLOR__PROP));
+			COLOR__PROP);
+		java.util.List<String> tmp = new java.util.ArrayList<>();
+		tmp.addAll(com.top_logic.threed.threejs.scene.ScenePart.PROPERTIES);
+		tmp.addAll(local);
+		PROPERTIES = java.util.Collections.unmodifiableList(tmp);
+	}
 
-	private static java.util.Set<String> TRANSIENT_PROPERTIES = java.util.Collections.unmodifiableSet(new java.util.HashSet<>(
-			java.util.Arrays.asList(
-				USER_DATA__PROP)));
+	@SuppressWarnings("hiding")
+	static final java.util.Set<String> TRANSIENT_PROPERTIES;
+	static {
+		java.util.HashSet<String> tmp = new java.util.HashSet<>();
+		tmp.addAll(com.top_logic.threed.threejs.scene.ScenePart.TRANSIENT_PROPERTIES);
+		tmp.addAll(java.util.Arrays.asList(
+				USER_DATA__PROP));
+		TRANSIENT_PROPERTIES = java.util.Collections.unmodifiableSet(tmp);
+	}
 
 	@Override
 	public java.util.List<String> properties() {

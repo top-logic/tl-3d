@@ -3,7 +3,7 @@ package com.top_logic.threed.threejs.scene;
 /**
  * A <tt>glTF</tt> artifact loaded from an URL.
  */
-public class GltfAsset extends Asset {
+public class GltfAsset extends com.top_logic.threed.threejs.scene.Asset {
 
 	/**
 	 * Creates a {@link com.top_logic.threed.threejs.scene.GltfAsset} instance.
@@ -121,14 +121,27 @@ public class GltfAsset extends Asset {
 		return GLTF_ASSET__TYPE;
 	}
 
-	private static java.util.List<String> PROPERTIES = java.util.Collections.unmodifiableList(
-		java.util.Arrays.asList(
+	@SuppressWarnings("hiding")
+	static final java.util.List<String> PROPERTIES;
+	static {
+		java.util.List<String> local = java.util.Arrays.asList(
 			URL__PROP, 
-			DYNAMIC_IMAGE__PROP));
+			DYNAMIC_IMAGE__PROP);
+		java.util.List<String> tmp = new java.util.ArrayList<>();
+		tmp.addAll(com.top_logic.threed.threejs.scene.Asset.PROPERTIES);
+		tmp.addAll(local);
+		PROPERTIES = java.util.Collections.unmodifiableList(tmp);
+	}
 
-	private static java.util.Set<String> TRANSIENT_PROPERTIES = java.util.Collections.unmodifiableSet(new java.util.HashSet<>(
-			java.util.Arrays.asList(
-				)));
+	@SuppressWarnings("hiding")
+	static final java.util.Set<String> TRANSIENT_PROPERTIES;
+	static {
+		java.util.HashSet<String> tmp = new java.util.HashSet<>();
+		tmp.addAll(com.top_logic.threed.threejs.scene.Asset.TRANSIENT_PROPERTIES);
+		tmp.addAll(java.util.Arrays.asList(
+				));
+		TRANSIENT_PROPERTIES = java.util.Collections.unmodifiableSet(tmp);
+	}
 
 	@Override
 	public java.util.List<String> properties() {

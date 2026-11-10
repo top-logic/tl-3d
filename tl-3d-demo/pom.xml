@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>com.top-logic</groupId>
 		<artifactId>tl-parent-app-internal</artifactId>
-	    <version>7.9.7</version>
+	    <version>7.10.3</version>
 	</parent>
 	
 	<artifactId>tl-3d-demo</artifactId>
@@ -21,8 +21,6 @@
 	<properties>
 		<maven.compiler.source>17</maven.compiler.source>
 		<maven.compiler.target>17</maven.compiler.target>
-
-		<msgbuf.version>1.1.8</msgbuf.version>
 
 		<project.build.sourceEncoding>utf-8</project.build.sourceEncoding>
 		
@@ -45,13 +43,6 @@
 	</properties>
 
 	<dependencies>
-		<!-- Repeat to overwrite default from TL - setting the property alone does not work. -->
-		<dependency>
-		    <groupId>de.haumacher.msgbuf</groupId>
-		    <artifactId>msgbuf-api</artifactId>
-		    <version>${msgbuf.version}</version>
-		</dependency>
-	
 		<dependency>
 			<groupId>com.top-logic</groupId>
 			<artifactId>tl-3d-threejs</artifactId>
