@@ -132,6 +132,13 @@
 			<generalizations>
 				<generalization type="tl.element:StructuredElement"/>
 			</generalizations>
+			<attributes>
+				<reference name="parent"
+					kind="backwards"
+					override="true"
+					type="Assembly"
+				/>
+			</attributes>
 		</interface>
 		<interface name="Node">
 			<generalizations>
