@@ -3,7 +3,7 @@ package com.top_logic.threed.threejs.scene;
 /**
  * The top-level object of a scene.
  */
-public class SceneGraph extends ScenePart {
+public class SceneGraph extends com.top_logic.threed.threejs.scene.ScenePart {
 
 	/**
 	 * Creates a {@link com.top_logic.threed.threejs.scene.SceneGraph} instance.

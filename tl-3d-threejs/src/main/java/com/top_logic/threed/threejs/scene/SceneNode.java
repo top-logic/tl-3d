@@ -3,7 +3,7 @@ package com.top_logic.threed.threejs.scene;
 /**
  * Base class for a node in a {@link SceneGraph}.
  */
-public abstract class SceneNode extends ScenePart {
+public abstract class SceneNode extends com.top_logic.threed.threejs.scene.ScenePart {
 
 	/** Visitor interface for the {@link com.top_logic.threed.threejs.scene.SceneNode} hierarchy.*/
 	public interface Visitor<R,A,E extends Throwable> {

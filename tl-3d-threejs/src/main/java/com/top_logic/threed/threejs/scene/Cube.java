@@ -3,7 +3,7 @@ package com.top_logic.threed.threejs.scene;
 /**
  * A <tt>glTF</tt> artifact displaying a cube.
  */
-public class Cube extends Asset {
+public class Cube extends com.top_logic.threed.threejs.scene.Asset {
 
 	/**
 	 * Creates a {@link com.top_logic.threed.threejs.scene.Cube} instance.

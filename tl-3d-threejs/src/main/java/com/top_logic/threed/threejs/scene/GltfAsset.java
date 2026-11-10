@@ -3,7 +3,7 @@ package com.top_logic.threed.threejs.scene;
 /**
  * A <tt>glTF</tt> artifact loaded from an URL.
  */
-public class GltfAsset extends Asset {
+public class GltfAsset extends com.top_logic.threed.threejs.scene.Asset {
 
 	/**
 	 * Creates a {@link com.top_logic.threed.threejs.scene.GltfAsset} instance.
