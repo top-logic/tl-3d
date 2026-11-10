@@ -22,8 +22,6 @@
 		<maven.compiler.source>17</maven.compiler.source>
 		<maven.compiler.target>17</maven.compiler.target>
 
-		<msgbuf.version>1.1.8</msgbuf.version>
-
 		<project.build.sourceEncoding>utf-8</project.build.sourceEncoding>
 		
 		<tl.deb.skip>false</tl.deb.skip>
@@ -45,13 +43,6 @@
 	</properties>
 
 	<dependencies>
-		<!-- Repeat to overwrite default from TL - setting the property alone does not work. -->
-		<dependency>
-		    <groupId>de.haumacher.msgbuf</groupId>
-		    <artifactId>msgbuf-api</artifactId>
-		    <version>${msgbuf.version}</version>
-		</dependency>
-	
 		<dependency>
 			<groupId>com.top-logic</groupId>
 			<artifactId>tl-3d-threejs</artifactId>

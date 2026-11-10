@@ -75,13 +75,20 @@ public abstract class ScenePart extends de.haumacher.msgbuf.graph.AbstractShared
 		return _parent != null;
 	}
 
-	private static java.util.List<String> PROPERTIES = java.util.Collections.unmodifiableList(
-		java.util.Arrays.asList(
-			PARENT__PROP));
+	static final java.util.List<String> PROPERTIES;
+	static {
+		java.util.List<String> local = java.util.Arrays.asList(
+			PARENT__PROP);
+		PROPERTIES = java.util.Collections.unmodifiableList(local);
+	}
 
-	private static java.util.Set<String> TRANSIENT_PROPERTIES = java.util.Collections.unmodifiableSet(new java.util.HashSet<>(
-			java.util.Arrays.asList(
-				)));
+	static final java.util.Set<String> TRANSIENT_PROPERTIES;
+	static {
+		java.util.HashSet<String> tmp = new java.util.HashSet<>();
+		tmp.addAll(java.util.Arrays.asList(
+				));
+		TRANSIENT_PROPERTIES = java.util.Collections.unmodifiableSet(tmp);
+	}
 
 	@Override
 	public java.util.List<String> properties() {
@@ -117,9 +124,9 @@ public abstract class ScenePart extends de.haumacher.msgbuf.graph.AbstractShared
 		String type = in.nextString();
 		int id = in.nextInt();
 		switch (type) {
-			case SceneGraph.SCENE_GRAPH__TYPE: result = com.top_logic.threed.threejs.scene.SceneGraph.create(); break;
 			case GroupNode.GROUP_NODE__TYPE: result = com.top_logic.threed.threejs.scene.GroupNode.create(); break;
 			case PartNode.PART_NODE__TYPE: result = com.top_logic.threed.threejs.scene.PartNode.create(); break;
+			case SceneGraph.SCENE_GRAPH__TYPE: result = com.top_logic.threed.threejs.scene.SceneGraph.create(); break;
 			default: in.skipValue(); result = null; break;
 		}
 		if (result != null) {
