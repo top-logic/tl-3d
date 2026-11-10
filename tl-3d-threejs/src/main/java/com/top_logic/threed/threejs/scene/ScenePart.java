@@ -124,9 +124,9 @@ public abstract class ScenePart extends de.haumacher.msgbuf.graph.AbstractShared
 		String type = in.nextString();
 		int id = in.nextInt();
 		switch (type) {
+			case SceneGraph.SCENE_GRAPH__TYPE: result = com.top_logic.threed.threejs.scene.SceneGraph.create(); break;
 			case GroupNode.GROUP_NODE__TYPE: result = com.top_logic.threed.threejs.scene.GroupNode.create(); break;
 			case PartNode.PART_NODE__TYPE: result = com.top_logic.threed.threejs.scene.PartNode.create(); break;
-			case SceneGraph.SCENE_GRAPH__TYPE: result = com.top_logic.threed.threejs.scene.SceneGraph.create(); break;
 			default: in.skipValue(); result = null; break;
 		}
 		if (result != null) {

@@ -3,7 +3,7 @@ package com.top_logic.threed.threejs.scene;
 /**
  * A collection of {@link SceneNode}s.
  */
-public class GroupNode extends com.top_logic.threed.threejs.scene.SceneNode {
+public class GroupNode extends SceneNode {
 
 	/**
 	 * Creates a {@link com.top_logic.threed.threejs.scene.GroupNode} instance.

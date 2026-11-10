@@ -5,7 +5,7 @@
 	<parent>
 	    <groupId>com.top-logic</groupId>
 	    <artifactId>tl-parent-core-internal</artifactId>
-	    <version>7.10.3</version>
+	    <version>8.0.0-alpha1</version>
 	</parent>
 	
 	<artifactId>tl-3d-core</artifactId>
