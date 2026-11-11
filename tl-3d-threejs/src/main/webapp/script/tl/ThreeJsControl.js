@@ -120,6 +120,9 @@ class ThreeJsControl {
 
     this.loadScene().then(() =>
       setTimeout(() => {
+        if (this.disposed) {
+          return;
+        }
         this.createBoundingBox();
         this.toggleWorkplane(initialState.isWorkplaneVisible);
         this.updateWorkplanePosition();
@@ -174,8 +177,8 @@ class ThreeJsControl {
     this.canvas.style.maxHeight = "100%";
     container.append(this.canvas);
     // update objects' size when the size of the canvas changes
-    const resizeObserver = this.createResizeObserver(this.canvas);
-    resizeObserver.observe(this.canvas);
+    this.resizeObserver = this.createResizeObserver(this.canvas);
+    this.resizeObserver.observe(this.canvas);
     this.canvas.addEventListener("mousedown", (event) =>
       this.onMouseDown(event),
     );
@@ -189,17 +192,17 @@ class ThreeJsControl {
     );
 
     // Create a MutationObserver to detect DOM changes that might affect layout
-    const mutationObserver = new MutationObserver(() => {
+    this.mutationObserver = new MutationObserver(() => {
       this.updateRendererSize();
     });
 
     // Observe the container and its parent for attribute changes
-    mutationObserver.observe(container, {
+    this.mutationObserver.observe(container, {
       attributes: true,
       attributeFilter: ["style", "class"],
     });
     if (container.parentNode) {
-      mutationObserver.observe(container.parentNode, {
+      this.mutationObserver.observe(container.parentNode, {
         attributes: true,
         attributeFilter: ["style", "class"],
       });
@@ -2013,6 +2016,44 @@ class ThreeJsControl {
     this.container.tlControl = this;
   }
 
+  /**
+   * Releases all resources of this control (WebGL contexts of the viewer and the
+   * navigation cube, observers, controls, animations).
+   *
+   * Called when a new control is initialized and the container of this control is
+   * no longer part of the document (see disposeDetachedControls). Without this, every
+   * rendering of the view leaves two WebGL contexts behind, until the browser starts
+   * to drop contexts ("Too many active WebGL contexts").
+   */
+  dispose() {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
+
+    this.resizeObserver?.disconnect();
+    this.mutationObserver?.disconnect();
+
+    if (this.controls) {
+      gsap.killTweensOf([this.controls.object.position, this.controls.target]);
+      this.controls.dispose();
+    }
+    this.translateControls?.dispose();
+    this.rotateControls?.dispose();
+
+    this.navigationCube?.dispose();
+    this.renderManager?.dispose();
+
+    if (this.renderer) {
+      this.renderer.dispose();
+      this.renderer.forceContextLoss();
+    }
+
+    if (this.container && this.container.tlControl === this) {
+      this.container.tlControl = null;
+    }
+  }
+
   async loadScene() {
     const dataResponse = await fetch(this.dataUrl);
     const dataJson = await dataResponse.json();
@@ -2357,11 +2398,32 @@ class ThreeJsControl {
   }
 }
 
+/**
+ * All controls that have not been disposed yet. When the server renders the view again
+ * (e.g. when switching back to its tab), it creates a new control with a new ID in a new
+ * container; the containers of the previous controls are then no longer part of the
+ * document.
+ */
+const activeControls = new Set();
+
+/** Disposes all controls whose container has been removed from the document. */
+function disposeDetachedControls() {
+  for (const control of activeControls) {
+    if (!control.container || !control.container.isConnected) {
+      control.dispose();
+      activeControls.delete(control);
+    }
+  }
+}
+
 // For server communication written in legacy JS.
 window.services.threejs = {
   init: function (initialState) {
+    disposeDetachedControls();
+
     const control = new ThreeJsControl(initialState);
     control.attach();
+    activeControls.add(control);
   },
 
   sceneChanged: function (container, changes) {

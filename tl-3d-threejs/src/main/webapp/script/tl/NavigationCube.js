@@ -422,5 +422,10 @@ export class NavigationCube {
   dispose() {
     // Unregister from render manager
     this.renderManager.unregisterRenderTarget(this);
+
+    gsap.killTweensOf(this.cubeControls.object.position);
+    this.cubeControls.dispose();
+    this.cubeRenderer.dispose();
+    this.cubeRenderer.forceContextLoss();
   }
 }
