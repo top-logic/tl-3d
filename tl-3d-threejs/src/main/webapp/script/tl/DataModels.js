@@ -36,6 +36,22 @@ import { GLTFLoader } from "GLTFLoader";
 import { DRACOLoader } from "DRACOLoader";
 import { InsertElement, RemoveElement, SetProperty } from "./Commands.js";
 
+/**
+ * The URL from which the GLTF of the given asset is loaded, and the key of the loaded GLTF in
+ * Scope.gltfs. An uploaded image (dynamicImage) takes precedence over the static URL.
+ *
+ * @returns {string|null} The URL, or null if the asset has no GLTF source.
+ */
+export function gltfUrlOf(ctrl, asset) {
+  if (asset.dynamicImage) {
+    return ctrl.imageUrl + "/" + asset.dynamicImage.imageID;
+  } else if (asset.url) {
+    return ctrl.contextPath + asset.url;
+  } else {
+    return null;
+  }
+}
+
 export class Scope {
   constructor() {
     this.objects = {};
@@ -221,20 +237,15 @@ export class Scope {
 
       const asset = group.asset;
 
-      // Determine GLTF URL
-      let gltfUrl;
-      if (asset.url) {
-        gltfUrl = ctrl.contextPath + asset.url;
-      } else if (asset.dynamicImage) {
-        gltfUrl = ctrl.imageUrl + "/" + asset.dynamicImage.imageID;
-      } else {
+      const gltfUrl = gltfUrlOf(ctrl, asset);
+      if (gltfUrl == null) {
         continue;
       }
 
       const gltf = this.gltfs[gltfUrl];
 
       if (!gltf) {
-        console.warn(`GLTF not loaded for ${assetKey}`);
+        console.warn(`GLTF not loaded for ${gltfUrl} (asset ${assetKey})`);
         continue;
       }
 
@@ -494,15 +505,9 @@ export class Scope {
     };
 
     // load assets in batches to prevent overwhelming the browser
-    const assetsByURL = Map.groupBy(this.assets, (asset) => {
-      if (asset.dynamicImage) {
-        return ctrl.imageUrl + "/" + asset.dynamicImage.imageID;
-      } else if (asset.url) {
-        return ctrl.contextPath + asset.url;
-      } else {
-        return null;
-      }
-    });
+    const assetsByURL = Map.groupBy(this.assets, (asset) =>
+      gltfUrlOf(ctrl, asset),
+    );
 
     // No need to load "null" URL.
     assetsByURL.delete(null);
@@ -554,13 +559,7 @@ export class Scope {
     // expensive (26 render passes per model).
     const entries = [];
     for (const [assetKey, group] of this.instanceGroups) {
-      const asset = group.asset;
-      let gltfUrl;
-      if (asset.url) {
-        gltfUrl = ctrl.contextPath + asset.url;
-      } else if (asset.dynamicImage) {
-        gltfUrl = ctrl.imageUrl + "/" + asset.dynamicImage.imageID;
-      }
+      const gltfUrl = gltfUrlOf(ctrl, group.asset);
       const gltf = gltfUrl ? this.gltfs[gltfUrl] : null;
       if (gltf) {
         entries.push([gltfUrl, gltf]);
@@ -774,9 +773,8 @@ export class SceneGraph extends SharedObject {
     for (const id of reachableIds) {
       const obj = scope.objects[id];
       if (obj instanceof GltfAsset) {
-        if (obj.url) neededUrls.add(this.ctrl.contextPath + obj.url);
-        else if (obj.dynamicImage)
-          neededUrls.add(this.ctrl.imageUrl + "/" + obj.dynamicImage.imageID);
+        const gltfUrl = gltfUrlOf(this.ctrl, obj);
+        if (gltfUrl != null) neededUrls.add(gltfUrl);
       }
     }
     scope.clearStaleGltfs(neededUrls);
