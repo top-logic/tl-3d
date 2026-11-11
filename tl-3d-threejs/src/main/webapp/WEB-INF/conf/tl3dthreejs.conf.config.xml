@@ -48,8 +48,8 @@
 		<config service-class="com.top_logic.tool.boundsec.CommandHandlerFactory">
 			<instance>
 				<handlers>
-					<handler id="applyTransform" class="com.top_logic.threed.threejs.component.ThreeJsComponent$ApplyTransformCommand" 
-						clique="apply" group="Write" executability="GeneralApply"/>
+					<handler id="applyTransform" class="com.top_logic.threed.threejs.component.ThreeJsComponent$ApplyTransformCommand"
+						executability="GeneralApply"/>
 				</handlers>
 			</instance>		
 		</config>

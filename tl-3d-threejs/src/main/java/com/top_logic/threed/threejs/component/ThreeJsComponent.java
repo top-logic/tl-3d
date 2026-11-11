@@ -33,7 +33,9 @@ import com.top_logic.basic.config.annotation.Name;
 import com.top_logic.basic.config.annotation.TagName;
 import com.top_logic.basic.config.annotation.defaults.BooleanDefault;
 import com.top_logic.basic.config.annotation.defaults.ClassDefault;
+import com.top_logic.basic.config.annotation.defaults.FormattedDefault;
 import com.top_logic.basic.config.annotation.defaults.ItemDefault;
+import com.top_logic.basic.config.annotation.defaults.StringDefault;
 import com.top_logic.basic.util.ResKey;
 import com.top_logic.event.infoservice.InfoService;
 import com.top_logic.knowledge.service.Transaction;
@@ -75,7 +77,10 @@ import com.top_logic.threed.threejs.scene.SceneGraph;
 import com.top_logic.threed.threejs.scene.SceneNode;
 import com.top_logic.threed.threejs.scene.SceneUtils;
 import com.top_logic.tool.boundsec.AbstractCommandHandler;
+import com.top_logic.tool.boundsec.CommandGroupReference;
+import com.top_logic.tool.boundsec.CommandHandlerFactory;
 import com.top_logic.tool.boundsec.HandlerResult;
+import com.top_logic.tool.boundsec.simple.SimpleBoundCommandGroup;
 
 import de.haumacher.msgbuf.observer.Listener;
 import de.haumacher.msgbuf.observer.Observable;
@@ -913,7 +918,19 @@ public class ThreeJsComponent extends BuilderComponent
 		 * Configuration of the {@link ApplyTransformCommand}.
 		 */
 		public interface Config extends AbstractCommandHandler.Config {
-			// No additional properties.
+
+			@Override
+			@FormattedDefault("tl.command.apply")
+			ResKey getResourceKey();
+
+			@Override
+			@StringDefault(CommandHandlerFactory.APPLY_CLIQUE)
+			String getClique();
+
+			@Override
+			@FormattedDefault(SimpleBoundCommandGroup.WRITE_NAME)
+			CommandGroupReference getGroup();
+
 		}
 
 		/**
