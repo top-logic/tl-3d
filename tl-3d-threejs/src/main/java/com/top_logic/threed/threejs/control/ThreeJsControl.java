@@ -343,16 +343,10 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 		_sceneListener.attach(_model);
 		updateGizmoControl(findGizmoNode(_model.getSelection()));
 
-		// Initialize step sizes from model with proper callbacks
+		// Initialize step sizes from model. Changes reach the client as scene graph update.
 		_gizmoControl.setStepSizes(_model.getTranslateStepSize(), _model.getRotateStepSize(),
-			newTranslateSize -> {
-				getModel().setTranslateStepSize(newTranslateSize);
-				addUpdate(new JSFunctionCall(getID(), THREEJS_JS_NS, "setProperty", "translateStepSize", newTranslateSize));
-			},
-			newRotateSize -> {
-				getModel().setRotateStepSize(newRotateSize);
-				addUpdate(new JSFunctionCall(getID(), THREEJS_JS_NS, "setProperty", "rotateStepSize", newRotateSize));
-			});
+			newTranslateSize -> getModel().setTranslateStepSize(newTranslateSize),
+			newRotateSize -> getModel().setRotateStepSize(newRotateSize));
 
 		getFrameScope().registerContentHandler(getID(), this);
 		getFrameScope().registerContentHandler(imageDataID(), _imageData);

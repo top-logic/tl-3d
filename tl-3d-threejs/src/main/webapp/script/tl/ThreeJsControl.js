@@ -1731,6 +1731,8 @@ class ThreeJsControl {
             "color",
             "selectable",
             "transform",
+            "translateStepSize",
+            "rotateStepSize",
           ];
 
           if (!safeIncrementalProperties.includes(cmdProps["p"])) {
@@ -2416,14 +2418,6 @@ window.services.threejs = {
     if (control != null) {
       control.toggleRotateMode(value);
     }
-  },
-
-  translate: function (container, axis, direction, stepSize) {
-    ThreeJsControl.control(container)?.translate(axis, direction, stepSize);
-  },
-
-  rotate: function (container, axis, direction, stepSize) {
-    ThreeJsControl.control(container)?.rotate(axis, direction, stepSize);
   },
 
   toggleOctreeDebug: function (container, visible) {
