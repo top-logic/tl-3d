@@ -95,7 +95,13 @@ export class InsertElement extends ListUpdate {
       return;
     }
 
-    // Store old element for reference updating
+    // Store old element for reference updating.
+    //
+    // The server replaces a node with List.set(idx, newNode), which msgbuf
+    // (ReferenceList.set) reports as an insert of the new node at idx followed by
+    // a remove of the old node at idx + 1. Therefore, the element at idx before
+    // the insert is the node being replaced. A plain insert without a following
+    // remove is not sent by the server and is not supported here.
     const oldElement = target[this.property] && target[this.property][this.idx];
 
     target.insertElementAt(scope, this.property, this.idx, this.element);
@@ -296,8 +302,9 @@ export class RemoveElement extends ListUpdate {
     target.removeElementAt(scope, this.property, this.idx);
 
     // Remove the 3D node from the scene if this was a non-instanced node.
-    // Instanced cleanup is handled by InsertElement.matchChildren when the
-    // server replaces the parent via a Remove+Insert pair.
+    // When the server replaces a node (insert at idx, then remove at idx + 1, see
+    // InsertElement.apply), the 3D node and the instancing data have already been
+    // transferred to the new node, so there is nothing left to clean up here.
     if (this.property === "contents" && removedElement && removedElement.node) {
       if (removedElement.node.parent) {
         removedElement.node.parent.remove(removedElement.node);
