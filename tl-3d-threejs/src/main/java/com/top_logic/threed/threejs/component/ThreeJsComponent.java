@@ -33,7 +33,10 @@ import com.top_logic.basic.config.annotation.Name;
 import com.top_logic.basic.config.annotation.TagName;
 import com.top_logic.basic.config.annotation.defaults.BooleanDefault;
 import com.top_logic.basic.config.annotation.defaults.ClassDefault;
+import com.top_logic.basic.config.annotation.defaults.FormattedDefault;
 import com.top_logic.basic.config.annotation.defaults.ItemDefault;
+import com.top_logic.basic.config.annotation.defaults.StringDefault;
+import com.top_logic.basic.util.ResKey;
 import com.top_logic.event.infoservice.InfoService;
 import com.top_logic.knowledge.service.Transaction;
 import com.top_logic.knowledge.wrap.WrapperHistoryUtils;
@@ -44,6 +47,7 @@ import com.top_logic.layout.channel.ComponentChannel.ChannelListener;
 import com.top_logic.layout.channel.DefaultChannelSPI;
 import com.top_logic.layout.component.Selectable;
 import com.top_logic.layout.component.SelectableWithSelectionModel;
+import com.top_logic.layout.component.model.SelectionEvent;
 import com.top_logic.layout.component.model.SelectionListener;
 import com.top_logic.layout.form.component.Editor;
 import com.top_logic.layout.form.component.TransactionHandler;
@@ -73,7 +77,10 @@ import com.top_logic.threed.threejs.scene.SceneGraph;
 import com.top_logic.threed.threejs.scene.SceneNode;
 import com.top_logic.threed.threejs.scene.SceneUtils;
 import com.top_logic.tool.boundsec.AbstractCommandHandler;
+import com.top_logic.tool.boundsec.CommandGroupReference;
+import com.top_logic.tool.boundsec.CommandHandlerFactory;
 import com.top_logic.tool.boundsec.HandlerResult;
+import com.top_logic.tool.boundsec.simple.SimpleBoundCommandGroup;
 
 import de.haumacher.msgbuf.observer.Listener;
 import de.haumacher.msgbuf.observer.Observable;
@@ -82,7 +89,7 @@ import de.haumacher.msgbuf.observer.Observable;
  * {@link BuilderComponent} displaying a 3D-Viewer using the <code>Three.js</code> library.
  */
 public class ThreeJsComponent extends BuilderComponent
-		implements SelectionListener, SelectableWithSelectionModel, Editor {
+		implements SelectionListener<Object>, SelectableWithSelectionModel, Editor {
 
 	/**
 	 * Configuration options of {@link ThreeJsComponent} that can be choosen "in app".
@@ -161,7 +168,7 @@ public class ThreeJsComponent extends BuilderComponent
 
 		@Override
 		@ItemDefault(CP.class)
-		PolymorphicConfiguration<LayoutControlProvider> getComponentControlProvider();
+		PolymorphicConfiguration<? extends LayoutControlProvider> getComponentControlProvider();
 
 		@Override
 		@BooleanDefault(true)
@@ -491,16 +498,17 @@ public class ThreeJsComponent extends BuilderComponent
 				}
 			}
 		});
-		selectionModel.addSelectionListener(new SelectionListener() {
+		selectionModel.addSelectionListener(new SelectionListener<Object>() {
 
 			@Override
-			public void notifySelectionChanged(SelectionModel model, Set<?> formerlySelectedObjects,
-					Set<?> selectedObjects) {
+			public void notifySelectionChanged(SelectionModel<Object> model, SelectionEvent<Object> event) {
 				if (ignoreSelectEvent.booleanValue()) {
 					return;
 				}
 				ignoreSelectEvent.setTrue();
 				try {
+					Set<?> formerlySelectedObjects = event.getOldSelection();
+					Set<?> selectedObjects = event.getNewSelection();
 					Set<?> newElements = new HashSet<>(selectedObjects);
 					newElements.removeAll(formerlySelectedObjects);
 					Set<?> removedElements = new HashSet<>(formerlySelectedObjects);
@@ -615,6 +623,11 @@ public class ThreeJsComponent extends BuilderComponent
 		_addToIndex.reset();
 
 		SceneNode root = builder().getModel(getModel(), this);
+		if (root == null) {
+			// No (readable) root object, e.g. the user must not read the root of the scene: Show an
+			// empty scene.
+			root = GroupNode.create();
+		}
 		root.visit(_addToIndex, null);
 		_scene.setRoot(root);
 
@@ -778,8 +791,9 @@ public class ThreeJsComponent extends BuilderComponent
 	}
 
 	@Override
-	public void notifySelectionChanged(SelectionModel model, Set<?> formerlySelectedObjects, Set<?> selectedObjects) {
+	public void notifySelectionChanged(SelectionModel<Object> model, SelectionEvent<Object> event) {
 		// Selection was changed in the UI.
+		Set<?> selectedObjects = event.getNewSelection();
 		if (_selectionModel.isMultiSelectionSupported()) {
 			Set<Object> newSelection = new HashSet<>();
 			for (Object selectedNode : selectedObjects) {
@@ -904,7 +918,19 @@ public class ThreeJsComponent extends BuilderComponent
 		 * Configuration of the {@link ApplyTransformCommand}.
 		 */
 		public interface Config extends AbstractCommandHandler.Config {
-			// No additional properties.
+
+			@Override
+			@FormattedDefault("tl.command.apply")
+			ResKey getResourceKey();
+
+			@Override
+			@StringDefault(CommandHandlerFactory.APPLY_CLIQUE)
+			String getClique();
+
+			@Override
+			@FormattedDefault(SimpleBoundCommandGroup.WRITE_NAME)
+			CommandGroupReference getGroup();
+
 		}
 
 		/**
@@ -922,7 +948,9 @@ public class ThreeJsComponent extends BuilderComponent
 		@Override
 		public HandlerResult handleCommand(DisplayContext aContext, LayoutComponent aComponent,
 				Object model, Map<String, Object> someArguments) {
-			try (Transaction tx = beginTransaction(model)) {
+			ResKey customMessage = getCustomCommitMessage(someArguments);
+			ResKey message = customMessage == null ? I18NConstants.APPLIED_TRANSFORMATIONS : customMessage;
+			try (Transaction tx = beginTransaction(model, message)) {
 				HandlerResult result = ((ThreeJsComponent) aComponent).applyTransformation();
 				if (result.isSuccess()) {
 					tx.commit();

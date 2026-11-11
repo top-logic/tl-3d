@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2025 (c) Business Operation Systems GmbH <info@top-logic.com>
+ * SPDX-FileCopyrightText: 2026 (c) Business Operation Systems GmbH <info@top-logic.com>
  * 
  * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-BOS-TopLogic-1.0
  */
@@ -16,5 +16,13 @@ public interface ScenePartBase extends com.top_logic.element.structured.Structur
 	 * Name of type <code>ScenePart</code>
 	 */
 	String SCENE_PART_TYPE = "ScenePart";
+
+	/**
+	 * Getter for part {@link #PARENT_ATTR}.
+	 */
+	@Override
+	default com.top_logic.threed.demo.model.Assembly getParent() {
+		return (com.top_logic.threed.demo.model.Assembly) tValueByName(PARENT_ATTR);
+	}
 
 }

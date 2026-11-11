@@ -40,7 +40,6 @@ import com.top_logic.model.search.expr.SearchExpression;
 import com.top_logic.model.search.expr.config.dom.Expr;
 import com.top_logic.model.search.expr.query.QueryExecutor;
 import com.top_logic.model.util.TLModelPartRef;
-import com.top_logic.model.util.TLModelPartRefsFormat;
 import com.top_logic.threed.threejs.scene.SceneNode;
 import com.top_logic.util.error.TopLogicException;
 import com.top_logic.util.model.ModelService;
@@ -226,7 +225,7 @@ public class SceneBuilderByExpression extends AbstractSceneBuilder
 		 * The types whose instances have to be observed to update the scene.
 		 */
 		@Name(TYPES_TO_OBSERVE)
-		@Format(TLModelPartRefsFormat.class)
+		@Format(TLModelPartRef.CommaSeparatedTLModelPartRefs.class)
 		List<TLModelPartRef> getTypesToObserve();
 
 		/**

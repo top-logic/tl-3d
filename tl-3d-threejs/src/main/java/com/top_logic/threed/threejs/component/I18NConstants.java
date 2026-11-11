@@ -45,6 +45,12 @@ public class I18NConstants extends I18NConstantsBase {
 	 */
 	public static ResKey1 ERROR_NOT_VALID_HIDDEN_CHANNEL_VALUE__VALUE;
 
+	/**
+	 * @en Applied changed positions of objects in the 3D view.
+	 * @de Geänderte Positionen von Objekten in der 3D-Ansicht übernommen.
+	 */
+	public static ResKey APPLIED_TRANSFORMATIONS;
+
 	static {
 		initConstants(I18NConstants.class);
 	}

@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2025 (c) Business Operation Systems GmbH <info@top-logic.com>
+ * SPDX-FileCopyrightText: 2026 (c) Business Operation Systems GmbH <info@top-logic.com>
  * 
  * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-BOS-TopLogic-1.0
  */
@@ -16,5 +16,10 @@ public interface AssetCatalogueBase extends com.top_logic.threed.demo.model.Asse
 	 * Name of type <code>AssetCatalogue</code>
 	 */
 	String ASSET_CATALOGUE_TYPE = "AssetCatalogue";
+
+	/**
+	 * Name of the table storing {@link #ASSET_CATALOGUE_TYPE} objects.
+	 */
+	String TABLE_NAME = "GenericObject";
 
 }
