@@ -259,7 +259,7 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 	private Assembly addFloor(TlThreedDemoFactory factory, Assembly parent, String name, MutableInteger assetNr) {
 		Assembly floor = factory.createAssembly();
 		floor.setName(name);
-		parent.addChild(floor);
+		parent.tAddByName(Assembly.CHILDREN_ATTR, floor);
 
 		int numberStations = config.getNumberStations();
 		int columns = (int) Math.sqrt(numberStations);
@@ -288,7 +288,7 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 		assetNr = assetNr % (getConfig().getNumberAssetClones() + 1);
 		Assembly station = factory.createAssembly();
 		station.setName(name);
-		parent.addChild(station);
+		parent.tAddByName(Assembly.CHILDREN_ATTR, station);
 
 		addPart(factory, station, "Achse", _roboterAchse.get(assetNr));
 
@@ -320,14 +320,14 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 	private Assembly addRobotSystem(TlThreedDemoFactory factory, Assembly parent, int number, int assetNr) {
 		Assembly robotSystem = factory.createAssembly();
 		robotSystem.setName("RS " + number);
-		parent.addChild(robotSystem);
+		parent.tAddByName(Assembly.CHILDREN_ATTR, robotSystem);
 
 		Part robot = addPart(factory, robotSystem, "KR360", _kr360.get(assetNr));
 
 		Part greifer = addPart(factory, robotSystem, "Greifer", _greiferGross.get(assetNr));
 
 		Part podest = factory.createPart();
-		robotSystem.addChild(podest);
+		robotSystem.tAddByName(Assembly.CHILDREN_ATTR, podest);
 		if (number % 3 == 0) {
 			podest.setAsset(_podest1000.get(assetNr));
 			robot.setTx(translate(0, 0, 1000));
@@ -351,7 +351,7 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 
 	private Part addPart(TlThreedDemoFactory factory, Assembly parent, String name, Asset3D asset) {
 		Part robot = factory.createPart();
-		parent.addChild(robot);
+		parent.tAddByName(Assembly.CHILDREN_ATTR, robot);
 		robot.setAsset(asset);
 		robot.setName(name);
 		return robot;

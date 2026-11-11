@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2025 (c) Business Operation Systems GmbH <info@top-logic.com>
+ * SPDX-FileCopyrightText: 2026 (c) Business Operation Systems GmbH <info@top-logic.com>
  * 
  * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-BOS-TopLogic-1.0
  */
@@ -17,20 +17,28 @@ package com.top_logic.threed.demo.model;
 public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.StructuredElementWrapperFactory {
 
 	/**
-	 * Name of singleton {@link #TL_THREED_DEMO_STRUCTURE}.
+	 * Name of singleton {@link #TL_THREED_DEMO_MODULE}.
 	 */
 	public static final String SINGLETON_CATALOGUE = "CATALOGUE";
 
 	/**
-	 * Name of the structure <code>tl.threed.demo</code> defined by {@link TlThreedDemoFactory}.
+	 * Name of the module <code>tl.threed.demo</code> defined by {@link TlThreedDemoFactory}.
 	 */
-	public static final String TL_THREED_DEMO_STRUCTURE = "tl.threed.demo";
+	public static final String TL_THREED_DEMO_MODULE = "tl.threed.demo";
+
+	/**
+	 * Name of the structure <code>tl.threed.demo</code> defined by {@link TlThreedDemoFactory}.
+	 * 
+	 * @deprecated Use {@link #TL_THREED_DEMO_MODULE}.
+	 */
+	@Deprecated
+	public static final String TL_THREED_DEMO_STRUCTURE = TL_THREED_DEMO_MODULE;
 
 	/**
 	 * Lookup {@link Asset3D} type.
 	 */
 	public static com.top_logic.model.TLClass getAsset3DType() {
-		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_STRUCTURE).getType(Asset3D.ASSET3D_TYPE);
+		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_MODULE).getType(Asset3D.ASSET3D_TYPE);
 	}
 
 	/**
@@ -79,7 +87,7 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 	 * Lookup {@link AssetCollection} type.
 	 */
 	public static com.top_logic.model.TLClass getAssetCollectionType() {
-		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_STRUCTURE).getType(AssetCollection.ASSET_COLLECTION_TYPE);
+		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_MODULE).getType(AssetCollection.ASSET_COLLECTION_TYPE);
 	}
 
 	/**
@@ -100,14 +108,14 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 	 * Lookup {@link AssetCatalogue} type.
 	 */
 	public static com.top_logic.model.TLClass getAssetCatalogueType() {
-		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_STRUCTURE).getType(AssetCatalogue.ASSET_CATALOGUE_TYPE);
+		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_MODULE).getType(AssetCatalogue.ASSET_CATALOGUE_TYPE);
 	}
 
 	/**
 	 * Lookup {@link AssetFolder} type.
 	 */
 	public static com.top_logic.model.TLClass getAssetFolderType() {
-		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_STRUCTURE).getType(AssetFolder.ASSET_FOLDER_TYPE);
+		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_MODULE).getType(AssetFolder.ASSET_FOLDER_TYPE);
 	}
 
 	/**
@@ -121,7 +129,7 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 	 * Lookup {@link ConnectionPoint} type.
 	 */
 	public static com.top_logic.model.TLClass getConnectionPointType() {
-		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_STRUCTURE).getType(ConnectionPoint.CONNECTION_POINT_TYPE);
+		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_MODULE).getType(ConnectionPoint.CONNECTION_POINT_TYPE);
 	}
 
 	/**
@@ -142,14 +150,21 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 	 * Lookup {@link ScenePart} type.
 	 */
 	public static com.top_logic.model.TLClass getScenePartType() {
-		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_STRUCTURE).getType(ScenePart.SCENE_PART_TYPE);
+		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_MODULE).getType(ScenePart.SCENE_PART_TYPE);
+	}
+
+	/**
+	 * Lookup {@link ScenePart#PARENT_ATTR} of {@link ScenePart}.
+	 */
+	public static com.top_logic.model.TLReference getParentScenePartAttr() {
+		return (com.top_logic.model.TLReference) getScenePartType().getPart(ScenePart.PARENT_ATTR);
 	}
 
 	/**
 	 * Lookup {@link Node} type.
 	 */
 	public static com.top_logic.model.TLClass getNodeType() {
-		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_STRUCTURE).getType(Node.NODE_TYPE);
+		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_MODULE).getType(Node.NODE_TYPE);
 	}
 
 	/**
@@ -212,7 +227,7 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 	 * Lookup {@link Assembly} type.
 	 */
 	public static com.top_logic.model.TLClass getAssemblyType() {
-		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_STRUCTURE).getType(Assembly.ASSEMBLY_TYPE);
+		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_MODULE).getType(Assembly.ASSEMBLY_TYPE);
 	}
 
 	/**
@@ -226,14 +241,14 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 	 * Lookup {@link Part} type.
 	 */
 	public static com.top_logic.model.TLClass getPartType() {
-		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_STRUCTURE).getType(Part.PART_TYPE);
+		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_MODULE).getType(Part.PART_TYPE);
 	}
 
 	/**
 	 * Lookup {@link Text} type.
 	 */
 	public static com.top_logic.model.TLClass getTextType() {
-		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_STRUCTURE).getType(Text.TEXT_TYPE);
+		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_MODULE).getType(Text.TEXT_TYPE);
 	}
 
 	/**
@@ -261,7 +276,7 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 	 * Lookup {@link Scene} type.
 	 */
 	public static com.top_logic.model.TLClass getSceneType() {
-		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_STRUCTURE).getType(Scene.SCENE_TYPE);
+		return (com.top_logic.model.TLClass) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_DEMO_MODULE).getType(Scene.SCENE_TYPE);
 	}
 
 	/**
@@ -279,7 +294,7 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 	}
 
 	/**
-	 * Name of type <code>Asset3D</code> in structure {@link #TL_THREED_DEMO_STRUCTURE}.
+	 * Name of type <code>Asset3D</code> in module {@link #TL_THREED_DEMO_MODULE}.
 	 * 
 	 * @deprecated Use {@link Asset3D#ASSET3D_TYPE}.
 	 */
@@ -288,11 +303,14 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 
 	/**
 	 * Storage table name of {@link #ASSET3D_NODE} objects.
+	 * 
+	 * @deprecated Use {@link com.top_logic.threed.demo.model.impl.Asset3DBase#TABLE_NAME}.
 	 */
-	public static final String KO_NAME_ASSET3D = "GenericObject";
+	@Deprecated
+	public static final String KO_NAME_ASSET3D = com.top_logic.threed.demo.model.impl.Asset3DBase.TABLE_NAME;
 
 	/**
-	 * Name of type <code>AssetCollection</code> in structure {@link #TL_THREED_DEMO_STRUCTURE}.
+	 * Name of type <code>AssetCollection</code> in module {@link #TL_THREED_DEMO_MODULE}.
 	 * 
 	 * @deprecated Use {@link AssetCollection#ASSET_COLLECTION_TYPE}.
 	 */
@@ -301,11 +319,14 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 
 	/**
 	 * Storage table name of {@link #ASSET_COLLECTION_NODE} objects.
+	 * 
+	 * @deprecated Use {@link com.top_logic.threed.demo.model.impl.AssetCollectionBase#TABLE_NAME}.
 	 */
-	public static final String KO_NAME_ASSET_COLLECTION = "GenericObject";
+	@Deprecated
+	public static final String KO_NAME_ASSET_COLLECTION = com.top_logic.threed.demo.model.impl.AssetCollectionBase.TABLE_NAME;
 
 	/**
-	 * Name of type <code>AssetCatalogue</code> in structure {@link #TL_THREED_DEMO_STRUCTURE}.
+	 * Name of type <code>AssetCatalogue</code> in module {@link #TL_THREED_DEMO_MODULE}.
 	 * 
 	 * @deprecated Use {@link AssetCatalogue#ASSET_CATALOGUE_TYPE}.
 	 */
@@ -314,11 +335,14 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 
 	/**
 	 * Storage table name of {@link #ASSET_CATALOGUE_NODE} objects.
+	 * 
+	 * @deprecated Use {@link com.top_logic.threed.demo.model.impl.AssetCatalogueBase#TABLE_NAME}.
 	 */
-	public static final String KO_NAME_ASSET_CATALOGUE = "GenericObject";
+	@Deprecated
+	public static final String KO_NAME_ASSET_CATALOGUE = com.top_logic.threed.demo.model.impl.AssetCatalogueBase.TABLE_NAME;
 
 	/**
-	 * Name of type <code>AssetFolder</code> in structure {@link #TL_THREED_DEMO_STRUCTURE}.
+	 * Name of type <code>AssetFolder</code> in module {@link #TL_THREED_DEMO_MODULE}.
 	 * 
 	 * @deprecated Use {@link AssetFolder#ASSET_FOLDER_TYPE}.
 	 */
@@ -327,11 +351,14 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 
 	/**
 	 * Storage table name of {@link #ASSET_FOLDER_NODE} objects.
+	 * 
+	 * @deprecated Use {@link com.top_logic.threed.demo.model.impl.AssetFolderBase#TABLE_NAME}.
 	 */
-	public static final String KO_NAME_ASSET_FOLDER = "GenericObject";
+	@Deprecated
+	public static final String KO_NAME_ASSET_FOLDER = com.top_logic.threed.demo.model.impl.AssetFolderBase.TABLE_NAME;
 
 	/**
-	 * Name of type <code>ConnectionPoint</code> in structure {@link #TL_THREED_DEMO_STRUCTURE}.
+	 * Name of type <code>ConnectionPoint</code> in module {@link #TL_THREED_DEMO_MODULE}.
 	 * 
 	 * @deprecated Use {@link ConnectionPoint#CONNECTION_POINT_TYPE}.
 	 */
@@ -340,11 +367,14 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 
 	/**
 	 * Storage table name of {@link #CONNECTION_POINT_NODE} objects.
+	 * 
+	 * @deprecated Use {@link com.top_logic.threed.demo.model.impl.ConnectionPointBase#TABLE_NAME}.
 	 */
-	public static final String KO_NAME_CONNECTION_POINT = "GenericObject";
+	@Deprecated
+	public static final String KO_NAME_CONNECTION_POINT = com.top_logic.threed.demo.model.impl.ConnectionPointBase.TABLE_NAME;
 
 	/**
-	 * Name of type <code>ScenePart</code> in structure {@link #TL_THREED_DEMO_STRUCTURE}.
+	 * Name of type <code>ScenePart</code> in module {@link #TL_THREED_DEMO_MODULE}.
 	 * 
 	 * @deprecated Use {@link ScenePart#SCENE_PART_TYPE}.
 	 */
@@ -352,7 +382,7 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 	public static final String SCENE_PART_NODE = ScenePart.SCENE_PART_TYPE;
 
 	/**
-	 * Name of type <code>Node</code> in structure {@link #TL_THREED_DEMO_STRUCTURE}.
+	 * Name of type <code>Node</code> in module {@link #TL_THREED_DEMO_MODULE}.
 	 * 
 	 * @deprecated Use {@link Node#NODE_TYPE}.
 	 */
@@ -360,7 +390,7 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 	public static final String NODE_NODE = Node.NODE_TYPE;
 
 	/**
-	 * Name of type <code>Assembly</code> in structure {@link #TL_THREED_DEMO_STRUCTURE}.
+	 * Name of type <code>Assembly</code> in module {@link #TL_THREED_DEMO_MODULE}.
 	 * 
 	 * @deprecated Use {@link Assembly#ASSEMBLY_TYPE}.
 	 */
@@ -369,11 +399,14 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 
 	/**
 	 * Storage table name of {@link #ASSEMBLY_NODE} objects.
+	 * 
+	 * @deprecated Use {@link com.top_logic.threed.demo.model.impl.AssemblyBase#TABLE_NAME}.
 	 */
-	public static final String KO_NAME_ASSEMBLY = "GenericObject";
+	@Deprecated
+	public static final String KO_NAME_ASSEMBLY = com.top_logic.threed.demo.model.impl.AssemblyBase.TABLE_NAME;
 
 	/**
-	 * Name of type <code>Part</code> in structure {@link #TL_THREED_DEMO_STRUCTURE}.
+	 * Name of type <code>Part</code> in module {@link #TL_THREED_DEMO_MODULE}.
 	 * 
 	 * @deprecated Use {@link Part#PART_TYPE}.
 	 */
@@ -382,11 +415,14 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 
 	/**
 	 * Storage table name of {@link #PART_NODE} objects.
+	 * 
+	 * @deprecated Use {@link com.top_logic.threed.demo.model.impl.PartBase#TABLE_NAME}.
 	 */
-	public static final String KO_NAME_PART = "GenericObject";
+	@Deprecated
+	public static final String KO_NAME_PART = com.top_logic.threed.demo.model.impl.PartBase.TABLE_NAME;
 
 	/**
-	 * Name of type <code>Text</code> in structure {@link #TL_THREED_DEMO_STRUCTURE}.
+	 * Name of type <code>Text</code> in module {@link #TL_THREED_DEMO_MODULE}.
 	 * 
 	 * @deprecated Use {@link Text#TEXT_TYPE}.
 	 */
@@ -395,11 +431,14 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 
 	/**
 	 * Storage table name of {@link #TEXT_NODE} objects.
+	 * 
+	 * @deprecated Use {@link com.top_logic.threed.demo.model.impl.TextBase#TABLE_NAME}.
 	 */
-	public static final String KO_NAME_TEXT = "GenericObject";
+	@Deprecated
+	public static final String KO_NAME_TEXT = com.top_logic.threed.demo.model.impl.TextBase.TABLE_NAME;
 
 	/**
-	 * Name of type <code>Scene</code> in structure {@link #TL_THREED_DEMO_STRUCTURE}.
+	 * Name of type <code>Scene</code> in module {@link #TL_THREED_DEMO_MODULE}.
 	 * 
 	 * @deprecated Use {@link Scene#SCENE_TYPE}.
 	 */
@@ -408,8 +447,11 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 
 	/**
 	 * Storage table name of {@link #SCENE_NODE} objects.
+	 * 
+	 * @deprecated Use {@link com.top_logic.threed.demo.model.impl.SceneBase#TABLE_NAME}.
 	 */
-	public static final String KO_NAME_SCENE = "GenericObject";
+	@Deprecated
+	public static final String KO_NAME_SCENE = com.top_logic.threed.demo.model.impl.SceneBase.TABLE_NAME;
 
 	/**
 	 * Singleton <code>CATALOGUE</code>.
@@ -563,6 +605,6 @@ public class TlThreedDemoFactory extends com.top_logic.element.structured.wrap.S
 	 * The singleton instance of {@link TlThreedDemoFactory}.
 	 */
 	public static TlThreedDemoFactory getInstance() {
-		return (TlThreedDemoFactory) com.top_logic.element.model.DynamicModelService.getFactoryFor(TL_THREED_DEMO_STRUCTURE);
+		return (TlThreedDemoFactory) com.top_logic.element.model.DynamicModelService.getFactoryFor(TL_THREED_DEMO_MODULE);
 	}
 }

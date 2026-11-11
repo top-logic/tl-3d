@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2025 (c) Business Operation Systems GmbH <info@top-logic.com>
+ * SPDX-FileCopyrightText: 2026 (c) Business Operation Systems GmbH <info@top-logic.com>
  * 
  * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-BOS-TopLogic-1.0
  */
@@ -25,5 +25,10 @@ public interface AssetFolderBase extends com.top_logic.threed.demo.model.AssetCo
 	 * </p>
 	 */
 	String NAME_ATTR = "name";
+
+	/**
+	 * Name of the table storing {@link #ASSET_FOLDER_TYPE} objects.
+	 */
+	String TABLE_NAME = "GenericObject";
 
 }
