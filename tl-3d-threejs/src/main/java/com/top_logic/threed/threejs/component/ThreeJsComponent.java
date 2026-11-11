@@ -618,6 +618,11 @@ public class ThreeJsComponent extends BuilderComponent
 		_addToIndex.reset();
 
 		SceneNode root = builder().getModel(getModel(), this);
+		if (root == null) {
+			// No (readable) root object, e.g. the user must not read the root of the scene: Show an
+			// empty scene.
+			root = GroupNode.create();
+		}
 		root.visit(_addToIndex, null);
 		_scene.setRoot(root);
 
