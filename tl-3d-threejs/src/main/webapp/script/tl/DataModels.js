@@ -462,11 +462,24 @@ export class Scope {
 	return dracoLoader;
   }
 
+  /**
+   * Loads the GLTF files of all assets and generates the impostors.
+   *
+   * A previous loading pipeline is aborted. The returned promise resolves to true when
+   * all assets are loaded, and to false when this pipeline was aborted (by a later call or
+   * by abortAssetLoading()); in that case the caller must not continue with the scene,
+   * since it may already show different content.
+   *
+   * Downloads already started by an aborted pipeline are not cancelled: three.js shares
+   * pending requests for the same URL between loaders, so the next pipeline may wait for
+   * them. Only the batches not yet started are skipped.
+   */
   loadAssets(ctrl) {
     // Abort any previous loading pipeline
     this.abortAssetLoading();
     const abortController = new AbortController();
     this._loadAbortController = abortController;
+    const signal = abortController.signal;
 
     const gltfLoader = new GLTFLoader();
     gltfLoader.setDRACOLoader(this.newDracoLoader());
@@ -474,7 +487,7 @@ export class Scope {
     const loadUrl = (url) => {
       return gltfLoader.loadAsync(url).then(
         (gltf) => {
-          if (abortController.signal.aborted) return;
+          if (signal.aborted) return;
           // Release the parser to free the raw ArrayBuffer data it retains.
           // The parser is only needed during the initial parse and is never
           // used after loadAsync resolves.
@@ -483,7 +496,7 @@ export class Scope {
           this.gltfs[url] = gltf;
         },
         (reason) => {
-          if (abortController.signal.aborted) return;
+          if (signal.aborted) return;
           const msg = "Failed to load '" + url + "': " + reason;
           console.error(msg);
         },
@@ -491,17 +504,15 @@ export class Scope {
     };
 
     const loadURLs = (urls, assetsByURL) => {
-      return Promise.all(urls.map(loadUrl))
-        .then(() => {
-          if (abortController.signal.aborted) return;
-          for (const url of urls) {
-            this.setGLTF(ctrl, url, assetsByURL);
-          }
-        })
-        .then(() => {
-          if (abortController.signal.aborted) return;
-          ctrl.invalidate();
-        });
+      // Checked when the batch starts, not when the chain is built.
+      if (signal.aborted) return Promise.resolve();
+      return Promise.all(urls.map(loadUrl)).then(() => {
+        if (signal.aborted) return;
+        for (const url of urls) {
+          this.setGLTF(ctrl, url, assetsByURL);
+        }
+        ctrl.invalidate();
+      });
     };
 
     // load assets in batches to prevent overwhelming the browser
@@ -532,17 +543,18 @@ export class Scope {
     }
 
     return batches
-      .reduce((promise, batch) => {
-        if (abortController.signal.aborted) return Promise.resolve();
-        return promise.then(() => loadURLs(batch, assetsByURL));
-      }, Promise.resolve())
+      .reduce(
+        (promise, batch) => promise.then(() => loadURLs(batch, assetsByURL)),
+        Promise.resolve(),
+      )
       .then(() => {
-        if (abortController.signal.aborted) return;
-        return this.generateImpostors(ctrl);
-      });
+        if (signal.aborted) return;
+        return this.generateImpostors(ctrl, signal);
+      })
+      .then(() => !signal.aborted);
   }
 
-  async generateImpostors(ctrl) {
+  async generateImpostors(ctrl, signal) {
     if (!this.instanceGroups || this.instanceGroups.size === 0) {
       return;
     }
@@ -553,6 +565,8 @@ export class Scope {
         ctrl.contextPath,
       );
     }
+    // Keep the manager of this pipeline: a reload replaces ctrl.impostorManager.
+    const impostorManager = ctrl.impostorManager;
 
     // Only generate impostors for instanced assets — non-instanced models
     // don't use impostors and generating atlases for all of them is extremely
@@ -571,16 +585,20 @@ export class Scope {
     for (let i = 0; i < entries.length; i += batchSize) {
       const batch = entries.slice(i, i + batchSize);
       for (const [url, gltf] of batch) {
-        ctrl.impostorManager.generateImpostorForAsset(url, gltf);
+        impostorManager.generateImpostorForAsset(url, gltf);
       }
       // Yield to the browser between batches so GC can run and the UI stays responsive
       if (i + batchSize < entries.length) {
         await new Promise((resolve) => setTimeout(resolve, 0));
+        if (signal?.aborted) {
+          // The scene was reloaded meanwhile, the manager is disposed or replaced.
+          return;
+        }
       }
     }
 
     // Shared render target is no longer needed after all impostors are generated
-    ctrl.impostorManager.disposeSharedRenderTarget();
+    impostorManager.disposeSharedRenderTarget();
   }
 
   setGLTF(ctrl, url, assetsByURL) {
@@ -799,7 +817,10 @@ export class SceneGraph extends SharedObject {
     // Recreate instanced meshes
     scope.createInstancedMeshes(this.ctrl);
 
-    scope.loadAssets(this.ctrl).then(() => {
+    scope.loadAssets(this.ctrl).then((loaded) => {
+      // Aborted by a later reload, which continues with the then current scene.
+      if (!loaded) return;
+
       // Update instanced meshes with real geometry
       scope.updateInstancedMeshesWithGLTF(this.ctrl);
 

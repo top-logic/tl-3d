@@ -2031,6 +2031,9 @@ class ThreeJsControl {
     }
     this.disposed = true;
 
+    // Stop loading assets for a scene that is no longer displayed.
+    this.scope?.abortAssetLoading();
+
     this.resizeObserver?.disconnect();
     this.mutationObserver?.disconnect();
 
@@ -2073,7 +2076,10 @@ class ThreeJsControl {
       this.skyboxManager.createFactoryFloors(null);
     }
 
-    await this.scope.loadAssets(this).then(() => {
+    await this.scope.loadAssets(this).then((loaded) => {
+      // Aborted by a reload or by dispose(); the reload completes the scene setup.
+      if (!loaded) return;
+
       // Update instanced meshes with real GLTF geometry
       this.scope.updateInstancedMeshesWithGLTF(this);
 
