@@ -54,6 +54,26 @@
 	<build>
 		<plugins>
 			<plugin>
+				<groupId>com.top-logic</groupId>
+				<artifactId>tl-maven-plugin</artifactId>
+
+				<executions>
+					<execution>
+						<!-- Regenerate the model wrappers: mvn tl:generate-java@generate-binding -->
+						<id>generate-binding</id>
+						<phase>none</phase>
+						<goals>
+							<goal>generate-java</goal>
+						</goals>
+
+						<configuration>
+							<modules>tl.threed.core</modules>
+							<languages>de,en</languages>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
 				<groupId>de.haumacher.msgbuf</groupId>
 				<artifactId>msgbuf-generator-maven-plugin</artifactId>
 				<version>${msgbuf.version}</version>
