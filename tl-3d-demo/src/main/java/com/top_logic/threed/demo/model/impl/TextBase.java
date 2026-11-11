@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2025 (c) Business Operation Systems GmbH <info@top-logic.com>
+ * SPDX-FileCopyrightText: 2026 (c) Business Operation Systems GmbH <info@top-logic.com>
  * 
  * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-BOS-TopLogic-1.0
  */
@@ -34,6 +34,11 @@ public interface TextBase extends com.top_logic.threed.demo.model.Node {
 	 * </p>
 	 */
 	String FONT_SIZE_ATTR = "fontSize";
+
+	/**
+	 * Name of the table storing {@link #TEXT_TYPE} objects.
+	 */
+	String TABLE_NAME = "GenericObject";
 
 	/**
 	 * Getter for part {@link #BACKGROUND_ATTR}.

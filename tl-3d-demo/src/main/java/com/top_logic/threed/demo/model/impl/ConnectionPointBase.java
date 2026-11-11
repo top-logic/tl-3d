@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2025 (c) Business Operation Systems GmbH <info@top-logic.com>
+ * SPDX-FileCopyrightText: 2026 (c) Business Operation Systems GmbH <info@top-logic.com>
  * 
  * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-BOS-TopLogic-1.0
  */
@@ -34,6 +34,11 @@ public interface ConnectionPointBase extends com.top_logic.model.TLObject {
 	 * </p>
 	 */
 	String TX_ATTR = "tx";
+
+	/**
+	 * Name of the table storing {@link #CONNECTION_POINT_TYPE} objects.
+	 */
+	String TABLE_NAME = "GenericObject";
 
 	/**
 	 * Getter for part {@link #CLASSIFIERS_ATTR}.

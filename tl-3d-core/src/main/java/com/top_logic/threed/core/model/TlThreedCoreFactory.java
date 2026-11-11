@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2025 (c) Business Operation Systems GmbH <info@top-logic.com>
+ * SPDX-FileCopyrightText: 2026 (c) Business Operation Systems GmbH <info@top-logic.com>
  * 
  * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-BOS-TopLogic-1.0
  */
@@ -17,12 +17,20 @@ package com.top_logic.threed.core.model;
 public class TlThreedCoreFactory extends com.top_logic.element.meta.kbbased.AbstractElementFactory {
 
 	/**
-	 * Name of the structure <code>tl.threed.core</code> defined by {@link TlThreedCoreFactory}.
+	 * Name of the module <code>tl.threed.core</code> defined by {@link TlThreedCoreFactory}.
 	 */
-	public static final String TL_THREED_CORE_STRUCTURE = "tl.threed.core";
+	public static final String TL_THREED_CORE_MODULE = "tl.threed.core";
 
 	/**
-	 * Name of the data type <code>Transformation</code> in module {@value #TL_THREED_CORE_STRUCTURE}.
+	 * Name of the structure <code>tl.threed.core</code> defined by {@link TlThreedCoreFactory}.
+	 * 
+	 * @deprecated Use {@link #TL_THREED_CORE_MODULE}.
+	 */
+	@Deprecated
+	public static final String TL_THREED_CORE_STRUCTURE = TL_THREED_CORE_MODULE;
+
+	/**
+	 * Name of the data type <code>Transformation</code> in module {@value #TL_THREED_CORE_MODULE}.
 	 */
 	public static final String TRANSFORMATION_TYPE = "Transformation";
 
@@ -30,7 +38,7 @@ public class TlThreedCoreFactory extends com.top_logic.element.meta.kbbased.Abst
 	 * Lookup {@value #TRANSFORMATION_TYPE} data type.
 	 */
 	public static com.top_logic.model.TLPrimitive getTransformationType() {
-		return (com.top_logic.model.TLPrimitive) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_CORE_STRUCTURE).getType(TRANSFORMATION_TYPE);
+		return (com.top_logic.model.TLPrimitive) com.top_logic.util.model.ModelService.getApplicationModel().getModule(TL_THREED_CORE_MODULE).getType(TRANSFORMATION_TYPE);
 	}
 
 
@@ -38,6 +46,6 @@ public class TlThreedCoreFactory extends com.top_logic.element.meta.kbbased.Abst
 	 * The singleton instance of {@link TlThreedCoreFactory}.
 	 */
 	public static TlThreedCoreFactory getInstance() {
-		return (TlThreedCoreFactory) com.top_logic.element.model.DynamicModelService.getFactoryFor(TL_THREED_CORE_STRUCTURE);
+		return (TlThreedCoreFactory) com.top_logic.element.model.DynamicModelService.getFactoryFor(TL_THREED_CORE_MODULE);
 	}
 }
