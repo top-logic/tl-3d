@@ -17,7 +17,6 @@ import {
   Sphere,
   UnsignedByteType,
   Vector3,
-  Vector4,
   WebGLRenderTarget,
 } from "three";
 
@@ -263,9 +262,6 @@ export class ImpostorManager {
     const originalClearColor = this.renderer.getClearColor(new Color());
     const originalClearAlpha = this.renderer.getClearAlpha();
 
-    const currentViewport = new Vector4();
-    this.renderer.getViewport(currentViewport);
-
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.setRenderTarget(atlasTarget);
     this.renderer.clear();
@@ -321,28 +317,23 @@ export class ImpostorManager {
         faceCornerUVData,
       );
 
-      // Set viewport to render into correct atlas position
-      this.renderer.setViewport(
-        gridX * resolution,
-        gridY * resolution,
-        resolution,
-        resolution,
-      );
-      this.renderer.setScissor(
-        gridX * resolution,
-        gridY * resolution,
-        resolution,
-        resolution,
-      );
-      this.renderer.setScissorTest(true);
+      // Render into the atlas cell. Viewport and scissor are set on the render
+      // target (in physical pixels): the renderer's setViewport/setScissor scale
+      // by the device pixel ratio, which misplaces the cells on HiDPI screens.
+      const cellX = gridX * resolution;
+      const cellY = gridY * resolution;
+      atlasTarget.viewport.set(cellX, cellY, resolution, resolution);
+      atlasTarget.scissor.set(cellX, cellY, resolution, resolution);
+      atlasTarget.scissorTest = true;
+      this.renderer.setRenderTarget(atlasTarget);
 
-      // Render directly into atlas
       this.renderer.render(scene, camera);
     }
 
-    // Reset viewport/scissor
-    this.renderer.setScissorTest(false);
-    this.renderer.setViewport(currentViewport);
+    // Reset the shared target, so that the next asset clears the whole atlas.
+    atlasTarget.viewport.set(0, 0, atlasWidth, atlasHeight);
+    atlasTarget.scissor.set(0, 0, atlasWidth, atlasHeight);
+    atlasTarget.scissorTest = false;
 
     this.renderer.setClearColor(originalClearColor, originalClearAlpha);
     this.renderer.setRenderTarget(null);
