@@ -68,6 +68,9 @@
 						<grant operation="Create" roles="SecurityStructure.user, SecurityStructure.superuser" inherit="true"/>
 						<grant operation="Delete" roles="SecurityStructure.user, SecurityStructure.superuser" inherit="true"/>
 					</module>
+
+					<!-- Transient form types of the UI, never accessed as persistent objects. -->
+					<module name="tl.threed.demo.ui" internal="true"/>
 				</security-config>
 			</instance>
 		</config>
