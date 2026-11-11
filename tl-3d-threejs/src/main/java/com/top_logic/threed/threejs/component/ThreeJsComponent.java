@@ -163,7 +163,7 @@ public class ThreeJsComponent extends BuilderComponent
 
 		@Override
 		@ItemDefault(CP.class)
-		PolymorphicConfiguration<LayoutControlProvider> getComponentControlProvider();
+		PolymorphicConfiguration<? extends LayoutControlProvider> getComponentControlProvider();
 
 		@Override
 		@BooleanDefault(true)
