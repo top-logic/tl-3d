@@ -72,31 +72,6 @@
 			<view name="admin/technical/index.layout.xml#adminTechnicalView">
 				<commandGroup name="Read"/>
 			</view>
-			<view name="com.top_logic.bpe.app/processCockpit/cockpitTab.layout.xml#TabLayout">
-				<commandGroup name="Read"/>
-			</view>
-			<view name="com.top_logic.bpe.app/processCockpit/contextListContext.layout.xml#ContextList">
-				<commandGroup name="Read"/>
-			</view>
-			<view name="com.top_logic.bpe.app/processCockpit/currentTasks/currentTasksTileLayout.layout.xml#TileLayout">
-				<commandGroup name="Read"/>
-			</view>
-			<view name="com.top_logic.bpe.app/processCockpit/currentTasks/tasksTable.layout.xml#ContextTable">
-				<commandGroup name="Read"/>
-				<commandGroup name="Write"/>
-			</view>
-			<view name="com.top_logic.bpe.app/processCockpit/myProcesses/myProcessesTileLayout.layout.xml#TileLayout">
-				<commandGroup name="Read"/>
-			</view>
-			<view name="com.top_logic.bpe.app/processCockpit/myProcesses/processesTable.layout.xml#ContextTable">
-				<commandGroup name="Create"/>
-				<commandGroup name="Read"/>
-				<commandGroup name="Write"/>
-			</view>
-			<view name="com.top_logic.bpe.app/processCockpit/startProcessRun/startProcessRunObjects.layout.xml#TileLayout">
-				<commandGroup name="Create"/>
-				<commandGroup name="Read"/>
-			</view>
 			<view name="com.top_logic.contact/admin/companyContacts/companyContactView.layout.xml#companyContactView">
 				<commandGroup name="Create"/>
 				<commandGroup name="Delete"/>
@@ -285,13 +260,6 @@
 			<view name="reporting/flex/chart/chartDetailsDialog.layout.xml#ChartDetailsTableDialog">
 				<commandGroup name="Export"/>
 				<commandGroup name="Read"/>
-			</view>
-			<view name="tl-bpe-modeler/editor/workflowAdminView.layout.xml#workflowAdminView">
-				<commandGroup name="Create"/>
-				<commandGroup name="Delete"/>
-				<commandGroup name="Export"/>
-				<commandGroup name="Read"/>
-				<commandGroup name="Write"/>
 			</view>
 		</profile>
 		<profile name="SecurityStructure.user">

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<!--
+	Removes the parts of the process engine and the stored reports from the database, after the
+	demo no longer depends on tl-bpe-app (and with it tl-bpe, tl-bpe-modeler and tl-reporting).
+
+	Without this migration the application does not start any more: the persistent schema still
+	binds the table StoredReport to the class com.top_logic.reporting.report.wrap.StoredReport,
+	which is no longer on the class path.
+
+	The demo never used workflows; all tables dropped here were empty when this migration was
+	written. Types of other modules do not reference types of the deleted modules.
+-->
+<migration config:interface="com.top_logic.knowledge.service.migration.MigrationConfig"
+	xmlns:config="http://www.top-logic.com/ns/config/6.0"
+>
+	<version name="Issue_28_remove_tl_bpe_app"
+		module="tl-3d-demo"
+	/>
+	<dependencies>
+		<!--
+			Latest versions of the engine modules (TopLogic 8.0.0-alpha12). The module tl-bpe is not
+			listed, because it is no longer part of the application.
+		-->
+		<dependency name="Ticket_29492_enlarge_layout_key"
+			module="tl"
+		/>
+		<dependency name="Ticket_29852_binary_attribute_values"
+			module="tl-element"
+		/>
+		<dependency name="Ticket_28710_Added_TLSearch"
+			module="tl-model-search"
+		/>
+		<dependency name="Ticket_29741_hide_anonymous_in_options"
+			module="tl-contact"
+		/>
+		<dependency name="Ticket_29092_multi_factor_authentication"
+			module="tl-layout-formeditor"
+		/>
+		<dependency name="Ticket_29410_filename_binary"
+			module="tl-model-wysiwyg"
+		/>
+		<dependency name="Ticket_28604_changelog"
+			module="tl-doc"
+		/>
+		<dependency name="Ticket_27736_Upgrade_layout"
+			module="tl-monitoring"
+		/>
+		<dependency name="Ticket_27442_Update_lucene_version_to_8_11_2"
+			module="tl-search-lucene"
+		/>
+	</dependencies>
+	<pre-processors>
+		<!--
+			Drops the tables and removes them from the persistent schema. Specializations first.
+			The abstract table BPItem has no database table and therefore is removed below.
+		-->
+		<processor class="com.top_logic.knowledge.service.migration.DeleteTableProcessor">
+			<tables>
+				<table object_name="BPNode"/>
+				<table object_name="BPEdge"/>
+				<table object_name="BPFlow"/>
+				<table object_name="BPCollaboration"/>
+				<table object_name="BPAnnotation"/>
+				<table object_name="BPAssociation"/>
+				<table object_name="BPExecution"/>
+				<table object_name="BPEntity"/>
+				<table object_name="BPElement"/>
+				<table object_name="StoredReport"/>
+			</tables>
+		</processor>
+
+		<!--
+			Removes the abstract table BPItem from the persistent schema. Otherwise it is recovered
+			as lost table into WEB-INF/autoconf/inapp-schema-N.*.
+
+			Workaround for TopLogic Ticket #30184: up to 8.0.0-alpha12, DeleteTableProcessor executes
+			DROP TABLE also for abstract tables, which fails because they have no database table.
+			Migrations for a TopLogic version containing the fix of #30184 can list abstract tables
+			directly in the DeleteTableProcessor instead.
+		-->
+		<processor class="com.top_logic.knowledge.service.db2.migration.processor.XsltTableDefinitionBaselineProcessor"
+			transform="/WEB-INF/kbase/migration/tl-3d-demo/Issue_28_remove_tl_bpe_app.schema.xslt"
+		/>
+
+		<!-- Deletes the model modules including their types, parts and generalizations. -->
+		<delete-module name="tl.bpe.app"/>
+		<delete-module name="tl.bpe.execution"/>
+		<delete-module name="tl.bpe.bpml"/>
+	</pre-processors>
+</migration>

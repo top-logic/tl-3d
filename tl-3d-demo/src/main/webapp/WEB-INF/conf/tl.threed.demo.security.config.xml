@@ -5,7 +5,7 @@
 
 	Role source: The roles "SecurityStructure.user" and "SecurityStructure.superuser" are assigned
 	to the groups "user" and "superuser" on the security root "SecurityStructure#ROOT" (singleton
-	rules from tl-bpe-app). The objects of the TL-3D model have no role of their own. All TL-3D
+	rules from tl-element). The objects of the TL-3D model have no role of their own. All TL-3D
 	types are implemented by StructuredElementWrapper subclasses, which ignore configured
 	security parents (role parents). Therefore, inheritance rules pass the roles from the security
 	root to all objects of the TL-3D types.
