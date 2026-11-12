@@ -23,6 +23,7 @@ import {
 
 import {
   applyColorToObject,
+  disposeMaterial,
   toMatrix,
   toTX,
   transform,
@@ -33,6 +34,7 @@ import { InstancedMeshManager } from "./InstancedMeshManager.js";
 import { ImpostorManager } from "./ImpostorManager.js";
 
 import { GLTFLoader } from "GLTFLoader";
+import { mergeGeometries } from "BufferGeometryUtils";
 import { DRACOLoader } from "DRACOLoader";
 import { InsertElement, RemoveElement, SetProperty } from "./Commands.js";
 
@@ -50,6 +52,95 @@ export function gltfUrlOf(ctrl, asset) {
   } else {
     return null;
   }
+}
+
+/**
+ * Inverse of the layout point transformation of the given asset, or null if it has none.
+ *
+ * The normal rendering moves the model by this matrix (see GltfAsset.build), so that the
+ * layout point of the asset lies at the origin of the part.
+ */
+export function layoutPointInverse(asset) {
+  const transform = asset?.layoutPoint?.transform;
+  return transform ? toMatrix(transform).invert() : null;
+}
+
+/**
+ * Builds the geometry and material for rendering the given GLTF instanced, so that it looks
+ * like the normal rendering of the asset (GltfAsset.build / setGLTF):
+ *
+ * - all meshes of the GLTF are merged into one geometry, each transformed by its world matrix
+ *   within the GLTF scene, with one geometry group and material per mesh,
+ * - the inverse of the layout point of the asset is applied.
+ *
+ * Returns {geometry, material, triangleCount} (material is an array for several meshes), or
+ * null if the GLTF has no mesh. The geometry is new; the materials are the ones of the GLTF
+ * (the InstancedMeshManager clones them).
+ */
+function instanceTemplate(gltf, asset, assetKey) {
+  const meshes = [];
+  gltf.scene.updateMatrixWorld(true);
+  gltf.scene.traverse((obj) => {
+    if (obj.isMesh) {
+      meshes.push(obj);
+    }
+  });
+  if (meshes.length === 0) {
+    return null;
+  }
+
+  const layoutInverse = layoutPointInverse(asset);
+  const toModel = (mesh) => {
+    const matrix = mesh.matrixWorld.clone();
+    if (layoutInverse) {
+      matrix.premultiply(layoutInverse);
+    }
+    return matrix;
+  };
+  // GLTFLoader creates one mesh per primitive, so a mesh has a single material.
+  const materialOf = (mesh) =>
+    Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+
+  let geometry;
+  let material;
+  if (meshes.length === 1) {
+    geometry = meshes[0].geometry.clone().applyMatrix4(toModel(meshes[0]));
+    material = materialOf(meshes[0]);
+  } else {
+    // mergeGeometries needs the same attributes and indexing in all geometries.
+    const names = Object.keys(meshes[0].geometry.attributes).filter((name) =>
+      meshes.every((mesh) => mesh.geometry.attributes[name] !== undefined),
+    );
+    const indexed = meshes.every((mesh) => mesh.geometry.index !== null);
+    const parts = meshes.map((mesh) => {
+      let part = mesh.geometry.clone();
+      if (!indexed && part.index !== null) {
+        part = part.toNonIndexed();
+      }
+      for (const name of Object.keys(part.attributes)) {
+        if (!names.includes(name)) {
+          part.deleteAttribute(name);
+        }
+      }
+      part.morphAttributes = {};
+      return part.applyMatrix4(toModel(mesh));
+    });
+    geometry = mergeGeometries(parts, true);
+    parts.forEach((part) => part.dispose());
+    if (geometry == null) {
+      console.warn(
+        `Cannot merge the ${meshes.length} meshes of ${assetKey}, instancing shows only the first one.`,
+      );
+      geometry = meshes[0].geometry.clone().applyMatrix4(toModel(meshes[0]));
+      material = materialOf(meshes[0]);
+    } else {
+      material = meshes.map(materialOf);
+    }
+  }
+
+  const triangleCount =
+    (geometry.index ? geometry.index.count : geometry.attributes.position.count) / 3;
+  return { geometry, material, triangleCount };
 }
 
 export class Scope {
@@ -249,26 +340,12 @@ export class Scope {
         continue;
       }
 
-      // Get the first mesh from the GLTF to use as template
-      let templateMesh = null;
-      gltf.scene.traverse((obj) => {
-        if (obj.isMesh && !templateMesh) {
-          templateMesh = obj;
-        }
-      });
-
-      if (!templateMesh) {
+      const template = instanceTemplate(gltf, asset, assetKey);
+      if (!template) {
         console.warn(`No mesh found in GLTF for ${assetKey}`);
         continue;
       }
-
-      // Calculate actual triangle count
-      let triangleCount = 0;
-      if (templateMesh.geometry.index) {
-        triangleCount = templateMesh.geometry.index.count / 3;
-      } else if (templateMesh.geometry.attributes.position) {
-        triangleCount = templateMesh.geometry.attributes.position.count / 3;
-      }
+      const { geometry: templateGeometry, material: templateMaterial, triangleCount } = template;
 
       // Get the old placeholder mesh from the manager
       const oldMeshData = this.instanceManager.managedMeshes.get(assetKey);
@@ -284,7 +361,7 @@ export class Scope {
 
       // Dispose old placeholder resources
       oldMesh.geometry.dispose();
-      oldMesh.material.dispose();
+      disposeMaterial(oldMesh.material);
 
       // Prepare instance data with IDs and matrices
       const instanceData = group.instances.map((instance, index) => ({
@@ -296,12 +373,14 @@ export class Scope {
       // Create new InstancedMesh with real geometry using the manager
       const newInstancedMesh = this.instanceManager.createInstancedMesh(
         assetKey,
-        templateMesh.geometry,
-        templateMesh.material.clone(),
+        templateGeometry,
+        templateMaterial,
         group.instances.length,
         instanceData,
         triangleCount,
       );
+      // The manager copies the geometry into an instanced geometry.
+      templateGeometry.dispose();
 
       // Copy over important userData
       newInstancedMesh.userData.isInstancedMesh = true;
@@ -576,7 +655,7 @@ export class Scope {
       const gltfUrl = gltfUrlOf(ctrl, group.asset);
       const gltf = gltfUrl ? this.gltfs[gltfUrl] : null;
       if (gltf) {
-        entries.push([gltfUrl, gltf]);
+        entries.push([gltfUrl, gltf, layoutPointInverse(group.asset)]);
       }
     }
 
@@ -584,8 +663,8 @@ export class Scope {
 
     for (let i = 0; i < entries.length; i += batchSize) {
       const batch = entries.slice(i, i + batchSize);
-      for (const [url, gltf] of batch) {
-        impostorManager.generateImpostorForAsset(url, gltf);
+      for (const [url, gltf, layoutInverse] of batch) {
+        impostorManager.generateImpostorForAsset(url, gltf, layoutInverse);
       }
       // Yield to the browser between batches so GC can run and the UI stays responsive
       if (i + batchSize < entries.length) {

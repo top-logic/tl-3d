@@ -26,6 +26,7 @@ import {
 } from "three";
 
 import { SELECTION_COLOR } from "./Constants.js";
+import { disposeMaterial } from "./ThreeJsUtils.js";
 
 export class InstancedMeshManager {
   constructor() {
@@ -75,7 +76,7 @@ export class InstancedMeshManager {
     if (existingData) {
       existingData.matrixTexture?.dispose();
       existingData.geometry?.dispose();
-      existingData.mesh.material?.dispose();
+      disposeMaterial(existingData.mesh.material);
     }
 
     // Calculate optimal texture dimensions
@@ -106,13 +107,18 @@ export class InstancedMeshManager {
 
     // Convert material to use our matrix lookup shader
     const selectionColor = new Color(SELECTION_COLOR);
-    const customMaterial = this.createMatrixLookupMaterial(
-      baseMaterial,
-      matrixTexture,
-      textureWidth,
-      textureHeight,
-      selectionColor,
-    );
+    // An array of materials (one per geometry group) is converted element-wise.
+    const toLookupMaterial = (material) =>
+      this.createMatrixLookupMaterial(
+        material,
+        matrixTexture,
+        textureWidth,
+        textureHeight,
+        selectionColor,
+      );
+    const customMaterial = Array.isArray(baseMaterial)
+      ? baseMaterial.map(toLookupMaterial)
+      : toLookupMaterial(baseMaterial);
 
     // Create regular Mesh with instanced geometry (not InstancedMesh)
     const mesh = new Mesh(instancedGeometry, customMaterial);
@@ -934,7 +940,7 @@ export class InstancedMeshManager {
     for (const [assetKey, data] of this.managedMeshes) {
       data.matrixTexture?.dispose();
       data.mesh.geometry.dispose();
-      data.mesh.material.dispose();
+      disposeMaterial(data.mesh.material);
     }
     this.managedMeshes.clear();
   }

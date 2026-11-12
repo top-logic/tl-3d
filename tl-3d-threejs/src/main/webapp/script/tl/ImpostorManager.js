@@ -207,7 +207,11 @@ export class ImpostorManager {
     this._sharedTarget = null;
   }
 
-  generateImpostorForAsset(assetKey, gltf) {
+  /**
+   * @param layoutInverse Inverse of the layout point transformation of the asset (moves the
+   *        model as in the normal rendering), or null.
+   */
+  generateImpostorForAsset(assetKey, gltf, layoutInverse = null) {
     // Dispose old data if this asset was previously captured
     const existingData = this.impostorData.get(assetKey);
     if (existingData?.colorTexture) {
@@ -216,6 +220,9 @@ export class ImpostorManager {
 
     // Clone model
     const modelClone = gltf.scene.clone();
+    if (layoutInverse) {
+      modelClone.applyMatrix4(layoutInverse);
+    }
     modelClone.updateMatrixWorld(true);
 
     // Compute bounding box and sphere

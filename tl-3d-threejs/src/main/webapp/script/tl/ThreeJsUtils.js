@@ -27,6 +27,17 @@ import {
   WHITE,
 } from "./Constants.js";
 
+/**
+ * Disposes a material or an array of materials (one per geometry group).
+ */
+export function disposeMaterial(material) {
+  if (Array.isArray(material)) {
+    material.forEach((m) => m.dispose());
+  } else {
+    material?.dispose();
+  }
+}
+
 export function applyColorToObject(object, colorString) {
   const color = new Color(colorString);
 
