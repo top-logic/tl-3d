@@ -57,6 +57,7 @@ import {
   WHITE,
   WIDTH_SEGMENTS,
   YELLOW,
+  ZOOM_SPEED,
   _90_DEGREE,
 } from "./Constants.js";
 
@@ -208,13 +209,6 @@ class ThreeJsControl {
       this.onMouseDown(event),
     );
     this.canvas.addEventListener("mouseup", (event) => this.onMouseUp(event));
-    this.container.addEventListener(
-      "wheel",
-      (event) => this.onMouseWheel(event),
-      {
-        passive: false,
-      },
-    );
 
     // Create a MutationObserver to detect DOM changes that might affect layout
     this.mutationObserver = new MutationObserver(() => {
@@ -237,7 +231,9 @@ class ThreeJsControl {
   initControls() {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.reset();
+    // Zooming with the mouse wheel is done by the OrbitControls only.
     this.controls.enableZoom = true;
+    this.controls.zoomSpeed = ZOOM_SPEED;
     this.controls.screenSpacePanning = true;
 
     this.controlsIsUpdating = false;
@@ -1560,25 +1556,6 @@ class ThreeJsControl {
       const delta = currentZUpLocal.multiply(startMatrix.clone().invert());
       this.applyDeltaToInstanceSnapshots(delta, snap);
     }
-  }
-
-  onMouseWheel(event) {
-    event.preventDefault();
-
-    const target = this.controls.target;
-    const position = this.camera.position;
-
-    const offset = new Vector3();
-    offset.copy(position);
-    offset.sub(target);
-
-    const factor = event.deltaY < 0 ? 0.888888889 : 1.125;
-    offset.multiplyScalar(factor);
-    offset.add(target);
-
-    this.camera.position.copy(offset);
-
-    this.renderManager.onCameraMove();
   }
 
   /**

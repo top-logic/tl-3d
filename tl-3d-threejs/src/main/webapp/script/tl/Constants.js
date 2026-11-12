@@ -54,3 +54,9 @@ export const CLICK_MAX_DURATION = 500;
 
 /** Maximum distance (px) the pointer may move between pressing and releasing for a click. */
 export const CLICK_MAX_MOVE = 5;
+
+/**
+ * Zoom speed of the mouse wheel (OrbitControls.zoomSpeed): a wheel step changes the camera
+ * distance by about 5 % with 1 (the three.js default), about 10 % with 2.
+ */
+export const ZOOM_SPEED = 1;
