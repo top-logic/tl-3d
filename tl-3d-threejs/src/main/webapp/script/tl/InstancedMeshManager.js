@@ -11,6 +11,7 @@
 import {
   Box3,
   BoxGeometry,
+  BufferGeometry,
   Color,
   DataArrayTexture,
   FloatType,
@@ -503,6 +504,60 @@ export class InstancedMeshManager {
   /**
    * Set hidden state for an instance (layer 4, B channel)
    */
+  isInstanceHidden(assetKey, instanceID) {
+    const data = this.managedMeshes.get(assetKey);
+    if (!data) return true;
+    const offset = this._getLayerPixelOffset(data, instanceID, 4);
+    return data.matrixTextureData[offset + 2] > 0;
+  }
+
+  /**
+   * Exact raycast against one instance (its geometry at its position).
+   *
+   * @param {Matrix4} parentMatrixWorld - World matrix of the group containing the instanced
+   *        meshes (the instance matrices are relative to it).
+   * @returns {{distance, partNode, assetKey, instanceID}|null} the nearest hit, or null if the
+   *          ray misses the instance or the instance is hidden.
+   */
+  raycastInstance(assetKey, instanceID, raycaster, parentMatrixWorld) {
+    const data = this.managedMeshes.get(assetKey);
+    const instance = data?.instanceData[instanceID];
+    if (!instance || this.isInstanceHidden(assetKey, instanceID)) {
+      return null;
+    }
+    if (!data.pickMesh) {
+      // The geometry of the instanced mesh has a bounding box over all instances, which would
+      // be wrong in the space of a single instance. The pick mesh shares its buffers, but has
+      // the bounding box of the base geometry.
+      const geometry = new BufferGeometry();
+      geometry.setIndex(data.geometry.index);
+      for (const [name, attribute] of Object.entries(data.geometry.attributes)) {
+        if (!attribute.isInstancedBufferAttribute) {
+          geometry.setAttribute(name, attribute);
+        }
+      }
+      for (const group of data.geometry.groups) {
+        geometry.addGroup(group.start, group.count, group.materialIndex);
+      }
+      geometry.boundingBox = data.baseBoundingBox.clone();
+      geometry.boundingSphere = geometry.boundingBox.getBoundingSphere(new Sphere());
+      data.pickMesh = new Mesh(geometry, data.mesh.material);
+    }
+    const pickMesh = data.pickMesh;
+    pickMesh.matrixWorld.multiplyMatrices(parentMatrixWorld, instance.matrix);
+    const hits = [];
+    pickMesh.raycast(raycaster, hits);
+    if (hits.length === 0) {
+      return null;
+    }
+    return {
+      distance: Math.min(...hits.map((hit) => hit.distance)),
+      partNode: instance.partNode,
+      assetKey,
+      instanceID,
+    };
+  }
+
   setInstanceHidden(assetKey, instanceID, hidden) {
     const data = this.managedMeshes.get(assetKey);
     if (!data) return;

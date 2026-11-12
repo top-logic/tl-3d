@@ -60,6 +60,27 @@ import {
   _90_DEGREE,
 } from "./Constants.js";
 
+/** Whether the given object and all its ancestors are visible. */
+function isShown(object) {
+  for (let o = object; o != null; o = o.parent) {
+    if (!o.visible) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** The selectable scene node the given 3D object belongs to, or null. */
+function selectableNodeOf(object) {
+  for (let o = object; o != null; o = o.parent) {
+    const sharedNode = o.userData?.nodeRef;
+    if (sharedNode instanceof SharedObject && sharedNode.selectable) {
+      return sharedNode;
+    }
+  }
+  return null;
+}
+
 /**
  * Initial state configuration for ThreeJsControl.
  * @typedef {Object} ThreeJsControlState
@@ -1285,41 +1306,35 @@ class ThreeJsControl {
       return; // The gizmo was used.
     }
     const raycaster = getRaycaster(event, this.camera, this.canvas);
-    const visibleObjects = this.scene.children.filter((obj) => obj.visible);
-    const intersects = raycaster.intersectObjects(visibleObjects, true);
-
-    // Check if any regular selectable hit was found
-    const hasSelectableHit = intersects.some((hit) => {
-      let candidate = hit.object;
-      while (candidate != null) {
-        const sharedNode = candidate.userData?.nodeRef;
-        if (sharedNode instanceof SharedObject && sharedNode.selectable) {
-          return true;
-        }
-        candidate = candidate.parent;
-      }
-      return false;
-    });
-
     const toggleMode = event.ctrlKey || event.metaKey;
-    if (hasSelectableHit) {
-      this.updateSelection(intersects, toggleMode);
+
+    // Nearest shown and selectable regular object. The raycaster does not check the visibility
+    // of descendants, so hidden nodes are filtered out here.
+    const visibleObjects = this.scene.children.filter((obj) => obj.visible);
+    const regularHit = raycaster
+      .intersectObjects(visibleObjects, true)
+      .find((hit) => isShown(hit.object) && selectableNodeOf(hit.object) != null);
+
+    // Nearest instance; the nearer of both is selected.
+    const instancedHit = this.raycastInstancedMeshes(raycaster);
+    if (
+      instancedHit &&
+      (!regularHit || instancedHit.distance < regularHit.distance)
+    ) {
+      this.updateSelectionInstanced(instancedHit.partNode, toggleMode);
+    } else if (regularHit) {
+      this.updateSelection([regularHit], toggleMode);
     } else {
-      // Fall back to instanced mesh raycasting
-      const instancedHit = this.raycastInstancedMeshes(raycaster);
-      if (instancedHit) {
-        this.updateSelectionInstanced(instancedHit.partNode, toggleMode);
-      } else {
-        // Clicked empty space — clear selection
-        this.updateSelection([], toggleMode);
-      }
+      // Clicked empty space — clear selection
+      this.updateSelection([], toggleMode);
     }
     this.invalidate();
   }
 
   /**
-   * Raycast against instanced meshes using octree (if available) or linear scan.
-   * Returns {partNode, assetKey, instanceID} for closest hit, or null.
+   * Raycast against instanced meshes using octree (if available) or linear scan to find
+   * candidates, which are then tested exactly against their geometry.
+   * Returns {partNode, assetKey, instanceID, distance} for the closest hit, or null.
    */
   raycastInstancedMeshes(raycaster) {
     const instanceManager = this.scope.instanceManager;
@@ -1362,21 +1377,20 @@ class ThreeJsControl {
 
     if (candidates.length === 0) return null;
 
-    // Find closest hit by distance to bounding box center
+    // Exact test against the geometry of each candidate; hidden instances are skipped.
+    this.zUpRoot.updateMatrixWorld(true);
     let closest = null;
-    let closestDist = Infinity;
-    const origin = raycaster.ray.origin;
-
     for (const candidate of candidates) {
-      const center = new Vector3();
-      candidate.boundingBox.getCenter(center);
-      const dist = center.distanceTo(origin);
-      if (dist < closestDist) {
-        closestDist = dist;
-        closest = candidate;
+      const hit = instanceManager.raycastInstance(
+        candidate.assetKey,
+        candidate.instanceID,
+        raycaster,
+        this.zUpRoot.matrixWorld,
+      );
+      if (hit && (closest == null || hit.distance < closest.distance)) {
+        closest = hit;
       }
     }
-
     return closest;
   }
 
