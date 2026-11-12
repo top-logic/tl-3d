@@ -142,6 +142,8 @@ class ThreeJsControl {
   initScene() {
     // Filled in loadScene().
     this.sceneGraph = null;
+    // Scene changes received while the scene data is loading, see loadScene().
+    this.pendingChanges = null;
     this.selection = [];
 
     this.scene = new Scene();
@@ -1703,54 +1705,15 @@ class ThreeJsControl {
 
   /** Applies the changes in the scene as received from the server. */
   applySceneChanges(changesString) {
+    if (this.sceneGraph == null) {
+      // The scene data is still loading (see loadScene()). Changes the server made after it
+      // delivered the data are applied as soon as the data is loaded; earlier changes are
+      // contained in the data.
+      this.pendingChanges?.push(changesString);
+      return;
+    }
     try {
-      const changes = JSON.parse(changesString);
-      let needsFullReload = false;
-
-      for (const change of changes) {
-        const command = change[0];
-        const cmdProps = command[1];
-
-        let cmd;
-        switch (command[0]) {
-          case "R":
-            cmd = new RemoveElement(cmdProps["id"]);
-            break;
-          case "I":
-            cmd = new InsertElement(cmdProps["id"]);
-            break;
-          case "S":
-            cmd = new SetProperty(cmdProps["id"]);
-            break;
-        }
-
-        // Only allow known safe incremental properties for SetProperty commands.
-        // Insert/Remove commands don't have a "p" key and are handled separately.
-        if (command[0] === "S") {
-          const safeIncrementalProperties = [
-            "selection",
-            "parent",
-            "hidden",
-            "color",
-            "selectable",
-            "transform",
-            "translateStepSize",
-            "rotateStepSize",
-          ];
-
-          if (!safeIncrementalProperties.includes(cmdProps["p"])) {
-            needsFullReload = true;
-          }
-        }
-        change.shift();
-        cmd.loadJson(cmdProps, change);
-        cmd.apply(this.scope);
-
-        if (cmd.needsFullReload) {
-          needsFullReload = true;
-        }
-      }
-
+      const needsFullReload = this.applySceneCommands(changesString);
       if (needsFullReload) {
         this.sceneGraph.reload(this.scope);
       } else {
@@ -1764,6 +1727,61 @@ class ThreeJsControl {
       console.error(ex);
       throw ex;
     }
+  }
+
+  /**
+   * Applies the commands of a scene change to the data model.
+   *
+   * @returns whether the 3D scene must be rebuilt completely.
+   */
+  applySceneCommands(changesString) {
+    const changes = JSON.parse(changesString);
+    let needsFullReload = false;
+
+    for (const change of changes) {
+      const command = change[0];
+      const cmdProps = command[1];
+
+      let cmd;
+      switch (command[0]) {
+        case "R":
+          cmd = new RemoveElement(cmdProps["id"]);
+          break;
+        case "I":
+          cmd = new InsertElement(cmdProps["id"]);
+          break;
+        case "S":
+          cmd = new SetProperty(cmdProps["id"]);
+          break;
+      }
+
+      // Only allow known safe incremental properties for SetProperty commands.
+      // Insert/Remove commands don't have a "p" key and are handled separately.
+      if (command[0] === "S") {
+        const safeIncrementalProperties = [
+          "selection",
+          "parent",
+          "hidden",
+          "color",
+          "selectable",
+          "transform",
+          "translateStepSize",
+          "rotateStepSize",
+        ];
+
+        if (!safeIncrementalProperties.includes(cmdProps["p"])) {
+          needsFullReload = true;
+        }
+      }
+      change.shift();
+      cmd.loadJson(cmdProps, change);
+      cmd.apply(this.scope);
+
+      if (cmd.needsFullReload) {
+        needsFullReload = true;
+      }
+    }
+    return needsFullReload;
   }
 
   /** Changes the selected state of the given shared node to the given value. */
@@ -2057,9 +2075,20 @@ class ThreeJsControl {
 
   async loadScene() {
     const dataResponse = await fetch(this.dataUrl);
+    // The server has delivered the data: it contains all changes made so far, later changes are
+    // sent as sceneChanged and must be applied to the data once it is loaded.
+    this.pendingChanges = [];
     const dataJson = await dataResponse.json();
 
     this.sceneGraph = this.scope.loadJson(dataJson);
+
+    // Without an await in between, so that no further change can come in meanwhile. The 3D scene
+    // is built afterwards, so the commands only need to change the data model.
+    const pendingChanges = this.pendingChanges;
+    this.pendingChanges = null;
+    for (const changes of pendingChanges) {
+      this.applySceneCommands(changes);
+    }
 
     // Analyse for instancing
     this.scope.analyzeForInstancing(this);
