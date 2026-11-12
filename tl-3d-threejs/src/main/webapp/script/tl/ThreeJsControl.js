@@ -101,7 +101,6 @@ class ThreeJsControl {
    * @param {ThreeJsControlState} initialState - Initial state configuration.
    */
   constructor(initialState) {
-    this.lastSelectedObject = null;
     this.prevClosestSnappingPoint = null;
     this.controlId = initialState.controlId;
     this.contextPath = initialState.contextPath;
@@ -237,6 +236,10 @@ class ThreeJsControl {
     this.controls.screenSpacePanning = true;
 
     this.controlsIsUpdating = false;
+
+    // The user takes over the camera: stop a running flight (zoomToSelection, zoomOut),
+    // which would otherwise move the camera back.
+    this.controls.addEventListener("start", () => this.stopCameraAnimation());
 
     this.controls.addEventListener("change", () => {
       if (this.navigationCube) {
@@ -1232,7 +1235,6 @@ class ThreeJsControl {
     if (this.lastSelectedBoxHelper) {
       this.scene.remove(this.lastSelectedBoxHelper);
       this.lastSelectedBoxHelper = null;
-      this.lastSelectedObject = null;
     }
   }
 
@@ -1622,54 +1624,44 @@ class ThreeJsControl {
 
     const maxSize = Math.max(size.x, size.y);
     const fov = this.camera.fov * (Math.PI / 180);
-    let targetDistance = maxSize / 2 / Math.tan(fov / 2);
+    // Distance from the front of the bounding box at which its width and height fit into the
+    // view; the camera looks along -z.
+    const targetDistance = maxSize / 2 / Math.tan(fov / 2);
+    const targetPositionZ = center.z + size.z / 2 + targetDistance;
 
-    const targetPositionZ = targetDistance + center.z;
-    const offset = new Vector3(0, 0, 0);
-    const targetZoomInPosition = center.clone().add(offset);
+    this.stopCameraAnimation();
+    gsap.to(this.controls.object.position, {
+      x: center.x,
+      y: center.y + 2000,
+      z: targetPositionZ,
+      duration: CAMERA_MOVE_DURATION,
+      ease: "power3.inOut",
+      onUpdate: () => {
+        this.controls.update();
+        this.invalidate();
+      },
+    });
 
-    const controlsObjectPositionMatches =
-      this.controls.object.position.x === targetZoomInPosition.x &&
-      this.controls.object.position.y === targetZoomInPosition.y &&
-      this.controls.object.position.z === targetPositionZ;
-
-    const controlsTargetMatches =
-      this.controls.target.x === center.x &&
-      this.controls.target.y === center.y &&
-      this.controls.target.z === center.z;
-
-    if (!controlsObjectPositionMatches && !controlsTargetMatches) {
-      gsap.to(this.controls.object.position, {
-        x: center.x,
-        y: center.y + 2000,
-        z: targetPositionZ,
-        duration: CAMERA_MOVE_DURATION,
-        ease: "power3.inOut",
-        onUpdate: () => {
-          this.controls.update();
-          this.invalidate();
-        },
-        onComplete: () => {
-          this.lastSelectedObject = selected.node;
-          this.controls.enableDamping = true;
-          this.controls.update();
-          this.invalidate();
-        },
-      });
-
-      gsap.to(this.controls.target, {
-        x: center.x,
-        y: center.y,
-        z: center.z,
-        duration: CAMERA_MOVE_DURATION,
-        ease: "power3.inOut",
-        onUpdate: () => {
-          this.controls.update();
-          this.invalidate();
-        },
-      });
-    }
+    gsap.to(this.controls.target, {
+      x: center.x,
+      y: center.y,
+      z: center.z,
+      duration: CAMERA_MOVE_DURATION,
+      ease: "power3.inOut",
+      onUpdate: () => {
+        this.controls.update();
+        this.invalidate();
+      },
+    });
     this.invalidate();
+  }
+
+  /**
+   * Stops a running camera flight (zoomToSelection, zoomOut), so that a new one does not run
+   * against it.
+   */
+  stopCameraAnimation() {
+    gsap.killTweensOf([this.controls.object.position, this.controls.target]);
   }
 
   zoomOut() {
@@ -1687,6 +1679,7 @@ class ThreeJsControl {
     const fov = this.camera.fov * (Math.PI / 180);
     const distance = maxSize / 2 / Math.tan(fov / 2);
 
+    this.stopCameraAnimation();
     const targetZoomOutPosition = new Vector3(
       center.x + 12000, // for looking a bit at the right side
       center.y + 12000, // for looking a bit from the top
@@ -1716,7 +1709,6 @@ class ThreeJsControl {
         this.invalidate();
       },
       onComplete: () => {
-        this.lastSelectedObject = null;
         this.controls.update();
         this.invalidate();
       },
