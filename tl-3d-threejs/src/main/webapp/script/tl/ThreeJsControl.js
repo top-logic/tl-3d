@@ -43,6 +43,8 @@ import {
 import {
   CAMERA_MOVE_DURATION,
   C_P_RADIUS,
+  CLICK_MAX_DURATION,
+  CLICK_MAX_MOVE,
   GREEN,
   GRID_SMALL_CELL,
   GRID_SNAP_THRESHOLD,
@@ -499,6 +501,11 @@ class ThreeJsControl {
       "dragging-changed",
       updateRenderTransform,
     );
+    this.translateControls.addEventListener("dragging-changed", (event) => {
+      if (event.value) {
+        this.gizmoDragged = true;
+      }
+    });
 
     this.translateControls.addEventListener("objectChange", (event) => {
       if (event.target.dragging) {
@@ -569,6 +576,11 @@ class ThreeJsControl {
       "dragging-changed",
       updateRenderTransform,
     );
+    this.rotateControls.addEventListener("dragging-changed", (event) => {
+      if (event.value) {
+        this.gizmoDragged = true;
+      }
+    });
     this.rotateControls.addEventListener("objectChange", (event) => {
       if (event.target.dragging) {
         const selectedObject = event.target.object;
@@ -1246,14 +1258,31 @@ class ThreeJsControl {
   onMouseDown(event) {
     this.clickStart = Date.now();
     this.clickButton = event.button;
+    this.clickX = event.clientX;
+    this.clickY = event.clientY;
+    // Pressing on a handle of the gizmo starts a transformation, not a click on the object
+    // behind it. The handle under the pointer is known from the preceding hover.
+    this.clickOnGizmo =
+      this.translateControls?.axis != null || this.rotateControls?.axis != null;
+    this.gizmoDragged = false;
   }
 
   onMouseUp(event) {
     if (this.clickButton != 0) {
       return; // Not click with middle mouse button.
     }
-    if (Date.now() - this.clickStart > 500) {
+    if (Date.now() - this.clickStart > CLICK_MAX_DURATION) {
       return; // Not a click.
+    }
+    const moved = Math.hypot(
+      event.clientX - this.clickX,
+      event.clientY - this.clickY,
+    );
+    if (moved > CLICK_MAX_MOVE) {
+      return; // The view was dragged.
+    }
+    if (this.clickOnGizmo || this.gizmoDragged) {
+      return; // The gizmo was used.
     }
     const raycaster = getRaycaster(event, this.camera, this.canvas);
     const visibleObjects = this.scene.children.filter((obj) => obj.visible);

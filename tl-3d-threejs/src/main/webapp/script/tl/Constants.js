@@ -48,3 +48,9 @@ export const INSTANCING_MIN_COPIES = 10;
 // When an incremental update adds more children than this, trigger a full
 // reload so analyzeForInstancing can fold them into instanced groups.
 export const INCREMENTAL_ADD_RELOAD_THRESHOLD = 25;
+
+/** Maximum time (ms) between pressing and releasing the mouse button for a click. */
+export const CLICK_MAX_DURATION = 500;
+
+/** Maximum distance (px) the pointer may move between pressing and releasing for a click. */
+export const CLICK_MAX_MOVE = 5;
