@@ -66,6 +66,20 @@ export function layoutPointInverse(asset) {
 }
 
 /**
+ * Key of the instancing group of the given asset: the URL its GLTF is loaded from and, if
+ * present, its layout point. Assets with the same key are rendered identically and can share
+ * one instanced mesh (and impostor). Null if the asset has no GLTF.
+ */
+function instanceKey(ctrl, asset) {
+  const gltfUrl = gltfUrlOf(ctrl, asset);
+  if (gltfUrl == null) {
+    return null;
+  }
+  const layoutTransform = asset.layoutPoint?.transform;
+  return layoutTransform ? gltfUrl + "#layout=" + layoutTransform.join(",") : gltfUrl;
+}
+
+/**
  * Builds the geometry and material for rendering the given GLTF instanced, so that it looks
  * like the normal rendering of the asset (GltfAsset.build / setGLTF):
  *
@@ -161,9 +175,14 @@ export class Scope {
 
   /**
    * Analyse the scene graph to find duplicate assets that should be instanced
-   * @returns {Map} Map of assetKey -> {asset, instances[]}
+   *
+   * The instancing marks of all part nodes (willBeInstanced, assetKey, instanceID) are
+   * recomputed: nodes survive a reload of the scene, and a node whose asset is no longer
+   * instanced must be built normally again.
+   *
+   * @returns {Map} Map of assetKey -> {asset, instances[]}, see instanceKey()
    */
-  analyzeForInstancing() {
+  analyzeForInstancing(ctrl) {
     const instanceGroups = new Map();
 
     const collectPartNodes = (node, parentTransform = new Matrix4()) => {
@@ -175,10 +194,12 @@ export class Scope {
       }
 
       if (node instanceof PartNode) {
-        const asset = node.asset;
-        const assetKey =
-          asset.url || (asset.dynamicImage ? asset.dynamicImage.imageID : null);
+        node.willBeInstanced = false;
+        node.assetKey = null;
+        node.instanceID = null;
 
+        const asset = node.asset;
+        const assetKey = instanceKey(ctrl, asset);
         if (!assetKey) return;
 
         if (!instanceGroups.has(assetKey)) {
@@ -393,7 +414,7 @@ export class Scope {
       ctrl.zUpRoot.add(newInstancedMesh);
 
       if (ctrl.impostorManager) {
-        const impostorData = ctrl.impostorManager.impostorData.get(gltfUrl);
+        const impostorData = ctrl.impostorManager.impostorData.get(assetKey);
 
         if (impostorData) {
           const {
@@ -655,7 +676,7 @@ export class Scope {
       const gltfUrl = gltfUrlOf(ctrl, group.asset);
       const gltf = gltfUrl ? this.gltfs[gltfUrl] : null;
       if (gltf) {
-        entries.push([gltfUrl, gltf, layoutPointInverse(group.asset)]);
+        entries.push([assetKey, gltf, layoutPointInverse(group.asset)]);
       }
     }
 
@@ -663,8 +684,8 @@ export class Scope {
 
     for (let i = 0; i < entries.length; i += batchSize) {
       const batch = entries.slice(i, i + batchSize);
-      for (const [url, gltf, layoutInverse] of batch) {
-        impostorManager.generateImpostorForAsset(url, gltf, layoutInverse);
+      for (const [assetKey, gltf, layoutInverse] of batch) {
+        impostorManager.generateImpostorForAsset(assetKey, gltf, layoutInverse);
       }
       // Yield to the browser between batches so GC can run and the UI stays responsive
       if (i + batchSize < entries.length) {
@@ -889,7 +910,7 @@ export class SceneGraph extends SharedObject {
     this.ctrl.multiTransformGroup.clear();
 
     // Re-analyse for instancing
-    scope.analyzeForInstancing();
+    scope.analyzeForInstancing(this.ctrl);
 
     this.build(this.ctrl.zUpRoot);
 

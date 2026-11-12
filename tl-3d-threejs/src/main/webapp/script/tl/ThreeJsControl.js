@@ -2064,7 +2064,7 @@ class ThreeJsControl {
     this.sceneGraph = this.scope.loadJson(dataJson);
 
     // Analyse for instancing
-    this.scope.analyzeForInstancing();
+    this.scope.analyzeForInstancing(this);
 
     this.sceneGraph.buildGraph(this);
 
