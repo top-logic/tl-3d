@@ -142,6 +142,12 @@ export class InsertElement extends ListUpdate {
           instanceEntry.partNode = newSharedObject;
         }
       }
+
+      // The instance now belongs to the new node: the old node is removed afterwards
+      // (see RemoveElement.apply) and must not hide it.
+      oldSharedObject.willBeInstanced = false;
+      oldSharedObject.assetKey = null;
+      oldSharedObject.instanceID = null;
     }
 
     // Recursively transfer for GroupNode children
@@ -171,16 +177,22 @@ export class InsertElement extends ListUpdate {
 
   /**
    * Returns a structural fingerprint for matching old children to new children.
-   * Uses node type + asset identity (for PartNodes) or child count (for GroupNodes).
+   *
+   * Uses node type + asset identity (for PartNodes) or child count (for GroupNodes),
+   * and the transformation of the node. The server sends the replacement nodes as new
+   * objects, so the transformation is what tells apart the copies of the same asset in a
+   * group: without it, removing the first of several equal parts matched the remaining
+   * parts to the wrong instances and hid the last one instead of the removed one.
    */
   static fingerprint(node) {
+    const tx = node.transform ? "@" + node.transform.join(",") : "";
     if (node.asset) {
       const key = node.asset.url || (node.asset.dynamicImage ? "dyn:" + node.asset.dynamicImage.imageID : null);
-      return "P:" + (key || "?");
+      return "P:" + (key || "?") + tx;
     } else if (node.contents) {
-      return "G:" + node.contents.length;
+      return "G:" + node.contents.length + tx;
     }
-    return "?";
+    return "?" + tx;
   }
 
   /**
@@ -301,15 +313,13 @@ export class RemoveElement extends ListUpdate {
 
     target.removeElementAt(scope, this.property, this.idx);
 
-    // Remove the 3D node from the scene if this was a non-instanced node.
+    // Remove the 3D node and hide the instances of the removed subtree.
     // When the server replaces a node (insert at idx, then remove at idx + 1, see
     // InsertElement.apply), the 3D node and the instancing data have already been
-    // transferred to the new node, so there is nothing left to clean up here.
-    if (this.property === "contents" && removedElement && removedElement.node) {
-      if (removedElement.node.parent) {
-        removedElement.node.parent.remove(removedElement.node);
-      }
-      removedElement.node = null;
+    // transferred to the new node (updateNodeReferences clears them at the old node),
+    // so only what was not transferred is cleaned up here.
+    if (this.property === "contents" && removedElement) {
+      cleanUpRemovedNode(scope, removedElement);
     }
   }
 
