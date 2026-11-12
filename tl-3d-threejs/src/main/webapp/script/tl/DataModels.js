@@ -1052,6 +1052,50 @@ export class ConnectionPoint extends SharedObject {
   }
 }
 
+/**
+ * Builds a group or part node that is shown, but has no 3D object.
+ *
+ * build() skips hidden nodes, so a node that was hidden when the scene was built has no 3D
+ * object. When it is shown later, it is built below the 3D object of its parent, with the
+ * colour inherited from its ancestors, and already loaded GLTFs replace the placeholders. If
+ * the parent has no 3D object either (because it is hidden as well), nothing happens: the
+ * node is built together with its parent.
+ */
+function buildWhenShown(node) {
+  const parent = node.parent;
+  let ctrl = null;
+  let color = null;
+  for (let ancestor = parent; ancestor; ancestor = ancestor.parent) {
+    if (ancestor instanceof SceneGraph) {
+      ctrl = ancestor.ctrl;
+      break;
+    }
+    if (color == null && ancestor.color) {
+      color = ancestor.color;
+    }
+  }
+  if (ctrl == null) {
+    return;
+  }
+  const parentGroup = parent instanceof SceneGraph ? ctrl.zUpRoot : parent?.node;
+  if (!parentGroup) {
+    return;
+  }
+
+  node.build(parentGroup, { color });
+
+  const showModels = (n) => {
+    if (n instanceof PartNode) {
+      if (n.node && n.asset?.gltf) {
+        n.asset.setGLTF(n.asset.gltf, ctrl);
+      }
+    } else if (n.contents) {
+      n.contents.forEach(showModels);
+    }
+  };
+  showModels(node);
+}
+
 export class GroupNode extends SharedObject {
   constructor(id) {
     super(id);
@@ -1133,13 +1177,17 @@ export class GroupNode extends SharedObject {
         }
         this.setInstancedChildrenColor(scope, value);
         break;
-      case "hidden":
+      case "hidden": {
+        const wasHidden = this.hidden;
         this.hidden = value;
         if (this.node) {
           this.node.visible = !value;
+        } else if (wasHidden && !value) {
+          buildWhenShown(this);
         }
         this.setInstancedChildrenHidden(scope, value);
         break;
+      }
       case "selectable":
         this.selectable = value;
         break;
@@ -1374,11 +1422,14 @@ export class PartNode extends SharedObject {
         }
         break;
       case "hidden": {
+        const wasHidden = this.hidden;
         this.hidden = value;
         if (this.willBeInstanced && this.assetKey != null) {
           scope.instanceManager.setInstanceHidden(this.assetKey, this.instanceID, value);
         } else if (this.node) {
           this.node.visible = !value;
+        } else if (wasHidden && !value) {
+          buildWhenShown(this);
         }
         break;
       }
