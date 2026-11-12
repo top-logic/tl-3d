@@ -883,6 +883,7 @@ export class SceneGraph extends SharedObject {
       }
     }
     scope.instanceManager.dispose();
+    this.ctrl.resetSceneOctree();
     this.ctrl.impostorManager?.dispose();
     this.ctrl.impostorManager = null;
 

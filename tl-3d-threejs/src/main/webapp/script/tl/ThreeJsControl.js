@@ -1757,9 +1757,7 @@ class ThreeJsControl {
         this.applyColors();
         this.applySelection(this.sceneGraph.selection);
         this.updateTransformControls();
-        if (this.sceneOctree) {
-          this.buildSceneOctree();
-        }
+        this.buildSceneOctree();
         this.invalidate();
       }
     } catch (ex) {
@@ -2129,11 +2127,25 @@ class ThreeJsControl {
 
       // Update render manager reference
       this.renderManager.setSceneOctree(this.sceneOctree);
-    }
 
-    // Tell the render manager which rendering path to use.
-    // This also resets any in-progress state.
-    this.renderManager.setUseOctree(needsOctree);
+      // Tell the render manager which rendering path to use.
+      // This also resets any in-progress state.
+      this.renderManager.setUseOctree(true);
+    } else {
+      // An octree of a former state of the scene must not be used for picking.
+      this.resetSceneOctree();
+    }
+  }
+
+  /**
+   * Drops the octree, e.g. when the scene is rebuilt: its entries refer to the former instances
+   * and part nodes. Rendering and picking use the instance data directly until
+   * buildSceneOctree() builds a new one.
+   */
+  resetSceneOctree() {
+    this.sceneOctree = null;
+    this.renderManager.setSceneOctree(null);
+    this.renderManager.setUseOctree(false);
   }
 
   /**
