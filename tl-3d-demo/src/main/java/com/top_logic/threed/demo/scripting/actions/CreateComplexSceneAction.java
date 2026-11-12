@@ -76,35 +76,66 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 		 */
 		int getNumberAssetClones();
 
+		/**
+		 * Whether each station additionally gets an asset consisting of several meshes with a
+		 * layout point.
+		 * 
+		 * <p>
+		 * Such assets are rendered differently when they are instanced (used often in a scene),
+		 * see Gitea issue #30. To compare, station 0 gets a further copy that uses an asset of its
+		 * own, which is not instanced.
+		 * </p>
+		 */
+		boolean isInstancingTestAssets();
+
 	}
-	private static final String ROBOTER_PODEST_1000MM =
-		"F1/Roboter_Podest_1000mm/Roboter_Podest_1000mm.glb";
 
-	private static final String ROBOTER_PODEST_500MM =
-		"F1/Roboter_Podest_500mm/Roboter_Podest_500mm.glb";
+	/**
+	 * Folder (below the assets folder) for the assets used by this action.
+	 */
+	private static final String TEST_FOLDER = "test/";
 
-	private static final String KR360 =
-		"F1/KR360_R2830-4_Fortec/RB_ly000005_019_arw_2014-11-26_12_39_12.294_Default.glb";
+	private static final String ROBOTER_PODEST_1000MM = TEST_FOLDER + "pedestal-1000.glb";
 
-	private static final String GEOGREIFER_GROSS =
-		"F1/Geogreifer_gross/Geogreifer_gross.glb";
+	private static final String ROBOTER_PODEST_500MM = TEST_FOLDER + "pedestal-500.glb";
 
-	private static final String ROBOTER_ACHSE =
-		"F1/Roboter_7_Achse_12000/Roboter_7_Achse_12000.glb";
+	private static final String KR360 = TEST_FOLDER + "robot.glb";
 
-	private static final String LASER_QUELLE =
-		"E4/Laserquelle_TruDisk4002/Laserquelle_TruDisk4002.glb";
+	private static final String GEOGREIFER_GROSS = TEST_FOLDER + "gripper.glb";
 
-	private static final String UEBERGANG =
-		"E4/Uebergang_inkl_Treppe/Uebergang_inkl_Treppe.glb";
+	private static final String ROBOTER_ACHSE = TEST_FOLDER + "linear-axis.glb";
 
-	private static final String SCHLEPPER_GROSS =
-		"T3/Schlepper_gross/Schlepper_gross.glb";
+	private static final String LASER_QUELLE = TEST_FOLDER + "laser-source.glb";
+
+	private static final String UEBERGANG = TEST_FOLDER + "crossing.glb";
+
+	private static final String SCHLEPPER_GROSS = TEST_FOLDER + "tractor.glb";
+
+	/**
+	 * Robot on a 500 mm pedestal: two meshes, the robot node translated by 500 mm.
+	 */
+	private static final String ROBOT_ON_PEDESTAL = TEST_FOLDER + "robot-on-pedestal.glb";
+
+	/**
+	 * Copy of {@link #ROBOT_ON_PEDESTAL} that is used only once, so that it is not instanced.
+	 */
+	private static final String ROBOT_ON_PEDESTAL_SINGLE = TEST_FOLDER + "robot-on-pedestal.single.glb";
+
+	/**
+	 * Height of the pedestal in {@link #ROBOT_ON_PEDESTAL}, i.e. the position of the robot base.
+	 */
+	private static final int PEDESTAL_HEIGHT = 500;
 
 	private static final String ASSETS_FOLDER = "/assets/";
 
+	/**
+	 * Checked-in source of the files in {@link #TEST_FOLDER}. They are copied to the assets folder
+	 * (which is not under version control) if missing there.
+	 */
+	private static final String TEST_ASSETS_SOURCE = "/WEB-INF/test-assets/";
+
 	private Asset3D _greiferGrossTmpl, _kr360Tmpl, _podest500Tmpl, _podest1000Tmpl, _laserQuelleTmpl, _uebergangTmpl,
-			_roboterAchseTmpl, _schlepperGrossTmpl;
+			_roboterAchseTmpl, _schlepperGrossTmpl, _robotOnPedestal, _robotOnPedestalSingle;
 
 	private List<Asset3D> _greiferGross = new ArrayList<>(),
 			_kr360 = new ArrayList<>(),
@@ -127,6 +158,7 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 
 	@Override
 	protected Object processInternal(ActionContext context, Object argument) throws Throwable {
+		installTestAssets();
 		_tx = PersistencyLayer.getKnowledgeBase().beginTransaction(I18NConstants.CREATED_COMPLEX_SCENE);
 		TlThreedDemoFactory factory = TlThreedDemoFactory.getInstance();
 		createAssets(factory);
@@ -134,6 +166,34 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 		_tx.commit();
 
 		return argument;
+	}
+
+	/**
+	 * Copies the checked-in test assets to the assets folder, if not yet there.
+	 */
+	private void installTestAssets() {
+		File sourceDir = FileManager.getInstance().getIDEFile(TEST_ASSETS_SOURCE);
+		File[] sources = sourceDir.listFiles((dir, name) -> name.endsWith(".glb"));
+		if (sources == null) {
+			Logger.error("No test assets found in " + sourceDir.getPath(), CreateComplexSceneAction.class);
+			return;
+		}
+		for (File source : sources) {
+			copyIfMissing(source, FileManager.getInstance().getIDEFile(ASSETS_FOLDER + TEST_FOLDER + source.getName()));
+		}
+	}
+
+	private static void copyIfMissing(File source, File target) {
+		if (target.exists() || !source.exists()) {
+			return;
+		}
+		try {
+			Files.createDirectories(target.getParentFile().toPath());
+			Files.copy(source.toPath(), target.toPath());
+		} catch (IOException ex) {
+			Logger.error("Unable to copy " + source.getPath() + " to " + target.getPath(), ex,
+				CreateComplexSceneAction.class);
+		}
 	}
 
 	private void intermediateCommit() {
@@ -169,6 +229,16 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 			.add(newConnectionPoint(factory, translate(0, 0, 1000)));
 
 		cloneAssets(factory, assetsByJTFile);
+
+		if (getConfig().isInstancingTestAssets()) {
+			_robotOnPedestal = getOrCreate(factory, assetsByJTFile, ROBOT_ON_PEDESTAL);
+			_robotOnPedestal.setLayoutPoint(newConnectionPoint(factory, translate(0, 0, PEDESTAL_HEIGHT)));
+
+			_robotOnPedestalSingle = getOrCreate(factory, assetsByJTFile, ROBOT_ON_PEDESTAL_SINGLE);
+			_robotOnPedestalSingle.setLayoutPoint(newConnectionPoint(factory, translate(0, 0, PEDESTAL_HEIGHT)));
+			copyIfMissing(FileManager.getInstance().getIDEFile(ASSETS_FOLDER + ROBOT_ON_PEDESTAL),
+				FileManager.getInstance().getIDEFile(ASSETS_FOLDER + ROBOT_ON_PEDESTAL_SINGLE));
+		}
 	}
 
 	private void cloneAssets(TlThreedDemoFactory factory, Map<String, Asset3D> assetsByJTFile) {
@@ -195,20 +265,8 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 				.forEach(assetClone.getSnappingPointsModifiable()::add);
 			assets.add(assetClone);
 			
-			File imageFile = FileManager.getInstance().getIDEFile(ASSETS_FOLDER + newName);
-			if (!imageFile.exists()) {
-				File origFile = FileManager.getInstance().getIDEFile(ASSETS_FOLDER + jtFile);
-				if (origFile.exists()) {
-					try {
-						Files.copy(origFile.toPath(), imageFile.toPath());
-					} catch (IOException ex) {
-						Logger.error(
-							"Unable to copy " + origFile.getPath() + " to " + imageFile.getPath(), ex,
-							CreateComplexSceneAction.class);
-					}
-				}
-
-			}
+			copyIfMissing(FileManager.getInstance().getIDEFile(ASSETS_FOLDER + jtFile),
+				FileManager.getInstance().getIDEFile(ASSETS_FOLDER + newName));
 		}
 	}
 
@@ -313,6 +371,18 @@ public class CreateComplexSceneAction extends AbstractApplicationActionOp<Config
 
 		Part schlepper = addPart(factory, station, "Schlepper", _schlepperGross.get(assetNr));
 		schlepper.setTx(translate(-1500, 2000, 0).after(rotateZ(Math.PI)));
+
+		if (getConfig().isInstancingTestAssets()) {
+			// The layout point lies at the robot base, so the part is placed at the pedestal
+			// height to put the pedestal on the floor.
+			Part robotOnPedestal = addPart(factory, station, "Roboter auf Podest", _robotOnPedestal);
+			robotOnPedestal.setTx(translate(14000, 0, PEDESTAL_HEIGHT));
+
+			if (name.equals("Station 0")) {
+				Part single = addPart(factory, station, "Roboter auf Podest (einzeln)", _robotOnPedestalSingle);
+				single.setTx(translate(17000, 0, PEDESTAL_HEIGHT));
+			}
+		}
 
 		return station;
 	}
