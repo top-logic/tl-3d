@@ -1045,23 +1045,22 @@ class ThreeJsControl {
     const distanceToWorkplane = Math.abs(worldPosition.y);
     const MAX_SNAP_DISTANCE = 200;
 
+    // An object released near the workplane is put onto it and snapped to the grid.
     if (distanceToWorkplane <= MAX_SNAP_DISTANCE) {
       let snapMatrix = new Matrix4();
-      const isOnWorkplane = Math.abs(worldPosition.y);
 
-      if (this.isWorkplaneVisible && this.isEditMode && isOnWorkplane) {
-        // Object is already on workplane, apply grid snapping
+      if (this.isWorkplaneVisible && this.isEditMode) {
+        // Put the object onto the workplane and snap it to the nearby grid lines.
         const snappedPosition =
           this.calculateGridSnappedPosition(worldPosition);
 
-        // Create translation to snap to grid and workplane
         snapMatrix.makeTranslation(
           snappedPosition.x - worldPosition.x,
           snappedPosition.y - worldPosition.y,
           snappedPosition.z - worldPosition.z,
         );
       } else {
-        //  Object is not on workplane yet, just snap to workplane at current X,Z
+        // Only put the object onto the workplane at its current X, Z.
         snapMatrix.makeTranslation(0, -worldPosition.y, 0);
       }
 
