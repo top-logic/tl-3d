@@ -884,6 +884,7 @@ export class SceneGraph extends SharedObject {
     }
     scope.instanceManager.dispose();
     this.ctrl.resetSceneOctree();
+    this.ctrl.instancedSnappingPoints.dispose();
     this.ctrl.impostorManager?.dispose();
     this.ctrl.impostorManager = null;
 
@@ -927,6 +928,7 @@ export class SceneGraph extends SharedObject {
 
       // Re-evaluate whether octree is needed now that real geometry is loaded
       this.ctrl.buildSceneOctree();
+      this.ctrl.refreshInstancedSnappingPoints();
 
       this.ctrl.applyColors();
       this.ctrl.applySelection(this.selection);

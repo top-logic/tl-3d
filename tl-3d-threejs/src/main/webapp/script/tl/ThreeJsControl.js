@@ -28,6 +28,7 @@ import { NavigationCube } from "./NavigationCube.js";
 import { RenderManager } from "./RenderManager.js";
 import { SceneOctree } from "./SceneOctree.js";
 import { SkyboxManager } from "./SkyboxManager.js";
+import { InstancedSnappingPoints } from "./SnappingPoints.js";
 import {
   CameraUtils,
   SceneUtils,
@@ -129,6 +130,9 @@ class ThreeJsControl {
     this.impostorManager = null;
 
     this.sceneOctree = null;
+
+    // Snapping points of instanced parts, built in edit mode.
+    this.instancedSnappingPoints = new InstancedSnappingPoints(this.zUpRoot);
 
     this.initTransformControls();
     this.initNavigationCube();
@@ -557,31 +561,9 @@ class ThreeJsControl {
         // Live preview: update instanced descendants for a single GroupNode
         this._livePreviewInstancedDescendants(selectedObject, this._instanceSnapshots);
 
-        const { closestSnappingPoint } =
-          this.throttledFindClosestSnappingPoint(selectedObject);
-
-        if (this.prevClosestSnappingPoint !== closestSnappingPoint) {
-          if (this.prevClosestSnappingPoint) {
-            this.restoreSnappingPointColor(this.prevClosestSnappingPoint);
-          }
-          if (closestSnappingPoint) {
-            closestSnappingPoint.pointMaterial.color.set(YELLOW);
-            let mesh = closestSnappingPoint.node.children[0];
-            if (mesh && mesh.isMesh) {
-              const highResGeometry = new SphereGeometry(
-                C_P_RADIUS * 1.5,
-                WIDTH_SEGMENTS,
-                HEIGHT_SEGMENTS,
-              );
-              if (!mesh.userData.originalGeometry) {
-                mesh.userData.originalGeometry = mesh.geometry;
-              }
-              mesh.geometry = highResGeometry;
-            }
-            this.invalidate();
-          }
-          this.prevClosestSnappingPoint = closestSnappingPoint;
-        }
+        this.setSnappingHighlight(
+          this.throttledFindClosestSnappingPoint(selectedObject),
+        );
       }
       this.invalidate();
     });
@@ -793,6 +775,7 @@ class ThreeJsControl {
     }
 
     this.updateConnectionPointsVisibility();
+    this.refreshInstancedSnappingPoints();
 
     this.invalidate();
   }
@@ -921,11 +904,8 @@ class ThreeJsControl {
       }
     });
 
-    if (snappableObjects.length === 0) {
-      return { closestSnappingPoint: null, closestSnappingPointObject: null };
-    }
-
     selectedObj.updateMatrixWorld(true);
+    this.zUpRoot.updateMatrixWorld(true);
 
     // find the closest pair of snapping points
     let closestDistance = SNAP_THRESHOLD;
@@ -962,10 +942,40 @@ class ThreeJsControl {
       }
     }
 
+    // Snapping points of instanced parts, except those of the dragged parts.
+    let instancedSnappingPoint = null;
+    const excludedNodes = this.selectedSceneNodes();
+    const entries = this.instancedSnappingPoints.entries;
+    const parentMatrixWorld = this.zUpRoot.matrixWorld;
+    for (let i = 0; i < entries.length; i++) {
+      if (excludedNodes.has(entries[i].partNode)) {
+        continue;
+      }
+      const position = new Vector3()
+        .setFromMatrixPosition(entries[i].matrix)
+        .applyMatrix4(parentMatrixWorld);
+      const distance = this.useScreenSpaceSnapping
+        ? this.getScreenSpaceDistance(selectedWorldPosition, position)
+        : selectedWorldPosition.distanceTo(position);
+      if (distance < closestDistance) {
+        if (this.isPositionOccupied(position, selectedObj, excludedNodes)) {
+          continue;
+        }
+        closestDistance = distance;
+        instancedSnappingPoint = i;
+        closestSnappingPoint = null;
+        closestSnappingPointObject = null;
+      }
+    }
+
     const threshold = SNAP_THRESHOLD;
     return closestDistance < threshold
-      ? { closestSnappingPoint, closestSnappingPointObject }
-      : { closestSnappingPoint: null, closestSnappingPointObject: null };
+      ? { closestSnappingPoint, closestSnappingPointObject, instancedSnappingPoint }
+      : {
+          closestSnappingPoint: null,
+          closestSnappingPointObject: null,
+          instancedSnappingPoint: null,
+        };
   }
 
   // throttled version of findClosestSnappingPoint
@@ -973,13 +983,78 @@ class ThreeJsControl {
     return this.findClosestSnappingPoint(selectedObject);
   }, 100);
 
+  /**
+   * Marks the snapping point closest to the dragged object, as found by
+   * findClosestSnappingPoint().
+   */
+  setSnappingHighlight({ closestSnappingPoint, instancedSnappingPoint }) {
+    const key =
+      closestSnappingPoint ??
+      (instancedSnappingPoint != null ? "instanced:" + instancedSnappingPoint : null);
+    if (key === this.snappingHighlightKey) {
+      return;
+    }
+    this.clearSnappingHighlight();
+    this.snappingHighlightKey = key;
+
+    if (closestSnappingPoint) {
+      closestSnappingPoint.pointMaterial.color.set(YELLOW);
+      const mesh = closestSnappingPoint.node.children[0];
+      if (mesh && mesh.isMesh) {
+        const highResGeometry = new SphereGeometry(
+          C_P_RADIUS * 1.5,
+          WIDTH_SEGMENTS,
+          HEIGHT_SEGMENTS,
+        );
+        if (!mesh.userData.originalGeometry) {
+          mesh.userData.originalGeometry = mesh.geometry;
+        }
+        mesh.geometry = highResGeometry;
+      }
+      this.prevClosestSnappingPoint = closestSnappingPoint;
+    } else if (instancedSnappingPoint != null) {
+      this.instancedSnappingPoints.highlight(instancedSnappingPoint);
+    }
+    this.invalidate();
+  }
+
   /** Removes the mark of the snapping point closest to the dragged object. */
   clearSnappingHighlight() {
     if (this.prevClosestSnappingPoint) {
       this.restoreSnappingPointColor(this.prevClosestSnappingPoint);
       this.prevClosestSnappingPoint = null;
-      this.invalidate();
     }
+    this.instancedSnappingPoints.clearHighlight();
+    this.snappingHighlightKey = null;
+    this.invalidate();
+  }
+
+  /**
+   * Rebuilds the snapping points of instanced parts in edit mode (their positions may have
+   * changed), removes them otherwise.
+   */
+  refreshInstancedSnappingPoints() {
+    if (this.isEditMode && this.sceneGraph) {
+      this.instancedSnappingPoints.rebuild(
+        this.scope.instanceManager,
+        this.sceneGraph.root,
+      );
+    } else {
+      this.instancedSnappingPoints.dispose();
+    }
+    this.snappingHighlightKey = null;
+    this.invalidate();
+  }
+
+  /** The selected scene nodes and all their descendants. */
+  selectedSceneNodes() {
+    const nodes = new Set();
+    const add = (node) => {
+      nodes.add(node);
+      node.contents?.forEach(add);
+    };
+    this.selection.forEach(add);
+    return nodes;
   }
 
   restoreSnappingPointColor(snappingPoint) {
@@ -1123,7 +1198,37 @@ class ThreeJsControl {
     // Get world position of connection point
     const position = new Vector3();
     connectionPoint.node.getWorldPosition(position);
+    return this.isPositionOccupied(
+      position,
+      excludeObject,
+      this.selectedSceneNodes(),
+    );
+  }
+
+  /**
+   * Whether a part (other than the excluded object and parts) is placed at the given world
+   * position, i.e. a snapping point there is occupied.
+   */
+  isPositionOccupied(position, excludeObject, excludedNodes) {
     const checkRadius = 50;
+
+    // Instanced parts have no 3D objects; their positions are the instance matrices.
+    const instanceManager = this.scope.instanceManager;
+    const parentMatrixWorld = this.zUpRoot.matrixWorld;
+    const instancePosition = new Vector3();
+    for (const [assetKey, data] of instanceManager.managedMeshes) {
+      if (assetKey.endsWith("_impostor")) continue;
+      for (const instance of data.instanceData) {
+        if (!instance.partNode || excludedNodes.has(instance.partNode)) continue;
+        if (instanceManager.isInstanceHidden(assetKey, instance.id)) continue;
+        instancePosition
+          .setFromMatrixPosition(instance.matrix)
+          .applyMatrix4(parentMatrixWorld);
+        if (instancePosition.distanceTo(position) < checkRadius) {
+          return true;
+        }
+      }
+    }
 
     // Find all objects near this connection point
     const nearbyObjects = [];
@@ -1162,16 +1267,25 @@ class ThreeJsControl {
 
   snapObject(selectedObj) {
     // Not throttled: the decision must be based on the position where the object was released.
-    const { closestSnappingPoint, closestSnappingPointObject } =
-      this.findClosestSnappingPoint(selectedObj);
+    const {
+      closestSnappingPoint,
+      closestSnappingPointObject,
+      instancedSnappingPoint,
+    } = this.findClosestSnappingPoint(selectedObj);
 
+    let snappingPointWorldMatrix = null;
     if (closestSnappingPoint && closestSnappingPointObject) {
       closestSnappingPointObject.updateMatrixWorld(true);
       closestSnappingPoint.node.updateMatrixWorld(true);
-      selectedObj.updateMatrixWorld(true);
+      snappingPointWorldMatrix = closestSnappingPoint.node.matrixWorld.clone();
+    } else if (instancedSnappingPoint != null) {
+      snappingPointWorldMatrix = this.instancedSnappingPoints.worldMatrix(
+        instancedSnappingPoint,
+      );
+    }
 
-      const snappingPointWorldMatrix =
-        closestSnappingPoint.node.matrixWorld.clone();
+    if (snappingPointWorldMatrix) {
+      selectedObj.updateMatrixWorld(true);
 
       // convert the world matrix to a local matrix
       if (selectedObj.parent) {
@@ -1743,6 +1857,7 @@ class ThreeJsControl {
         this.applySelection(this.sceneGraph.selection);
         this.updateTransformControls();
         this.buildSceneOctree();
+        this.refreshInstancedSnappingPoints();
         this.invalidate();
       }
     } catch (ex) {
