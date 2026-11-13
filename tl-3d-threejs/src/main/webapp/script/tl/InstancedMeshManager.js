@@ -252,12 +252,13 @@ export class InstancedMeshManager {
         ${shader.vertexShader}
       `;
 
-      // Inject instance matrix texture lookup before <begin_vertex>.
-      // This must run before <project_vertex> (which applies instanceMatrix
-      // to the position).
+      // Inject the instance matrix texture lookup at the start of main(), so that the local
+      // instanceMatrix is in effect for all instancing chunks of three.js: the normal transform
+      // (<defaultnormal_vertex>) comes before <begin_vertex> and would otherwise use the
+      // instanceMatrix attribute, which is never filled (zero matrix, NaN normals).
       shader.vertexShader = shader.vertexShader.replace(
-        "#include <begin_vertex>",
-        `
+        "void main() {",
+        `void main() {
         #ifdef USE_INSTANCING
           // Calculate 2D texture coordinates from instanceID
           float x = mod(instanceID, textureWidth);
@@ -277,8 +278,6 @@ export class InstancedMeshManager {
 
           mat4 instanceMatrix = mat4(col0, col1, col2, col3);
         #endif
-
-        #include <begin_vertex>
         `,
       );
 
