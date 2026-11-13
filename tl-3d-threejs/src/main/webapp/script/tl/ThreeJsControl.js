@@ -362,11 +362,12 @@ class ThreeJsControl {
             lastWorldMatrixes = {};
             outer._instanceSnapshots = {};
 
+            // The gizmo moves the group, not its children: the step size applies to the group.
+            object.userData.dragStartPosition = object.position.clone();
+            object.userData.dragStartRotation = object.rotation.clone();
+
             for (const node of outer.multiTransformGroup.children) {
               lastWorldMatrixes[node.id] = node.matrixWorld.clone();
-              // Store starting position and rotation for incremental snapping
-              node.userData.dragStartPosition = node.position.clone();
-              node.userData.dragStartRotation = node.rotation.clone();
 
               // Snapshot instanced descendant matrices for GroupNodes
               const sharedNode = outer.selection.find((s) => s.node === node);
@@ -379,10 +380,9 @@ class ThreeJsControl {
             return;
           }
 
-          // Apply step snapping to each object in multi-select
-          outer.multiTransformGroup.children.forEach((node) => {
-            outer.snapToStepSize(node);
-          });
+          // Apply step snapping to the movement of the group
+          outer.snapToStepSize(object);
+          object.updateMatrixWorld(true);
 
           // Apply grid snapping to each object in multi-select if both workplane and edit mode are enabled
           if (
@@ -533,10 +533,8 @@ class ThreeJsControl {
     this.translateControls.addEventListener("objectChange", (event) => {
       if (event.target.dragging) {
         const selectedObject = event.target.object;
-        // Apply step snapping to single objects
-        if (selectedObject !== this.multiTransformGroup) {
-          this.snapToStepSize(selectedObject);
-        }
+        // Apply step snapping (for a multi-selection to the group, see dragging-changed)
+        this.snapToStepSize(selectedObject);
 
         this.snapObjectToWorkplane(selectedObject);
 
@@ -607,10 +605,8 @@ class ThreeJsControl {
     this.rotateControls.addEventListener("objectChange", (event) => {
       if (event.target.dragging) {
         const selectedObject = event.target.object;
-        // Apply step snapping to single objects
-        if (selectedObject !== this.multiTransformGroup) {
-          this.snapToStepSize(selectedObject);
-        }
+        // Apply step snapping (for a multi-selection to the group, see dragging-changed)
+        this.snapToStepSize(selectedObject);
 
         if (selectedObject === this.multiTransformGroup) {
           // Live preview: update instanced descendants for GroupNodes in the multi-select
