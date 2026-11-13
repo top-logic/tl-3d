@@ -56,21 +56,37 @@ export function applyColorToObject(object, colorString) {
   });
 }
 
-// throttle function to limit how often a function can be called
+/**
+ * Limits how often a function is called: the first call is executed at once, further calls
+ * within the next `limit` milliseconds are not. The last of them is executed when the time is
+ * over, so that the final state is not lost (e.g. the final size after a series of resizes).
+ *
+ * Returns the result of the last executed call.
+ */
 export const throttle = (func, limit) => {
   let inThrottle = false;
+  let pending = null;
   let lastResult = null;
 
+  const release = () => {
+    if (pending) {
+      const { self, args } = pending;
+      pending = null;
+      lastResult = func.apply(self, args);
+      setTimeout(release, limit);
+    } else {
+      inThrottle = false;
+    }
+  };
+
   return function (...args) {
-    if (!inThrottle) {
+    if (inThrottle) {
+      pending = { self: this, args };
+    } else {
       inThrottle = true;
       lastResult = func.apply(this, args);
-
-      setTimeout(() => {
-        inThrottle = false;
-      }, limit);
+      setTimeout(release, limit);
     }
-
     return lastResult;
   };
 };

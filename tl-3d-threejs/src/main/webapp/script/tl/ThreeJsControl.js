@@ -1154,8 +1154,9 @@ class ThreeJsControl {
   }
 
   snapObject(selectedObj) {
+    // Not throttled: the decision must be based on the position where the object was released.
     const { closestSnappingPoint, closestSnappingPointObject } =
-      this.throttledFindClosestSnappingPoint(selectedObj);
+      this.findClosestSnappingPoint(selectedObj);
 
     if (closestSnappingPoint && closestSnappingPointObject) {
       closestSnappingPointObject.updateMatrixWorld(true);
