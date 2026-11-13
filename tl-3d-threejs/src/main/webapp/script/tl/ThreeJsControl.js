@@ -864,6 +864,9 @@ class ThreeJsControl {
   }
 
   toggleRotateMode(enable) {
+    // Keep the mode also outside the edit mode: the server sends it with the initial state,
+    // and updateTransformControls() picks the gizmo by it when the edit mode is switched on.
+    this.isRotateMode = enable;
     if (!this.isEditMode) {
       return;
     }
@@ -876,7 +879,6 @@ class ThreeJsControl {
       this.rotateControls.detach();
     }
 
-    this.isRotateMode = enable;
     this.updateTransformControls();
     this.invalidate();
   }
