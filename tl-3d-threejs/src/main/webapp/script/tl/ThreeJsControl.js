@@ -524,6 +524,9 @@ class ThreeJsControl {
     this.translateControls.addEventListener("dragging-changed", (event) => {
       if (event.value) {
         this.gizmoDragged = true;
+      } else {
+        // The snapping point marked while dragging is only a preview.
+        this.clearSnappingHighlight();
       }
     });
 
@@ -973,6 +976,15 @@ class ThreeJsControl {
   throttledFindClosestSnappingPoint = throttle((selectedObject) => {
     return this.findClosestSnappingPoint(selectedObject);
   }, 100);
+
+  /** Removes the mark of the snapping point closest to the dragged object. */
+  clearSnappingHighlight() {
+    if (this.prevClosestSnappingPoint) {
+      this.restoreSnappingPointColor(this.prevClosestSnappingPoint);
+      this.prevClosestSnappingPoint = null;
+      this.invalidate();
+    }
+  }
 
   restoreSnappingPointColor(snappingPoint) {
     if (!snappingPoint) return;
