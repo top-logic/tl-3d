@@ -24,6 +24,7 @@ import {
 import {
   applyColorToObject,
   disposeMaterial,
+  disposeMaterialWithTextures,
   toMatrix,
   toTX,
   transform,
@@ -481,11 +482,8 @@ export class Scope {
         gltf.scene.traverse((obj) => {
           if (obj.isMesh) {
             obj.geometry.dispose();
-            if (Array.isArray(obj.material)) {
-              obj.material.forEach((m) => m.dispose());
-            } else {
-              obj.material?.dispose();
-            }
+            // The textures of the GLTF are no longer used either.
+            disposeMaterialWithTextures(obj.material);
           }
         });
         delete this.gltfs[url];

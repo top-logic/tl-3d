@@ -38,6 +38,22 @@ export function disposeMaterial(material) {
   }
 }
 
+/**
+ * Disposes a material or an array of materials together with the textures they use (maps).
+ * Only for materials whose textures are not shared with materials still in use.
+ */
+export function disposeMaterialWithTextures(material) {
+  for (const m of Array.isArray(material) ? material : [material]) {
+    if (!m) continue;
+    for (const value of Object.values(m)) {
+      if (value?.isTexture) {
+        value.dispose();
+      }
+    }
+    m.dispose();
+  }
+}
+
 export function applyColorToObject(object, colorString) {
   const color = new Color(colorString);
 

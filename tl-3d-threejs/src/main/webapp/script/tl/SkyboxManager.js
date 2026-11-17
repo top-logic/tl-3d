@@ -19,6 +19,7 @@ import {
 import { gsap } from "gsap";
 
 import { CAMERA_MOVE_DURATION, FLOOR_PADDING, WHITE } from "./Constants.js";
+import { disposeMaterialWithTextures } from "./ThreeJsUtils.js";
 
 export class SkyboxManager {
   constructor(threeJsControl) {
@@ -155,8 +156,25 @@ export class SkyboxManager {
     this.createEnvironmentCube(texture);
   }
 
+  /** Removes a 3D object of the environment and releases its geometry, materials and maps. */
+  disposeObject(object) {
+    if (!object) return;
+    object.parent?.remove(object);
+    object.geometry?.dispose();
+    disposeMaterialWithTextures(object.material);
+  }
+
+  /** Releases the skybox and the floors. */
+  dispose() {
+    this.disposeObject(this.environmentBackground);
+    this.environmentBackground = null;
+    this.factoryFloors?.forEach((floor) => this.disposeObject(floor));
+    this.factoryFloors = [];
+  }
+
   createEnvironmentCube(cubeTexture = null) {
-    this.environmentBackground?.parent?.remove(this.environmentBackground);
+    this.disposeObject(this.environmentBackground);
+    this.environmentBackground = null;
 
     const center = new Vector3();
     this.control.boundingBox.getCenter(center);
@@ -198,13 +216,7 @@ export class SkyboxManager {
   }
 
   createFactoryFloors(cubeTexture) {
-    if (this.factoryFloors) {
-      this.factoryFloors.forEach((floor) => {
-        if (floor.parent) {
-          floor.parent.remove(floor);
-        }
-      });
-    }
+    this.factoryFloors?.forEach((floor) => this.disposeObject(floor));
     this.factoryFloors = [];
 
     // Get floor levels from scene graph

@@ -2200,6 +2200,8 @@ class ThreeJsControl {
     this.rotateControls?.dispose();
 
     this.navigationCube?.dispose();
+    this.skyboxManager?.dispose();
+    this.instancedSnappingPoints?.dispose();
     this.renderManager?.dispose();
 
     if (this.renderer) {

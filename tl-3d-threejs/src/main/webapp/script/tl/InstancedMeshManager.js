@@ -662,6 +662,15 @@ export class InstancedMeshManager {
     }
 
     const { matrixTexture, boundingBoxSize } = existingMeshData;
+
+    // Replace an impostor mesh created before for this asset.
+    const previous = this.managedMeshes.get(assetKey + "_impostor");
+    if (previous) {
+      previous.mesh.parent?.remove(previous.mesh);
+      previous.faceCornerTexture?.dispose();
+      previous.mesh.geometry.dispose();
+      disposeMaterial(previous.mesh.material);
+    }
     const textureWidth = matrixTexture.image.width;
     const textureHeight = matrixTexture.image.height;
 

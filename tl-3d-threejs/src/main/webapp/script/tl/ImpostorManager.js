@@ -364,6 +364,12 @@ export class ImpostorManager {
       UnsignedByteType,
     );
     colorTexture.needsUpdate = true;
+    // The pixels are only needed for the upload to the GPU; do not keep a copy of each atlas
+    // (7.5 MiB) in the JS heap.
+    colorTexture.onUpdate = () => {
+      colorTexture.image.data = null;
+      colorTexture.onUpdate = null;
+    };
 
     // Dispose the cloned model's materials so the renderer releases its internal
     // cache entries. Geometries are shared with the source GLTF and not disposed here.
