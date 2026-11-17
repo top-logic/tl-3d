@@ -14,6 +14,7 @@ import {
   BufferGeometry,
   Color,
   DataArrayTexture,
+  DataTexture,
   FloatType,
   FrontSide,
   InstancedBufferAttribute,
@@ -22,7 +23,6 @@ import {
   RGBAFormat,
   ShaderMaterial,
   Sphere,
-  Vector2,
   Vector3,
 } from "three";
 
@@ -243,7 +243,7 @@ export class InstancedMeshManager {
       // Add custom attribute and uniforms at the top
       shader.vertexShader = `
         attribute float instanceID;
-        uniform mediump sampler2DArray matrixTexture;
+        uniform highp sampler2DArray matrixTexture;
         uniform float textureWidth;
         uniform float textureHeight;
 
@@ -283,7 +283,7 @@ export class InstancedMeshManager {
 
       // Add fragment shader declarations
       shader.fragmentShader = `
-        uniform mediump sampler2DArray matrixTexture;
+        uniform highp sampler2DArray matrixTexture;
         uniform vec3 selectionColor;
         varying vec2 vInstanceUV;
         float instanceOpacity;
@@ -685,13 +685,17 @@ export class InstancedMeshManager {
     instancedGeometry.setAttribute("instanceID", instanceIDAttribute);
     instancedGeometry.instanceCount = instanceData.length;
 
-    // Build Vector2 array for the uniform — Three.js requires Vector2 objects for vec2 array uniforms
-    const faceCornerUVs = [];
-    for (let i = 0; i < faceCornerUVData.length; i += 2) {
-      faceCornerUVs.push(
-        new Vector2(faceCornerUVData[i], faceCornerUVData[i + 1]),
-      );
-    }
+    // The corner UVs (26 captures * 6 faces * 4 corners, 2 floats each) are passed as a
+    // texture: as a uniform array they would need 624 uniform vectors, but WebGL 2 guarantees
+    // only 224 in a fragment shader (many mobile GPUs have no more).
+    const faceCornerTexture = new DataTexture(
+      new Float32Array(faceCornerUVData),
+      faceCornerUVData.length / 4,
+      1,
+      RGBAFormat,
+      FloatType,
+    );
+    faceCornerTexture.needsUpdate = true;
 
     // Create impostor material
     const material = this.createImpostorMaterial(
@@ -704,7 +708,7 @@ export class InstancedMeshManager {
       textureHeight,
       captureOrientations,
       boundingBoxSize,
-      faceCornerUVs,
+      faceCornerTexture,
     );
 
     const mesh = new Mesh(instancedGeometry, material);
@@ -715,6 +719,7 @@ export class InstancedMeshManager {
     const impostorKey = assetKey + "_impostor";
     this.managedMeshes.set(impostorKey, {
       mesh,
+      faceCornerTexture,
       geometry: instancedGeometry,
       instanceIDAttribute,
       instanceIDs,
@@ -738,7 +743,7 @@ export class InstancedMeshManager {
     textureHeight,
     captureOrientations,
     boundingBoxSize,
-    faceCornerUVs,
+    faceCornerTexture,
   ) {
     const selectionColor = new Color(SELECTION_COLOR);
     return new ShaderMaterial({
@@ -751,13 +756,13 @@ export class InstancedMeshManager {
         centerOffset: { value: centerOffset },
         boundingRadius: { value: boundingRadius },
         boundingBoxSize: { value: boundingBoxSize },
-        faceCornerUVs: { value: faceCornerUVs },
+        faceCornerTexture: { value: faceCornerTexture },
         selectionColor: { value: selectionColor },
       },
       vertexShader: `
         attribute float instanceID;
 
-        uniform mediump sampler2DArray matrixTexture;
+        uniform highp sampler2DArray matrixTexture;
         uniform float textureWidth;
         uniform float textureHeight;
         uniform vec3 centerOffset;
@@ -861,8 +866,9 @@ export class InstancedMeshManager {
 
       fragmentShader: `
         uniform sampler2D colorAtlas;
-        uniform mediump sampler2DArray matrixTexture;
-        uniform vec2 faceCornerUVs[624]; // 26 captures * 6 faces * 4 corners
+        uniform highp sampler2DArray matrixTexture;
+        // 26 captures * 6 faces * 4 corners UVs, two per texel
+        uniform highp sampler2D faceCornerTexture;
         uniform vec3 boundingBoxSize;
         uniform vec3 selectionColor;
 
@@ -874,6 +880,11 @@ export class InstancedMeshManager {
 
         // Maps a world-space normal to one of 6 face indices:
         //   0 = +X, 1 = -X, 2 = +Y, 3 = -Y, 4 = +Z, 5 = -Z
+        vec2 faceCornerUV(int index) {
+          vec4 texel = texelFetch(faceCornerTexture, ivec2(index / 2, 0), 0);
+          return (index % 2 == 0) ? texel.xy : texel.zw;
+        }
+
         int faceIndexFromNormal(vec3 n) {
           vec3 a = abs(n);
           if (a.x >= a.y && a.x >= a.z) return n.x > 0.0 ? 0 : 1;
@@ -915,10 +926,10 @@ export class InstancedMeshManager {
 
           // ---- Look up the 4 corner atlas UVs for this capture + face ----
           int base = vCaptureIndex * 24 + faceIdx * 4; // 24 = 6 faces * 4 corners
-          vec2 c00 = faceCornerUVs[base + 0]; // local (0,0)
-          vec2 c10 = faceCornerUVs[base + 1]; // local (1,0)
-          vec2 c11 = faceCornerUVs[base + 2]; // local (1,1)
-          vec2 c01 = faceCornerUVs[base + 3]; // local (0,1)
+          vec2 c00 = faceCornerUV(base + 0); // local (0,0)
+          vec2 c10 = faceCornerUV(base + 1); // local (1,0)
+          vec2 c11 = faceCornerUV(base + 2); // local (1,1)
+          vec2 c01 = faceCornerUV(base + 3); // local (0,1)
 
           // ---- Affine (parallelogram) mapping ----
           vec2 edgeU = c10 - c00;
@@ -1000,6 +1011,7 @@ export class InstancedMeshManager {
   dispose() {
     for (const [assetKey, data] of this.managedMeshes) {
       data.matrixTexture?.dispose();
+      data.faceCornerTexture?.dispose();
       data.mesh.geometry.dispose();
       disposeMaterial(data.mesh.material);
     }
