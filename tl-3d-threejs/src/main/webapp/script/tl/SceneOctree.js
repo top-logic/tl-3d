@@ -119,6 +119,12 @@ export class SceneOctree {
     while (heap.size() > 0) {
       const node = heap.pop();
 
+      if (node.spanningObject) {
+        // An object of an inner node, queued by its own distance (see below).
+        results.push(node.spanningObject);
+        continue;
+      }
+
       if (node.isLeaf) {
         for (const { object, boundingBox } of node.objects) {
           if (!seen.has(object) && frustum.intersectsBox(boundingBox)) {
@@ -127,6 +133,18 @@ export class SceneOctree {
           }
         }
       } else {
+        // Objects spanning several children: an inner node is near the camera as soon as one
+        // of its parts is, so these objects are queued by their own distance to keep the
+        // front-to-back order.
+        for (const { object, boundingBox } of node.objects) {
+          if (!seen.has(object) && frustum.intersectsBox(boundingBox)) {
+            seen.add(object);
+            heap.push(
+              { spanningObject: object },
+              boundingBox.distanceToPoint(cameraPosition),
+            );
+          }
+        }
         for (const child of node.children) {
           if (frustum.intersectsBox(child.boundingBox)) {
             heap.push(child, child.boundingBox.distanceToPoint(cameraPosition));
@@ -333,12 +351,20 @@ export class SceneOctree {
   }
 }
 
+/**
+ * Node of a SceneOctree.
+ *
+ * An object is stored in exactly one node: in the deepest node whose box contains the object's
+ * box. Objects that span the boundaries of the children stay in the inner node. (Copying them
+ * into all intersected children instead lets the tree explode for large, overlapping objects:
+ * every child gets all of them again and is subdivided again, down to the maximum depth.)
+ */
 class OctreeNode {
   constructor(boundingBox, depth, octree) {
     this.boundingBox = boundingBox; // Box3
     this.depth = depth;
     this.octree = octree;
-    this.objects = []; // Objects in this node: {object, boundingBox}
+    this.objects = []; // Objects in this node: {object, boundingBox}; in inner nodes the spanning ones
     this.children = null; // Array of 8 child nodes (if subdivided)
     this.isLeaf = true;
   }
@@ -355,7 +381,6 @@ class OctreeNode {
       return false;
     }
 
-    // If leaf and under capacity, add here
     if (this.isLeaf) {
       this.objects.push({ object, boundingBox });
 
@@ -370,35 +395,37 @@ class OctreeNode {
       return true;
     }
 
-    // Otherwise, insert into appropriate child(ren)
-    // An object can be in multiple children if it spans boundaries
-    let inserted = false;
-    for (const child of this.children) {
-      if (child.insert(object)) {
-        inserted = true;
-      }
+    // Into the child containing the object, otherwise into this node.
+    const child = this.childContaining(boundingBox);
+    if (child) {
+      return child.insert(object);
     }
+    this.objects.push({ object, boundingBox });
+    return true;
+  }
 
-    return inserted;
+  /** The child whose box contains the given box, or null. */
+  childContaining(boundingBox) {
+    return (
+      this.children.find((child) => child.boundingBox.containsBox(boundingBox)) ||
+      null
+    );
   }
 
   remove(object) {
-    if (this.isLeaf) {
-      const index = this.objects.findIndex((item) => item.object === object);
-      if (index > -1) {
-        this.objects.splice(index, 1);
-        return true;
-      }
-      return false;
-    } else {
-      let removed = false;
+    const index = this.objects.findIndex((item) => item.object === object);
+    if (index > -1) {
+      this.objects.splice(index, 1);
+      return true;
+    }
+    if (!this.isLeaf) {
       for (const child of this.children) {
         if (child.remove(object)) {
-          removed = true;
+          return true;
         }
       }
-      return removed;
     }
+    return false;
   }
 
   subdivide() {
@@ -435,27 +462,19 @@ class OctreeNode {
       }
     }
 
-    // Redistribute objects to children
-    // Note: objects can end up in multiple children if they span boundaries
-    for (const { object, boundingBox } of this.objects) {
-      let inserted = false;
-      for (const child of this.children) {
-        if (child.insert(object)) {
-          inserted = true;
-        }
-      }
-
-      if (!inserted) {
-        console.warn(
-          "SceneOctree: Failed to insert object during subdivision",
-          object,
-        );
-      }
-    }
-
-    // Clear objects from this node
+    // Move the objects into the child containing them; objects spanning several children
+    // stay in this node.
+    const objects = this.objects;
     this.objects = [];
     this.isLeaf = false;
+    for (const entry of objects) {
+      const child = this.childContaining(entry.boundingBox);
+      if (child) {
+        child.insert(entry.object);
+      } else {
+        this.objects.push(entry);
+      }
+    }
   }
 
   /**
@@ -472,14 +491,13 @@ class OctreeNode {
       return;
     }
 
-    if (this.isLeaf) {
-      for (const { object, boundingBox } of this.objects) {
-        if (!seen.has(object) && frustum.intersectsBox(boundingBox)) {
-          seen.add(object);
-          results.push(object);
-        }
+    for (const { object, boundingBox } of this.objects) {
+      if (!seen.has(object) && frustum.intersectsBox(boundingBox)) {
+        seen.add(object);
+        results.push(object);
       }
-    } else {
+    }
+    if (!this.isLeaf) {
       for (const child of this.children) {
         child.queryFrustum(frustum, results, seen);
       }
@@ -492,15 +510,13 @@ class OctreeNode {
       return;
     }
 
-    if (this.isLeaf) {
-      // Test each object's bounding box against ray
-      for (const { object, boundingBox } of this.objects) {
-        if (ray.intersectsBox(boundingBox)) {
-          results.add(object);
-        }
+    // Test each object's bounding box against ray
+    for (const { object, boundingBox } of this.objects) {
+      if (ray.intersectsBox(boundingBox)) {
+        results.add(object);
       }
-    } else {
-      // Recurse into children
+    }
+    if (!this.isLeaf) {
       for (const child of this.children) {
         child.queryRay(ray, results);
       }
@@ -514,15 +530,12 @@ class OctreeNode {
       return;
     }
 
-    if (this.isLeaf) {
-      // Check each object's bounding box
-      for (const { object, boundingBox } of this.objects) {
-        if (boundingBox.distanceToPoint(point) <= radius) {
-          results.add(object);
-        }
+    for (const { object, boundingBox } of this.objects) {
+      if (boundingBox.distanceToPoint(point) <= radius) {
+        results.add(object);
       }
-    } else {
-      // Recurse into children
+    }
+    if (!this.isLeaf) {
       for (const child of this.children) {
         child.queryRadius(point, radius, results);
       }
@@ -535,15 +548,12 @@ class OctreeNode {
       return;
     }
 
-    if (this.isLeaf) {
-      // Check each object's bounding box
-      for (const { object, boundingBox } of this.objects) {
-        if (box.intersectsBox(boundingBox)) {
-          results.add(object);
-        }
+    for (const { object, boundingBox } of this.objects) {
+      if (box.intersectsBox(boundingBox)) {
+        results.add(object);
       }
-    } else {
-      // Recurse into children
+    }
+    if (!this.isLeaf) {
       for (const child of this.children) {
         child.queryBox(box, results);
       }
