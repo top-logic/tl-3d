@@ -928,6 +928,7 @@ export class SceneGraph extends SharedObject {
 
       // Re-evaluate whether octree is needed now that real geometry is loaded
       this.ctrl.buildSceneOctree();
+      this.ctrl.createBoundingBox();
       this.ctrl.refreshInstancedSnappingPoints();
 
       this.ctrl.applyColors();

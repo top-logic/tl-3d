@@ -153,7 +153,9 @@ export class RenderManager {
             this.instanceManager.updateVisibleInstances(assetKey, allIDs);
           }
         } else if (this.sceneOctree) {
-          // Octree path: use frustum culling
+          // Octree path: use frustum culling. The camera may have moved since the last frame;
+          // its world matrix is updated only when rendering, which comes after this query.
+          this.camera.updateMatrixWorld();
           const frustum = new Frustum();
           const projScreenMatrix = new Matrix4();
           projScreenMatrix.multiplyMatrices(

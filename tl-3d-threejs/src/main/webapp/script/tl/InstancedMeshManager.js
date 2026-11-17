@@ -464,6 +464,13 @@ export class InstancedMeshManager {
 
     // Mark texture for update
     matrixTexture.needsUpdate = true;
+
+    // Grow the bounds of the mesh, so that frustum culling does not drop the moved instance.
+    const bounds = data.mesh.geometry.boundingBox;
+    if (data.baseBoundingBox && bounds) {
+      bounds.union(data.baseBoundingBox.clone().applyMatrix4(newMatrix));
+      bounds.getBoundingSphere(data.mesh.geometry.boundingSphere);
+    }
   }
 
   /**

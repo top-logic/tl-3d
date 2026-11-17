@@ -1358,10 +1358,16 @@ class ThreeJsControl {
     }
   }
 
+  /**
+   * Computes the bounding box of the scene (used by zoomOut() and for the size of the
+   * workplane). Instanced meshes count with the bounds of all their instances; impostors are
+   * left out (their geometry is a quad at the origin).
+   */
   createBoundingBox() {
     this.boundingBox = new Box3();
+    this.zUpRoot.updateMatrixWorld(true);
     this.zUpRoot.traverse((object) => {
-      if (object.type === "Mesh") {
+      if (object.type === "Mesh" && !object.userData.isImpostorMesh) {
         this.boundingBox.expandByObject(object);
       }
     });
