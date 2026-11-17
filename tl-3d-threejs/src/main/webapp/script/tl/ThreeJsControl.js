@@ -62,6 +62,15 @@ import {
   _90_DEGREE,
 } from "./Constants.js";
 
+/**
+ * The nearest grid line of the workplane, if the value is close enough to it (within
+ * GRID_SNAP_THRESHOLD), otherwise the value itself.
+ */
+function snapToGridLine(value) {
+  const nearest = Math.round(value / GRID_SMALL_CELL) * GRID_SMALL_CELL;
+  return Math.abs(value - nearest) <= GRID_SNAP_THRESHOLD ? nearest : value;
+}
+
 /** Whether the given object and all its ancestors are visible. */
 function isShown(object) {
   for (let o = object; o != null; o = o.parent) {
@@ -284,6 +293,9 @@ class ThreeJsControl {
       this.snapToWorkplaneEnabled = true;
     }
 
+    // Set before updateWorkplanePosition(), which only places a visible workplane.
+    this.isWorkplaneVisible = visible;
+
     if (visible) {
       if (this.workplane.parent) {
         this.workplane.parent.remove(this.workplane);
@@ -298,7 +310,6 @@ class ThreeJsControl {
       this.snapToWorkplaneEnabled = false;
     }
 
-    this.isWorkplaneVisible = visible;
     this.invalidate();
   }
 
@@ -306,12 +317,14 @@ class ThreeJsControl {
     if (!this.workplane || !this.isWorkplaneVisible) {
       return;
     }
-    if (this.sceneGraph && this.sceneGraph.coordinateSystem) {
-      const matrixValues = toMatrix(this.sceneGraph.coordinateSystem);
-      this.workplane.applyMatrix4(
-        matrixValues.multiply(this.workplane.matrix.clone().invert()),
-      );
-    }
+    // Without a chosen coordinate system, the workplane lies in the world coordinates.
+    const coordinateSystem = this.sceneGraph?.coordinateSystem;
+    const matrixValues = coordinateSystem
+      ? toMatrix(coordinateSystem)
+      : new Matrix4();
+    this.workplane.applyMatrix4(
+      matrixValues.multiply(this.workplane.matrix.clone().invert()),
+    );
     this.workplane.updateMatrixWorld(true);
     this.invalidate();
   }
@@ -1116,7 +1129,7 @@ class ThreeJsControl {
   }
 
   snapObjectToWorkplane(object) {
-    if (!this.snapToWorkplaneEnabled) {
+    if (!this.snapToWorkplaneEnabled || !this.workplane) {
       return false;
     }
 
@@ -1125,27 +1138,33 @@ class ThreeJsControl {
     const worldPosition = new Vector3();
     object.getWorldPosition(worldPosition);
 
-    const distanceToWorkplane = Math.abs(worldPosition.y);
+    // The workplane lies in the x-y plane of the chosen coordinate system (see
+    // updateWorkplanePosition()), with grid lines at multiples of GRID_SMALL_CELL: work in
+    // that coordinate system.
+    this.workplane.updateMatrixWorld(true);
+    const workplaneMatrix = this.workplane.matrixWorld;
+    const positionOnWorkplane = worldPosition
+      .clone()
+      .applyMatrix4(workplaneMatrix.clone().invert());
+
+    const distanceToWorkplane = Math.abs(positionOnWorkplane.z);
     const MAX_SNAP_DISTANCE = 200;
 
     // An object released near the workplane is put onto it and snapped to the grid.
     if (distanceToWorkplane <= MAX_SNAP_DISTANCE) {
-      let snapMatrix = new Matrix4();
-
+      positionOnWorkplane.z = 0;
       if (this.isWorkplaneVisible && this.isEditMode) {
-        // Put the object onto the workplane and snap it to the nearby grid lines.
-        const snappedPosition =
-          this.calculateGridSnappedPosition(worldPosition);
-
-        snapMatrix.makeTranslation(
-          snappedPosition.x - worldPosition.x,
-          snappedPosition.y - worldPosition.y,
-          snappedPosition.z - worldPosition.z,
-        );
-      } else {
-        // Only put the object onto the workplane at its current X, Z.
-        snapMatrix.makeTranslation(0, -worldPosition.y, 0);
+        // Snap to the nearby grid lines.
+        positionOnWorkplane.x = snapToGridLine(positionOnWorkplane.x);
+        positionOnWorkplane.y = snapToGridLine(positionOnWorkplane.y);
       }
+      const snappedPosition = positionOnWorkplane.applyMatrix4(workplaneMatrix);
+
+      const snapMatrix = new Matrix4().makeTranslation(
+        snappedPosition.x - worldPosition.x,
+        snappedPosition.y - worldPosition.y,
+        snappedPosition.z - worldPosition.z,
+      );
 
       // Apply the translation in world space
       if (object.parent) {
@@ -1170,29 +1189,6 @@ class ThreeJsControl {
     return false;
   }
 
-  calculateGridSnappedPosition(worldPosition) {
-    // Calculate nearest grid positions
-    const nearestGridX =
-      Math.round(worldPosition.x / GRID_SMALL_CELL) * GRID_SMALL_CELL;
-    const nearestGridZ =
-      Math.round(worldPosition.z / GRID_SMALL_CELL) * GRID_SMALL_CELL;
-
-    // Check if position is close enough to grid lines to snap
-    const distanceToGridX = Math.abs(worldPosition.x - nearestGridX);
-    const distanceToGridZ = Math.abs(worldPosition.z - nearestGridZ);
-
-    // Only snap if within threshold distance
-    const snappedX =
-      distanceToGridX <= GRID_SNAP_THRESHOLD ? nearestGridX : worldPosition.x;
-    const snappedZ =
-      distanceToGridZ <= GRID_SNAP_THRESHOLD ? nearestGridZ : worldPosition.z;
-
-    return {
-      x: snappedX,
-      y: 0, // Always snap to workplane
-      z: snappedZ,
-    };
-  }
 
   isConnectionPointOccupied(connectionPoint, excludeObject = null) {
     // Get world position of connection point
