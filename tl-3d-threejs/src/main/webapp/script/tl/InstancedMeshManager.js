@@ -832,11 +832,12 @@ export class InstancedMeshManager {
             normalize(instanceMatrix[1].xyz),
             normalize(instanceMatrix[2].xyz)
           );
-          vec3 instancePosLocal = instanceMatrix[3].xyz;
-          vec3 adjustedPosLocal = instancePosLocal + instanceRotation * centerOffset;
+          // The full instance matrix (with its scale) places the box; the rotation alone gives
+          // the view direction in model space.
+          vec3 adjustedPosLocal = (instanceMatrix * vec4(centerOffset, 1.0)).xyz;
 
           // ---- World position ----
-          vec3 transformedPosition = instanceRotation * position + adjustedPosLocal;
+          vec3 transformedPosition = (instanceMatrix * vec4(position + centerOffset, 1.0)).xyz;
           vec4 worldPosition = modelMatrix * vec4(transformedPosition, 1.0);
 
           vLocalNormal = normal;

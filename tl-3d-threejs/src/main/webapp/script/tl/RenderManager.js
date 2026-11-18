@@ -17,7 +17,6 @@ export class RenderManager {
     this.rafId = null;
 
     this.useOctree = false;
-    this.sortVisibleInstances = true; // Enable by default for triangle budgeting
 
     // Triangle budget settings
     this.maxTrianglesPerFrame = MAX_TRIANGLES_PER_FRAME;
@@ -41,8 +40,6 @@ export class RenderManager {
     this.instanceManager = null;
 
     // Camera tracking
-    this.cameraIsMoving = false;
-    this.cameraStopTimer = null;
   }
 
   setSceneOctree(sceneOctree) {
@@ -57,26 +54,6 @@ export class RenderManager {
    * Call this when the camera changes (from orbit controls, etc.)
    */
   onCameraMove() {
-    // If we're not using octree, camera movement is irrelevant to instance
-    // visibility. Just invalidate and return.
-    if (!this.useOctree) {
-      this.invalidate();
-      return;
-    }
-
-    this.cameraIsMoving = true;
-
-    // Clear any existing "stopped" timer
-    if (this.cameraStopTimer) {
-      clearTimeout(this.cameraStopTimer);
-    }
-
-    // Set timer to detect when camera stops
-    this.cameraStopTimer = setTimeout(() => {
-      this.cameraIsMoving = false;
-      this.invalidate();
-    }, 100);
-
     this.invalidate();
   }
 
@@ -95,6 +72,8 @@ export class RenderManager {
     for (const obj of visibleObjects) {
       const meshData = this.instanceManager.managedMeshes.get(obj.assetKey);
       if (!meshData) continue;
+      // Hidden instances are not drawn and must not use up the budget.
+      if (this.instanceManager.isInstanceHidden(obj.assetKey, obj.instanceID)) continue;
 
       const instanceTriangles = meshData.triangleCount;
 
@@ -273,31 +252,14 @@ export class RenderManager {
   setUseOctree(enabled) {
     this.useOctree = enabled;
 
-    if (!enabled) {
-      // We're going into simple mode. Stop anything the octree path may have
-      // started, and make sure all instances are visible on the next frame.
-      this.cameraIsMoving = false;
-
-      // Re-enable auto clear
-      this.renderer.autoClearColor = true;
-      this.renderer.autoClearDepth = true;
-
-      this.invalidate();
-    } else {
-      // When using octree, we can keep auto-clear enabled
-      // since we're doing deterministic frustum culling
-      this.renderer.autoClearColor = true;
-      this.renderer.autoClearDepth = true;
-    }
+    // The next frame shows the instances of the chosen path.
+    this.invalidate();
   }
 
   dispose() {
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
-    }
-    if (this.cameraStopTimer) {
-      clearTimeout(this.cameraStopTimer);
     }
     this.renderTargets = [];
   }

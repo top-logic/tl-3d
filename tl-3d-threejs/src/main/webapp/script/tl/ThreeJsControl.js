@@ -2419,7 +2419,6 @@ class ThreeJsControl {
       this.applySelection(this.sceneGraph.selection);
     });
 
-    this.camera.position.applyMatrix4(this.scene.matrix);
     this.camera.updateProjectionMatrix();
     this.updateTransformControls();
 
