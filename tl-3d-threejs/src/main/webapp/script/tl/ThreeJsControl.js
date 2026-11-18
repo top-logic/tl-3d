@@ -256,6 +256,9 @@ class ThreeJsControl {
     this.zUpRoot.rotation.x = -_90_DEGREE;
     this.scene.add(this.zUpRoot);
     this.scene.add(this.zUpEnvironment);
+    // Skybox and floors are added and removed as a whole (see SkyboxManager.toggleSkybox()).
+    this.zUpEnvironment.addEventListener("childadded", () => this.invalidateContentBounds());
+    this.zUpEnvironment.addEventListener("childremoved", () => this.invalidateContentBounds());
     this.multiTransformGroup.rotation.x = -_90_DEGREE;
     this.scene.add(this.multiTransformGroup);
   }
@@ -376,6 +379,7 @@ class ThreeJsControl {
 
     // Set before updateWorkplanePosition(), which only places a visible workplane.
     this.isWorkplaneVisible = visible;
+    this.invalidateContentBounds();
 
     if (visible) {
       if (this.workplane.parent) {
@@ -407,6 +411,7 @@ class ThreeJsControl {
       matrixValues.multiply(this.workplane.matrix.clone().invert()),
     );
     this.workplane.updateMatrixWorld(true);
+    this.invalidateContentBounds();
     this.invalidate();
   }
 
@@ -1395,6 +1400,7 @@ class ThreeJsControl {
    * left out (their geometry is a quad at the origin).
    */
   createBoundingBox() {
+    this.invalidateContentBounds();
     // The bounds of the instanced meshes only grow while instances are moved.
     for (const assetKey of this.scope.instanceManager.managedMeshes.keys()) {
       if (!assetKey.endsWith("_impostor")) {
@@ -1419,20 +1425,11 @@ class ThreeJsControl {
    * camera is outside, otherwise at a small fraction of the distance to the orbit target.
    */
   updateClippingPlanes() {
-    const content = new Box3();
-    if (this.boundingBox) {
-      content.union(this.boundingBox);
-    }
-    // Skybox, floors and workplane extend beyond the parts.
-    content.union(new Box3().setFromObject(this.zUpEnvironment));
-    if (this.workplane?.parent) {
-      content.union(new Box3().setFromObject(this.workplane));
-    }
-    if (content.isEmpty()) {
+    const sphere = this.contentSphere();
+    if (!sphere) {
       return;
     }
 
-    const sphere = content.getBoundingSphere(new Sphere());
     const position = this.camera.position;
     const distance = position.distanceTo(sphere.center);
     // Margin for objects moved beyond the bounds that are not yet updated.
@@ -1449,6 +1446,34 @@ class ThreeJsControl {
       this.camera.far = far;
       this.camera.updateProjectionMatrix();
     }
+  }
+
+  /**
+   * The bounding sphere of the displayed content (parts, skybox, floors, workplane), or null if
+   * there is none. Computed only after a change (see invalidateContentBounds()), not for every
+   * frame.
+   */
+  contentSphere() {
+    if (this._contentSphere === undefined) {
+      const content = new Box3();
+      if (this.boundingBox) {
+        content.union(this.boundingBox);
+      }
+      // Skybox, floors and workplane extend beyond the parts.
+      content.union(new Box3().setFromObject(this.zUpEnvironment));
+      if (this.workplane?.parent) {
+        content.union(new Box3().setFromObject(this.workplane));
+      }
+      this._contentSphere = content.isEmpty()
+        ? null
+        : content.getBoundingSphere(new Sphere());
+    }
+    return this._contentSphere;
+  }
+
+  /** The displayed content has changed its bounds, see contentSphere(). */
+  invalidateContentBounds() {
+    this._contentSphere = undefined;
   }
 
   /** Renders the scene again after the WebGL context has been restored. */
