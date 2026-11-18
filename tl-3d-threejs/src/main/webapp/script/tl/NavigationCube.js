@@ -6,6 +6,7 @@
 import {
   BoxGeometry,
   CanvasTexture,
+  SRGBColorSpace,
   EdgesGeometry,
   FrontSide,
   Group,
@@ -31,6 +32,11 @@ import { CameraUtils, SceneUtils, getRaycaster } from "./ThreeJsUtils.js";
  * NavigationCube class handles the 3D navigation cube functionality.
  * Provides visual orientation feedback and quick camera position controls.
  */
+/** Pixel ratio of the cube: sharp on high resolution screens, but not more than twice. */
+function cubePixelRatio() {
+  return Math.min(window.devicePixelRatio, 2);
+}
+
 export class NavigationCube {
   /**
    * Creates a new NavigationCube instance.
@@ -180,13 +186,17 @@ export class NavigationCube {
     }
     context.fillText(text, 0, 0);
 
-    return new CanvasTexture(textCanvas);
+    // The canvas holds sRGB colours, like an image; without the colour space the labels look
+    // pale.
+    const texture = new CanvasTexture(textCanvas);
+    texture.colorSpace = SRGBColorSpace;
+    return texture;
   }
 
   initRenderer() {
     this.cubeRenderer = new WebGLRenderer({ alpha: true });
     this.cubeRenderer.setSize(this.options.size, this.options.size);
-    this.cubeRenderer.setPixelRatio(window.devicePixelRatio);
+    this.cubeRenderer.setPixelRatio(cubePixelRatio());
 
     this.cubeCanvas = this.cubeRenderer.domElement;
     this.cubeCanvas.style.position = "absolute";
@@ -306,7 +316,7 @@ export class NavigationCube {
     this.updateCubePosition();
 
     // Update pixel ratio if device pixel ratio changed
-    const newPixelRatio = window.devicePixelRatio;
+    const newPixelRatio = cubePixelRatio();
     if (this.cubeRenderer.getPixelRatio() !== newPixelRatio) {
       this.cubeRenderer.setPixelRatio(newPixelRatio);
     }
