@@ -1311,15 +1311,24 @@ class ThreeJsControl {
   }
 
   createResizeObserver() {
-    return new ResizeObserver(
-      throttle(() => {
-        this.updateRendererSize();
-      }, 100),
-    );
+    const resize = throttle(() => {
+      this.updateRendererSize();
+    }, 100);
+    return new ResizeObserver(() => {
+      // Removing the container from the document shrinks the canvas to zero, so the
+      // observer also notices that the view has been closed or rendered again. Release the
+      // WebGL contexts and GPU memory right away instead of waiting for the next viewer.
+      if (!this.container?.isConnected) {
+        disposeDetachedControls();
+        return;
+      }
+      resize();
+    });
   }
 
   updateRendererSize() {
-    if (!this.container) return;
+    // A throttled call may arrive after the control has been disposed.
+    if (!this.container || this.disposed) return;
 
     this.renderer.setSize(
       this.container.clientWidth,
@@ -2110,12 +2119,15 @@ class ThreeJsControl {
     return this.sceneGraph.clearSelection();
   }
 
+  /**
+   * The element of this control. It is looked up once: when the server renders the control
+   * again, a new element with the same ID replaces it, which belongs to the new control.
+   */
   get container() {
-    const container = document.getElementById(this.controlId);
-    if (!container) {
-      return null;
+    if (this._container === undefined) {
+      this._container = document.getElementById(this.controlId);
     }
-    return container;
+    return this._container;
   }
 
   static control(container) {
@@ -2540,7 +2552,8 @@ class ThreeJsControl {
  * All controls that have not been disposed yet. When the server renders the view again
  * (e.g. when switching back to its tab), it creates a new control with a new ID in a new
  * container; the containers of the previous controls are then no longer part of the
- * document.
+ * document. A control notices the removal of its container itself (see
+ * createResizeObserver()); initializing a new control disposes the remaining ones.
  */
 const activeControls = new Set();
 
