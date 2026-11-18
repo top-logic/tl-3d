@@ -200,6 +200,10 @@ export class NavigationCube {
   }
 
   setupEventListeners() {
+    // The cube is drawn with the main scene: render both when the context is back.
+    this.cubeCanvas.addEventListener("webglcontextrestored", () =>
+      this.renderManager.invalidate(),
+    );
     this.cubeCanvas.addEventListener(
       "mousemove",
       (event) => this.handleCubeHover(event),

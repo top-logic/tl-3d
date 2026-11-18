@@ -219,6 +219,19 @@ class ThreeJsControl {
     );
     this.canvas.addEventListener("mouseup", (event) => this.onMouseUp(event));
 
+    // The browser may drop the WebGL context (GPU reset, driver update, too many contexts,
+    // a mobile device in the background). three.js keeps the context restorable and sets up
+    // its state again when it comes back; the viewer must render what exists on the GPU only.
+    this.canvas.addEventListener("webglcontextlost", () => {
+      // Disposing the control drops the context on purpose.
+      if (!this.disposed) {
+        console.warn("3D viewer: WebGL context lost, waiting for its restoration.");
+      }
+    });
+    this.canvas.addEventListener("webglcontextrestored", () =>
+      this.onContextRestored(),
+    );
+
     // Create a MutationObserver to detect DOM changes that might affect layout
     this.mutationObserver = new MutationObserver(() => {
       this.updateRendererSize();
@@ -1308,6 +1321,15 @@ class ThreeJsControl {
         this.boundingBox.expandByObject(object);
       }
     });
+  }
+
+  /** Renders the scene again after the WebGL context has been restored. */
+  onContextRestored() {
+    if (this.disposed) {
+      return;
+    }
+    this.scope.regenerateImpostors(this);
+    this.renderManager.forceRender();
   }
 
   createResizeObserver() {

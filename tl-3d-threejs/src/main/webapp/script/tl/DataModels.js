@@ -723,6 +723,46 @@ export class Scope {
     impostorManager.disposeSharedRenderTarget();
   }
 
+  /**
+   * Renders the impostor atlases of all instanced assets again and hands them to their
+   * impostor meshes.
+   *
+   * Called when the WebGL context has been restored: three.js uploads geometries and
+   * textures again, but the atlases exist on the GPU only (their pixels are dropped after the
+   * upload).
+   */
+  regenerateImpostors(ctrl) {
+    const impostorManager = ctrl.impostorManager;
+    if (!impostorManager || !this.instanceGroups) {
+      return;
+    }
+    for (const [assetKey, group] of this.instanceGroups) {
+      if (!impostorManager.impostorData.has(assetKey)) {
+        // Not yet generated, the loading pipeline still does that.
+        continue;
+      }
+      const gltf = this.gltfs[gltfUrlOf(ctrl, group.asset)];
+      if (!gltf) {
+        continue;
+      }
+      // The old atlas belongs to the lost context, there is nothing to release.
+      impostorManager.impostorData.delete(assetKey);
+      impostorManager.generateImpostorForAsset(
+        assetKey,
+        gltf,
+        layoutPointInverse(group.asset),
+      );
+      const meshData = this.instanceManager.managedMeshes.get(
+        assetKey + "_impostor",
+      );
+      if (meshData) {
+        meshData.mesh.material.uniforms.colorAtlas.value =
+          impostorManager.impostorData.get(assetKey).colorTexture;
+      }
+    }
+    impostorManager.disposeSharedRenderTarget();
+  }
+
   setGLTF(ctrl, url, assetsByURL) {
     const gltf = this.gltfs[url];
     if (gltf != null) {
