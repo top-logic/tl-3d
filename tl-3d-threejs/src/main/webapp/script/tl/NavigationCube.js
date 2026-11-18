@@ -185,7 +185,6 @@ export class NavigationCube {
 
   initRenderer() {
     this.cubeRenderer = new WebGLRenderer({ alpha: true });
-    this.cubeRenderer.shadowMap.enabled = true;
     this.cubeRenderer.setSize(this.options.size, this.options.size);
     this.cubeRenderer.setPixelRatio(window.devicePixelRatio);
 

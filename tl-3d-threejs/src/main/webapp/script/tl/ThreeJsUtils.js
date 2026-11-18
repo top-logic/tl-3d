@@ -431,12 +431,10 @@ export const SceneUtils = {
 
     const light = new DirectionalLight(WHITE, 0.5);
     light.position.set(3, 5, 8);
-    light.castShadow = true;
     scene.add(light);
 
     const light2 = new DirectionalLight(WHITE, 0.5);
     light2.position.set(-3, -5, 0);
-    light2.castShadow = true;
     scene.add(light2);
 
     return {
