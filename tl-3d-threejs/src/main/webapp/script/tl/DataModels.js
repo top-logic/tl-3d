@@ -1149,7 +1149,7 @@ export class SceneGraph extends SharedObject {
       this.ctrl.applySelection(this.selection);
       this.ctrl.updateTransformControls();
       this.ctrl.invalidate();
-    });
+    }).catch((error) => this.ctrl.showLoadError(error));
 
     this.ctrl.toggleWorkplane(this.ctrl.isWorkplaneVisible);
   }
