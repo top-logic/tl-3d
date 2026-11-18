@@ -17,6 +17,9 @@ function cleanUpRemovedNode(scope, node) {
       node.node.parent.remove(node.node);
     }
     node.node = null;
+    // The 3D objects of the part are gone: release its model materials and point markers.
+    // (A node whose 3D object was taken over by a replacement has no node any more.)
+    node.asset?.dispose();
   }
   if (node.contents) {
     for (const child of node.contents) {

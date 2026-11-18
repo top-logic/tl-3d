@@ -1153,9 +1153,16 @@ export class ConnectionPoint extends SharedObject {
     this.setProperty(scope, "classifiers", json.classifiers);
   }
 
-  build(parentGroup, layoutPoint) {
+  /** Releases the marker sphere of this point (geometry and material). */
+  dispose() {
     this.pointGeometry?.dispose();
     this.pointMaterial?.dispose();
+    this.pointGeometry = null;
+    this.pointMaterial = null;
+  }
+
+  build(parentGroup, layoutPoint) {
+    this.dispose();
 
     const group = new Group();
     parentGroup.add(group);
@@ -1771,6 +1778,8 @@ export class GltfAsset extends SharedObject {
       });
       this._clonedModel = null;
     }
+    this.layoutPoint?.dispose();
+    this.snappingPoints?.forEach((point) => point.dispose());
     this.group = null;
   }
 }
