@@ -18,6 +18,9 @@ public class I18NConstants extends I18NConstantsBase {
 	/** @en Apply scene changes. */
 	public static ResKey APPLY_SCENE_CHANGES;
 
+	/** @en The scene could not be loaded. Please reload the view or log in again. */
+	public static ResKey ERROR_LOADING_SCENE;
+
 	/** @en X */
 	public static ResKey TRANSLATE_X_LABEL;
 

@@ -44,6 +44,7 @@ import com.top_logic.threed.threejs.scene.SceneNode;
 import com.top_logic.threed.threejs.scene.ScenePart;
 import com.top_logic.threed.threejs.scene.SceneUtils;
 import com.top_logic.tool.boundsec.HandlerResult;
+import com.top_logic.util.Resources;
 
 import de.haumacher.msgbuf.graph.DefaultScope;
 import de.haumacher.msgbuf.graph.SharedGraphNode;
@@ -489,6 +490,7 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 			.put("isInEditMode", _isInEditMode)
 			.put("isRotateMode", _isRotateMode)
 			.put("areObjectsTransparent", _areObjectsTransparent)
+			.put("loadErrorMessage", Resources.getInstance().getString(I18NConstants.ERROR_LOADING_SCENE))
 			.toMap();
 
 		String initialStateJson = JSON.toString(initialState);

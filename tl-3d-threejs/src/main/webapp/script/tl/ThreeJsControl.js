@@ -158,25 +158,57 @@ class ThreeJsControl {
 
     this.isEditMode = false;
 
-    this.loadScene().then(() =>
-      setTimeout(() => {
-        if (this.disposed) {
-          return;
-        }
-        this.createBoundingBox();
-        this.toggleWorkplane(initialState.isWorkplaneVisible);
-        this.updateWorkplanePosition();
-        this.toggleEditMode(initialState.isInEditMode);
-        this.toggleRotateMode(initialState.isRotateMode);
-        this.zoomOut();
+    this.loadErrorMessage = initialState.loadErrorMessage;
+    this.loadScene()
+      .then(() =>
+        setTimeout(() => {
+          if (this.disposed) {
+            return;
+          }
+          this.createBoundingBox();
+          this.toggleWorkplane(initialState.isWorkplaneVisible);
+          this.updateWorkplanePosition();
+          this.toggleEditMode(initialState.isInEditMode);
+          this.toggleRotateMode(initialState.isRotateMode);
+          this.zoomOut();
 
-        this.skyboxManager
-          .initSkybox()
-          .then(() =>
-            this.skyboxManager.toggleSkybox(initialState.isSkyboxVisible),
-          );
-      }, 100),
-    );
+          this.skyboxManager
+            .initSkybox()
+            .then(() =>
+              this.skyboxManager.toggleSkybox(initialState.isSkyboxVisible),
+            );
+        }, 100),
+      )
+      .catch((error) => this.showLoadError(error));
+  }
+
+  /**
+   * Reports that the scene could not be loaded (server error, expired session), instead of
+   * leaving the view empty without a hint.
+   */
+  showLoadError(error) {
+    console.error("3D viewer: loading the scene failed.", error);
+    // Changes for a scene that is not loaded cannot be applied.
+    this.pendingChanges = null;
+    if (this.disposed || !this.container) {
+      return;
+    }
+    const message = document.createElement("div");
+    message.className = "tl3dLoadError";
+    message.textContent = this.loadErrorMessage || String(error);
+    Object.assign(message.style, {
+      position: "absolute",
+      left: "50%",
+      top: "50%",
+      transform: "translate(-50%, -50%)",
+      maxWidth: "80%",
+      padding: "1em 1.5em",
+      background: "rgba(255, 255, 255, 0.9)",
+      border: "1px solid #c00",
+      color: "#c00",
+      zIndex: "1001",
+    });
+    this.container.append(message);
   }
 
   initScene() {
@@ -2289,6 +2321,11 @@ class ThreeJsControl {
 
   async loadScene() {
     const dataResponse = await fetch(this.dataUrl);
+    if (!dataResponse.ok) {
+      throw new Error(
+        `Scene data: HTTP ${dataResponse.status} ${dataResponse.statusText}`,
+      );
+    }
     // The server has delivered the data: it contains all changes made so far, later changes are
     // sent as sceneChanged and must be applied to the data once it is loaded.
     this.pendingChanges = [];
