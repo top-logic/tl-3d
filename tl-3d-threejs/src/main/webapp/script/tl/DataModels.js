@@ -565,7 +565,12 @@ export class Scope {
   releaseDecoders() {
     this._dracoLoader?.dispose();
     this._dracoLoader = null;
-    this._ktx2Loader?.dispose();
+    // Only a KTX2Loader that has loaded its transcoder has workers. Disposing an unused one would
+    // decrement the module wide count of active loaders below zero (and silence its warning
+    // about several active loaders).
+    if (this._ktx2Loader?.transcoderPending) {
+      this._ktx2Loader.dispose();
+    }
     this._ktx2Loader = null;
   }
 
