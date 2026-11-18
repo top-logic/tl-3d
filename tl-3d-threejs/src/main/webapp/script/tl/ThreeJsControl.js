@@ -151,6 +151,7 @@ class ThreeJsControl {
 
     this.renderManager.setSceneOctree(this.sceneOctree);
     this.renderManager.setInstanceManager(this.scope.instanceManager);
+    this.scope.instanceManager.setTransparentMode(this.areObjectsTransparent);
 
     // Initial render
     this.renderManager.forceRender();
@@ -2599,6 +2600,7 @@ class ThreeJsControl {
     }
 
     this.areObjectsTransparent = shouldBeTransparent;
+    this.scope.instanceManager.setTransparentMode(shouldBeTransparent);
     if (this.areObjectsTransparent) {
       this.setObjectsTransparency();
     } else {

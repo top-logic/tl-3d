@@ -33,6 +33,9 @@ export class InstancedMeshManager {
   constructor() {
     // Map of assetKey -> InstancedMeshData
     this.managedMeshes = new Map();
+
+    // Whether the viewer shows objects transparently, see setTransparentMode().
+    this.transparentMode = false;
   }
 
   /**
@@ -230,7 +233,11 @@ export class InstancedMeshManager {
   ) {
     // Clone the material to avoid modifying the original
     const material = baseMaterial.clone();
-    material.transparent = true;
+    // Transparent only in the transparency mode (see setTransparentMode()): a transparent
+    // double sided material is drawn in two passes (back faces, then front faces), which
+    // doubles the triangles of all instances.
+    material.userData.baseTransparent = baseMaterial.transparent;
+    material.transparent = baseMaterial.transparent || this.transparentMode;
 
     // Patch the shader using onBeforeCompile
     material.onBeforeCompile = (shader) => {
@@ -986,6 +993,23 @@ export class InstancedMeshManager {
       total += data.triangleCount * data.instanceData.length;
     }
     return total;
+  }
+
+  /**
+   * Switches the transparency mode of the viewer, in which instances get their own opacity
+   * (see setInstanceOpacity()). Only then the materials of the instances are transparent.
+   */
+  setTransparentMode(enabled) {
+    this.transparentMode = enabled;
+    for (const [assetKey, data] of this.managedMeshes) {
+      if (assetKey.endsWith("_impostor")) continue;
+      const material = data.mesh.material;
+      const transparent = material.userData.baseTransparent || enabled;
+      if (material.transparent !== transparent) {
+        material.transparent = transparent;
+        material.needsUpdate = true;
+      }
+    }
   }
 
   /**
