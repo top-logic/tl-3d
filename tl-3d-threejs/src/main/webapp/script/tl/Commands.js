@@ -105,20 +105,27 @@ export class InsertElement extends ListUpdate {
     // (ReferenceList.set) reports as an insert of the new node at idx followed by
     // a remove of the old node at idx + 1. Therefore, the element at idx before
     // the insert is the node being replaced. A plain insert without a following
-    // remove is not sent by the server and is not supported here.
+    // remove is not sent by the server; only appending an element is handled.
     const oldElement = target[this.property] && target[this.property][this.idx];
 
     target.insertElementAt(scope, this.property, this.idx, this.element);
 
-    // Update 3D object references if this is a replacement
-    if (this.property === "contents" && oldElement) {
-      const newElement =
-        target[this.property] && target[this.property][this.idx];
-      if (newElement) {
-        if (!this.updateNodeReferences(scope, oldElement, newElement)) {
-          this.needsFullReload = true;
-        }
+    if (this.property !== "contents") {
+      return;
+    }
+    const newElement = target[this.property] && target[this.property][this.idx];
+    if (!newElement) {
+      return;
+    }
+    if (oldElement) {
+      // Update 3D object references if this is a replacement
+      if (!this.updateNodeReferences(scope, oldElement, newElement)) {
+        this.needsFullReload = true;
       }
+    } else if (target.node) {
+      // Appended element (not sent by the server today): build it, so that it does not stay
+      // invisible until the next reload.
+      this.buildAddedChild(scope, newElement, target.node);
     }
   }
 

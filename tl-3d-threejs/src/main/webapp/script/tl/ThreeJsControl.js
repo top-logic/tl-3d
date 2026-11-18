@@ -2006,6 +2006,12 @@ class ThreeJsControl {
         case "S":
           cmd = new SetProperty(cmdProps["id"]);
           break;
+        default:
+          // A command this client does not know: rebuild the scene from the data model
+          // instead of stopping in the middle of the patch.
+          console.error("3D viewer: unknown scene change command", command);
+          needsFullReload = true;
+          continue;
       }
 
       // Only allow known safe incremental properties for SetProperty commands.
