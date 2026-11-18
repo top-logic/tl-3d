@@ -23,6 +23,8 @@ export const WIDTH_SEGMENTS = 8;
 export const HEIGHT_SEGMENTS = 8;
 export const _90_DEGREE = Math.PI / 2;
 export const OPTIMIZED_PIXEL_RATIO = Math.min(window.devicePixelRatio, 1.7);
+/** Up to this device pixel ratio (exclusive), the 3D viewer smoothes edges (multisampling). */
+export const ANTIALIAS_MAX_PIXEL_RATIO = 1.5;
 export const GRID_SMALL_CELL = 500;
 export const SNAP_THRESHOLD = 50;
 export const GRID_SNAP_THRESHOLD = 200;

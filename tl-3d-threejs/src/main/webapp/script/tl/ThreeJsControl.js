@@ -41,6 +41,7 @@ import {
 } from "./ThreeJsUtils.js";
 
 import {
+  ANTIALIAS_MAX_PIXEL_RATIO,
   CAMERA_MOVE_DURATION,
   C_P_RADIUS,
   CLICK_MAX_DURATION,
@@ -201,6 +202,10 @@ class ThreeJsControl {
     // cost a copy per frame on many GPUs).
     this.renderer = new WebGLRenderer({
       powerPreference: "high-performance",
+      // Smooth the edges on normal screens. On high resolution screens, steps are hardly
+      // visible, but multisampling would be expensive with up to OPTIMIZED_PIXEL_RATIO times
+      // the pixels in both directions.
+      antialias: window.devicePixelRatio < ANTIALIAS_MAX_PIXEL_RATIO,
     });
 
     this.renderer.setSize(container.clientWidth, container.clientHeight);
