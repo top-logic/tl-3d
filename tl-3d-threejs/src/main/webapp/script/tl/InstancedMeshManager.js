@@ -849,7 +849,6 @@ export class InstancedMeshManager {
         matrixTexture: { value: matrixTexture },
         textureWidth: { value: textureWidth },
         textureHeight: { value: textureHeight },
-        atlasResolution: { value: 256 },
         centerOffset: { value: centerOffset },
         boundingBoxSize: { value: boundingBoxSize },
         faceCornerTexture: { value: faceCornerTexture },

@@ -24,6 +24,13 @@ import {
 
 import { SceneUtils } from "./ThreeJsUtils.js";
 
+/**
+ * Pixels of the edge of one view in an impostor atlas. Impostors replace instances beyond the
+ * triangle budget, i.e. far away and small on the screen; 128 pixels need a quarter of the GPU
+ * memory of 256 (1.9 instead of 7.5 MiB per instanced asset).
+ */
+const IMPOSTOR_CELL_RESOLUTION = 128;
+
 export class ImpostorManager {
   constructor(renderer, contextPath) {
     this.renderer = renderer;
@@ -249,7 +256,7 @@ export class ImpostorManager {
 
     const radius = boundingSphere.radius;
 
-    const resolution = 256;
+    const resolution = IMPOSTOR_CELL_RESOLUTION;
     const atlasColumns = 6;
     const atlasRows = 5;
     const atlasWidth = resolution * atlasColumns;
