@@ -1074,7 +1074,9 @@ export class InstancedMeshManager {
           gl_FragColor = color;
         }
       `,
-      transparent: true,
+      // Pixels outside the model are discarded; blending is needed only for the opacity of the
+      // transparency mode (see setTransparentMode()).
+      transparent: this.transparentMode,
       side: FrontSide,
     });
   }
@@ -1117,7 +1119,14 @@ export class InstancedMeshManager {
   setTransparentMode(enabled) {
     this.transparentMode = enabled;
     for (const [assetKey, data] of this.managedMeshes) {
-      if (assetKey.endsWith("_impostor")) continue;
+      if (assetKey.endsWith("_impostor")) {
+        const material = data.mesh.material;
+        if (material.transparent !== enabled) {
+          material.transparent = enabled;
+          material.needsUpdate = true;
+        }
+        continue;
+      }
       // One material per merged mesh for GLTFs with several meshes.
       for (const material of materialsOf(data.mesh)) {
         applyOpacityPass(material, enabled ? PASS_TRANSLUCENT : PASS_ALL);
