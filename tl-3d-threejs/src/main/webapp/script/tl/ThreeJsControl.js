@@ -958,12 +958,16 @@ class ThreeJsControl {
   getScreenSpaceDistance(pos1, pos2) {
     const screen1 = pos1.clone().project(this.camera);
     const screen2 = pos2.clone().project(this.camera);
+    // In CSS pixels: the drawing buffer has more pixels on high resolution screens, which
+    // would make the snapping threshold smaller there.
     const canvas = this.renderer.domElement;
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
 
-    const x1 = ((screen1.x + 1) * canvas.width) / 2;
-    const y1 = ((-screen1.y + 1) * canvas.height) / 2;
-    const x2 = ((screen2.x + 1) * canvas.width) / 2;
-    const y2 = ((-screen2.y + 1) * canvas.height) / 2;
+    const x1 = ((screen1.x + 1) * width) / 2;
+    const y1 = ((-screen1.y + 1) * height) / 2;
+    const x2 = ((screen2.x + 1) * width) / 2;
+    const y2 = ((-screen2.y + 1) * height) / 2;
 
     return Math.hypot(x2 - x1, y2 - y1);
   }
