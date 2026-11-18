@@ -175,6 +175,8 @@ class ThreeJsControl {
 
     this.initTransformControls();
     this.initNavigationCube();
+    // The cube follows the camera on changes; show the initial view direction at once.
+    this.navigationCube.updateFromMainCamera();
 
     this.renderManager.setSceneOctree(this.sceneOctree);
     this.renderManager.setInstanceManager(this.scope.instanceManager);
