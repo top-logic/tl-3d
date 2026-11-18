@@ -344,6 +344,9 @@ export class SkyboxManager {
       z: center.z + targetDistance,
     };
 
+    // The flight replaces running ones (e.g. zoomOut when the view is opened).
+    this.control.stopCameraAnimation();
+
     // Animate camera position and target simultaneously
     const updateCallback = () => {
       this.control.controls.update();

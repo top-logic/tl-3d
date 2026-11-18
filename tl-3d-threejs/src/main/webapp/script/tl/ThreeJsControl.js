@@ -1850,6 +1850,9 @@ class ThreeJsControl {
    */
   stopCameraAnimation() {
     gsap.killTweensOf([this.controls.object.position, this.controls.target]);
+    // A flight started from the navigation cube moves the cube camera, which drives the main
+    // camera.
+    this.navigationCube?.stopCameraAnimation();
   }
 
   zoomOut() {

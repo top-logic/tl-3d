@@ -226,6 +226,12 @@ export class NavigationCube {
     this.cubeControls.enablePan = false;
     this.cubeControls.target.set(0, 0, 0);
 
+    // The user turns the cube: running camera flights must not move the camera back.
+    this.cubeControls.addEventListener("start", () => {
+      this.stopCameraAnimation();
+      gsap.killTweensOf([this.mainControls.object.position, this.mainControls.target]);
+    });
+
     this.cubeControls.addEventListener("change", () => {
       if (!this.controlsIsUpdating) {
         this.cubeControlsIsUpdating = true;
@@ -382,6 +388,10 @@ export class NavigationCube {
 
     const newPos = facePositions[faceIndex];
 
+    // A new flight replaces running ones (also those of the main view, e.g. zoomOut).
+    this.stopCameraAnimation();
+    gsap.killTweensOf([this.mainControls.object.position, this.mainControls.target]);
+
     gsap.to(this.cubeControls.object.position, {
       x: newPos.x,
       y: newPos.y,
@@ -396,6 +406,11 @@ export class NavigationCube {
         this.renderManager.invalidate();
       },
     });
+  }
+
+  /** Stops a camera flight started by a click on a face of the cube. */
+  stopCameraAnimation() {
+    gsap.killTweensOf(this.cubeControls.object.position);
   }
 
   /**
