@@ -9,11 +9,13 @@ import {
   Color,
   DataTexture,
   FrontSide,
+  LinearFilter,
   Mesh,
   MeshBasicMaterial,
   OrthographicCamera,
   RGBAFormat,
   Scene,
+  SRGBColorSpace,
   Sphere,
   UnsignedByteType,
   Vector3,
@@ -193,10 +195,12 @@ export class ImpostorManager {
       return this._sharedTarget;
     }
     this._sharedTarget?.dispose();
+    // sRGB encoded: 8 bits per channel in linear values would show banding in dark shades.
     this._sharedTarget = new WebGLRenderTarget(width, height, {
       format: RGBAFormat,
       type: UnsignedByteType,
       depthBuffer: true,
+      colorSpace: SRGBColorSpace,
     });
     return this._sharedTarget;
   }
@@ -363,6 +367,12 @@ export class ImpostorManager {
       RGBAFormat,
       UnsignedByteType,
     );
+    // The pixels are sRGB encoded (see getSharedRenderTarget()); the GPU decodes them to linear
+    // values when sampling. Linear filtering avoids blocky impostors; mipmaps are left out, they
+    // would add a third to the memory of the atlases (7.5 MiB each).
+    colorTexture.colorSpace = SRGBColorSpace;
+    colorTexture.magFilter = LinearFilter;
+    colorTexture.minFilter = LinearFilter;
     colorTexture.needsUpdate = true;
     // The pixels are only needed for the upload to the GPU; do not keep a copy of each atlas
     // (7.5 MiB) in the JS heap.
@@ -370,18 +380,6 @@ export class ImpostorManager {
       colorTexture.image.data = null;
       colorTexture.onUpdate = null;
     };
-
-    // Dispose the cloned model's materials so the renderer releases its internal
-    // cache entries. Geometries are shared with the source GLTF and not disposed here.
-    modelClone.traverse((obj) => {
-      if (obj.isMesh) {
-        if (Array.isArray(obj.material)) {
-          obj.material.forEach((m) => m.dispose());
-        } else {
-          obj.material?.dispose();
-        }
-      }
-    });
 
     this.impostorData.set(assetKey, {
       colorTexture,
