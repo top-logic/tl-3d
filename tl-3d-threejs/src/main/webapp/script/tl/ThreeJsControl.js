@@ -1394,6 +1394,12 @@ class ThreeJsControl {
    * left out (their geometry is a quad at the origin).
    */
   createBoundingBox() {
+    // The bounds of the instanced meshes only grow while instances are moved.
+    for (const assetKey of this.scope.instanceManager.managedMeshes.keys()) {
+      if (!assetKey.endsWith("_impostor")) {
+        this.scope.instanceManager.updateBounds(assetKey);
+      }
+    }
     this.boundingBox = new Box3();
     this.zUpRoot.updateMatrixWorld(true);
     this.zUpRoot.traverse((object) => {

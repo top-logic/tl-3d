@@ -412,19 +412,13 @@ export class InstancedMeshManager {
     const data = this.managedMeshes.get(assetKey);
     if (!data) return;
 
-    const { mesh, instanceData } = data;
+    const { mesh } = data;
 
     // Get base geometry bounding box
     const positionAttr = mesh.geometry.attributes.position;
     if (!positionAttr) return;
 
-    const baseBox = new Box3();
-    for (let i = 0; i < positionAttr.count; i++) {
-      const x = positionAttr.getX(i);
-      const y = positionAttr.getY(i);
-      const z = positionAttr.getZ(i);
-      baseBox.expandByPoint(new Vector3(x, y, z));
-    }
+    const baseBox = new Box3().setFromBufferAttribute(positionAttr);
 
     // Store base box for BVH to use
     data.baseBoundingBox = baseBox.clone();
@@ -434,23 +428,31 @@ export class InstancedMeshManager {
     baseBox.getSize(size);
     data.boundingBoxSize = size;
 
-    // Compute world bounding box that encompasses all instances
+    this.updateBounds(assetKey);
+    mesh.frustumCulled = true;
+  }
+
+  /**
+   * Sets the bounds of the instanced mesh of the given asset to the shown instances. Moving an
+   * instance only enlarges them (updateInstanceMatrix()); this recomputes them, e.g. after
+   * instances have been moved back, removed (only hidden) or hidden.
+   */
+  updateBounds(assetKey) {
+    const data = this.managedMeshes.get(assetKey);
+    if (!data?.baseBoundingBox) return;
+
     const worldBox = new Box3();
-
-    instanceData.forEach((instance) => {
-      const matrix = instance.matrix;
-      const instanceBox = baseBox.clone();
-      instanceBox.applyMatrix4(matrix);
+    const instanceBox = new Box3();
+    for (const instance of data.instanceData) {
+      if (this.isInstanceHidden(assetKey, instance.id)) continue;
+      instanceBox.copy(data.baseBoundingBox).applyMatrix4(instance.matrix);
       worldBox.union(instanceBox);
-    });
+    }
 
-    mesh.geometry.boundingBox = worldBox;
-
+    data.mesh.geometry.boundingBox = worldBox;
     const sphere = new Sphere();
     worldBox.getBoundingSphere(sphere);
-    mesh.geometry.boundingSphere = sphere;
-
-    mesh.frustumCulled = true;
+    data.mesh.geometry.boundingSphere = sphere;
   }
 
   /**
