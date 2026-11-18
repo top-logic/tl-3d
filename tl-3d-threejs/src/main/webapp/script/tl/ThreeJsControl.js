@@ -1913,15 +1913,28 @@ class ThreeJsControl {
       return;
     }
     try {
-      const needsFullReload = this.applySceneCommands(changesString);
+      const changed = new Set();
+      const needsFullReload = this.applySceneCommands(changesString, changed);
       if (needsFullReload) {
         this.sceneGraph.reload(this.scope);
       } else {
-        this.applyColors();
+        // Rebuild only what depends on the changes: a selection made in another component
+        // must not rebuild the octree of a large scene.
+        const structure = changed.has(STRUCTURE_CHANGE);
+        if (structure || changed.has("color")) {
+          this.applyColors();
+        }
         this.applySelection(this.sceneGraph.selection);
         this.updateTransformControls();
-        this.buildSceneOctree();
-        this.refreshInstancedSnappingPoints();
+        if (
+          structure ||
+          changed.has("transform") ||
+          changed.has("hidden") ||
+          changed.has("parent")
+        ) {
+          this.buildSceneOctree();
+          this.refreshInstancedSnappingPoints();
+        }
         this.invalidate();
       }
     } catch (ex) {
@@ -1935,7 +1948,7 @@ class ThreeJsControl {
    *
    * @returns whether the 3D scene must be rebuilt completely.
    */
-  applySceneCommands(changesString) {
+  applySceneCommands(changesString, changed = new Set()) {
     const changes = JSON.parse(changesString);
     let needsFullReload = false;
 
@@ -1974,6 +1987,9 @@ class ThreeJsControl {
           needsFullReload = true;
         }
       }
+      // The changed properties, or STRUCTURE_CHANGE for inserted / removed elements.
+      changed.add(command[0] === "S" ? cmdProps["p"] : STRUCTURE_CHANGE);
+
       change.shift();
       cmd.loadJson(cmdProps, change);
       cmd.apply(this.scope);
@@ -2692,6 +2708,9 @@ class ThreeJsControl {
     this.renderManager.invalidate();
   }
 }
+
+/** Marks inserted or removed elements in the changes collected by applySceneCommands(). */
+const STRUCTURE_CHANGE = "#structure";
 
 /**
  * All controls that have not been disposed yet. When the server renders the view again
