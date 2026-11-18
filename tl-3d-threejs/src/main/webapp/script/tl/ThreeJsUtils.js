@@ -9,8 +9,8 @@ import {
   Color,
   DirectionalLight,
   Group,
-  Line,
   LineBasicMaterial,
+  LineSegments,
   Matrix4,
   PerspectiveCamera,
   Raycaster,
@@ -254,12 +254,6 @@ export function isDescendantOfAny(node, selectedNodes) {
   return false;
 }
 
-export function createLine(start, end, color, linewidth) {
-  const geometry = new BufferGeometry().setFromPoints([start, end]);
-  const material = new LineBasicMaterial({ color, linewidth });
-  return new Line(geometry, material);
-}
-
 export const CameraUtils = {
   calculateCubeCameraPosition: function (cameraPosition, controlsTarget) {
     const subAxesOffset = new Vector3().subVectors(
@@ -316,6 +310,11 @@ export const CameraUtils = {
 };
 
 export const SceneUtils = {
+  /**
+   * The grid of the workplane in the x-y plane: lines every GRID_SMALL_CELL, stronger lines
+   * every 10 cells, the strongest at the edges and through the centre. The lines of each kind
+   * form one LineSegments object, i.e. one draw call.
+   */
   createDetailedGrid: function (size) {
     const z = 0;
     const edge = size / 2;
@@ -324,103 +323,32 @@ export const SceneUtils = {
     const smallCell = GRID_SMALL_CELL;
     const bigCell = smallCell * 10;
 
-    const gridSmall = new Group();
-    // vertical lines
+    // Lines parallel to the y and the x axis at the given positions.
+    const linesAt = (positions) =>
+      positions.flatMap((p) => [
+        new Vector3(p, -edge, z),
+        new Vector3(p, edge, z),
+        new Vector3(-edge, p, z),
+        new Vector3(edge, p, z),
+      ]);
+    const segments = (points, color) =>
+      new LineSegments(
+        new BufferGeometry().setFromPoints(points),
+        new LineBasicMaterial({ color }),
+      );
+
+    const smallPositions = [];
     for (let i = 0; i <= edge; i += smallCell) {
-      gridSmall.add(
-        createLine(
-          new Vector3(-i, -edge, z),
-          new Vector3(-i, edge, z),
-          LIGHT_BLUE,
-          1,
-        ),
-      );
-      gridSmall.add(
-        createLine(
-          new Vector3(i, -edge, z),
-          new Vector3(i, edge, z),
-          LIGHT_BLUE,
-          1,
-        ),
-      );
+      smallPositions.push(-i, i);
     }
-    // horizontal lines
-    for (let i = z; i <= edge; i += smallCell) {
-      gridSmall.add(
-        createLine(
-          new Vector3(-edge, -i, z),
-          new Vector3(edge, -i, z),
-          LIGHT_BLUE,
-          1,
-        ),
-      );
-      gridSmall.add(
-        createLine(
-          new Vector3(-edge, i, z),
-          new Vector3(edge, i, z),
-          LIGHT_BLUE,
-          1,
-        ),
-      );
-    }
-
-    const gridBig = new Group();
+    const bigPositions = [];
     for (let i = bigCell; i <= edge; i += bigCell) {
-      // vertical lines
-      gridBig.add(
-        createLine(
-          new Vector3(-i, -edge, z),
-          new Vector3(-i, edge, z),
-          MIDDLE_BLUE,
-          2,
-        ),
-      );
-      gridBig.add(
-        createLine(
-          new Vector3(i, -edge, z),
-          new Vector3(i, edge, z),
-          MIDDLE_BLUE,
-          2,
-        ),
-      );
-      // horizontal lines
-      gridBig.add(
-        createLine(
-          new Vector3(-edge, -i, z),
-          new Vector3(edge, -i, z),
-          MIDDLE_BLUE,
-          2,
-        ),
-      );
-      gridBig.add(
-        createLine(
-          new Vector3(-edge, i, z),
-          new Vector3(edge, i, z),
-          MIDDLE_BLUE,
-          2,
-        ),
-      );
+      bigPositions.push(-i, i);
     }
 
-    const gridEdgeCenter = new Group();
-    const thickestLines = [
-      // vertical outer lines
-      [new Vector3(-edge, -edge, z), new Vector3(-edge, edge, z)],
-      [new Vector3(edge, -edge, z), new Vector3(edge, edge, z)],
-      // horizontal outer lines
-      [new Vector3(-edge, -edge, z), new Vector3(edge, -edge, z)],
-      [new Vector3(-edge, edge, z), new Vector3(edge, edge, z)],
-      // central lines
-      [new Vector3(0, -edge, z), new Vector3(0, edge, z)],
-      [new Vector3(-edge, 0, z), new Vector3(edge, 0, z)],
-    ];
-    thickestLines.forEach(([start, end]) => {
-      gridEdgeCenter.add(createLine(start, end, DARK_BLUE, 3));
-    });
-
-    gridGroup.add(gridSmall);
-    gridGroup.add(gridBig);
-    gridGroup.add(gridEdgeCenter);
+    gridGroup.add(segments(linesAt(smallPositions), LIGHT_BLUE));
+    gridGroup.add(segments(linesAt(bigPositions), MIDDLE_BLUE));
+    gridGroup.add(segments(linesAt([-edge, edge, 0]), DARK_BLUE));
 
     return gridGroup;
   },
