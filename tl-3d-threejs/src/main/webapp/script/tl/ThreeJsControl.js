@@ -12,7 +12,6 @@ import {
   Frustum,
   Group,
   Matrix4,
-  RGBAFormat,
   Scene,
   SphereGeometry,
   Vector3,
@@ -2439,7 +2438,6 @@ class ThreeJsControl {
         transparent: material.transparent,
         opacity: material.opacity,
         depthWrite: material.depthWrite,
-        format: material.format,
       };
     }
 
@@ -2449,13 +2447,11 @@ class ThreeJsControl {
       material.transparent = orig.transparent;
       material.opacity = orig.opacity;
       material.depthWrite = orig.depthWrite;
-      material.format = orig.format;
     } else {
       // Apply transparency
       material.transparent = true;
       material.opacity = opacity;
       material.depthWrite = false;
-      material.format = RGBAFormat;
     }
     material.needsUpdate = true;
   }
