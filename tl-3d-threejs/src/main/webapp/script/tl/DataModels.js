@@ -408,42 +408,7 @@ export class Scope {
       // Add to scene
       ctrl.zUpRoot.add(newInstancedMesh);
 
-      if (ctrl.impostorManager) {
-        const impostorData = ctrl.impostorManager.impostorData.get(assetKey);
-
-        if (impostorData) {
-          const {
-            colorTexture,
-            depthTexture,
-            boundingRadius,
-            centerOffset,
-            captureOrientations,
-            faceCornerUVData,
-          } = impostorData;
-
-          // Prepare instance data (same as for real meshes)
-          const instanceData = group.instances.map((instance, index) => ({
-            id: index,
-            matrix: instance.worldTransform,
-            partNode: instance.partNode,
-          }));
-
-          // Create impostor mesh
-          const impostorMesh = this.instanceManager.createImpostorMesh(
-            assetKey,
-            colorTexture,
-            depthTexture,
-            boundingRadius,
-            centerOffset,
-            group.instances.length,
-            instanceData,
-            captureOrientations,
-            faceCornerUVData,
-          );
-
-          ctrl.zUpRoot.add(impostorMesh);
-        }
-      }
+      this.createImpostorMesh(ctrl, assetKey, group);
 
       // Re-apply per-instance state after texture recreation
       this.applyInitialInstanceState(assetKey, group.instances);
@@ -531,6 +496,8 @@ export class Scope {
   abortAssetLoading() {
     this._loadAbortController?.abort();
     this._loadAbortController = null;
+    this._impostorAbortController?.abort();
+    this._impostorAbortController = null;
   }
 
   /**
@@ -591,7 +558,7 @@ export class Scope {
   }
 
   /**
-   * Loads the GLTF files of all assets and generates the impostors.
+   * Loads the GLTF files of all assets. The impostors are generated on demand (ensureImpostors()).
    *
    * A previous loading pipeline is aborted. The returned promise resolves to true when
    * all assets are loaded, and to false when this pipeline was aborted (by a later call or
@@ -676,10 +643,6 @@ export class Scope {
         Promise.resolve(),
       )
       .then(() => {
-        if (signal.aborted) return;
-        return this.generateImpostors(ctrl, signal);
-      })
-      .then(() => {
         // All GLTFs of this pipeline are decoded. A later pipeline that is already running
         // still needs the workers; it releases them when it ends.
         if (this._loadAbortController === abortController) {
@@ -754,6 +717,72 @@ export class Scope {
       });
   }
 
+  /**
+   * Creates the impostor mesh of the given instanced asset, if its impostor has been generated.
+   */
+  createImpostorMesh(ctrl, assetKey, group) {
+    const impostorData = ctrl.impostorManager?.impostorData.get(assetKey);
+    if (!impostorData || !this.instanceManager.managedMeshes.has(assetKey)) {
+      return;
+    }
+    const {
+      colorTexture,
+      depthTexture,
+      boundingRadius,
+      centerOffset,
+      captureOrientations,
+      faceCornerUVData,
+    } = impostorData;
+
+    // Prepare instance data (same as for real meshes)
+    const instanceData = group.instances.map((instance, index) => ({
+      id: index,
+      matrix: instance.worldTransform,
+      partNode: instance.partNode,
+    }));
+
+    const impostorMesh = this.instanceManager.createImpostorMesh(
+      assetKey,
+      colorTexture,
+      depthTexture,
+      boundingRadius,
+      centerOffset,
+      group.instances.length,
+      instanceData,
+      captureOrientations,
+      faceCornerUVData,
+    );
+    if (impostorMesh) {
+      ctrl.zUpRoot.add(impostorMesh);
+    }
+  }
+
+  /**
+   * Generates the impostors of the instanced assets, unless they exist or are being generated.
+   *
+   * Impostors are drawn only on the octree path, for the instances beyond the triangle budget
+   * (see RenderManager): a small scene never needs them, and generating them costs 26 render
+   * passes and a read back of the atlas per asset. Called when the octree path is switched on.
+   */
+  ensureImpostors(ctrl) {
+    if (!this.instanceGroups || this.instanceGroups.size === 0 || ctrl.impostorManager) {
+      return;
+    }
+    const abortController = new AbortController();
+    this._impostorAbortController = abortController;
+    const signal = abortController.signal;
+
+    this.generateImpostors(ctrl, signal).then(() => {
+      if (signal.aborted || ctrl.disposed) {
+        return;
+      }
+      for (const [assetKey, group] of this.instanceGroups) {
+        this.createImpostorMesh(ctrl, assetKey, group);
+      }
+      ctrl.invalidate();
+    });
+  }
+
   async generateImpostors(ctrl, signal) {
     if (!this.instanceGroups || this.instanceGroups.size === 0) {
       return;
@@ -780,21 +809,15 @@ export class Scope {
       }
     }
 
-    const batchSize = 10;
-
-    for (let i = 0; i < entries.length; i += batchSize) {
-      const batch = entries.slice(i, i + batchSize);
-      for (const [assetKey, gltf, layoutInverse] of batch) {
-        impostorManager.generateImpostorForAsset(assetKey, gltf, layoutInverse);
+    for (const [assetKey, gltf, layoutInverse] of entries) {
+      // One asset per task (26 render passes and a read back), so that the view stays
+      // responsive while the impostors are generated.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (signal?.aborted) {
+        // The scene was reloaded meanwhile, the manager is disposed or replaced.
+        return;
       }
-      // Yield to the browser between batches so GC can run and the UI stays responsive
-      if (i + batchSize < entries.length) {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        if (signal?.aborted) {
-          // The scene was reloaded meanwhile, the manager is disposed or replaced.
-          return;
-        }
-      }
+      impostorManager.generateImpostorForAsset(assetKey, gltf, layoutInverse);
     }
 
     // Shared render target is no longer needed after all impostors are generated

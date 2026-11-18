@@ -2431,6 +2431,9 @@ class ThreeJsControl {
       // Tell the render manager which rendering path to use.
       // This also resets any in-progress state.
       this.renderManager.setUseOctree(true);
+
+      // Only the octree path draws impostors.
+      this.scope.ensureImpostors(this);
     } else {
       // An octree of a former state of the scene must not be used for picking.
       this.resetSceneOctree();
