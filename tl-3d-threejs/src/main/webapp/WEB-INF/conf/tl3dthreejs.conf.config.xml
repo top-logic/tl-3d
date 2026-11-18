@@ -16,7 +16,6 @@
 					<file resource="webjar:org.webjars.npm/three:/webjars/three:build/three.module.js" type="module" as="three" />
 					<file resource="webjar:org.webjars.npm/three:/webjars/three:examples/jsm/controls/OrbitControls.js" type="module" as="OrbitControls" />
 					<file resource="webjar:org.webjars.npm/three:/webjars/three:examples/jsm/controls/TransformControls.js" type="module" as="TransformControls" />
-					<file resource="webjar:org.webjars.npm/three:/webjars/three:examples/jsm/controls/FlyControls.js" type="module" as="FlyControls" />
 					<file resource="webjar:org.webjars.npm/three:/webjars/three:examples/jsm/loaders/GLTFLoader.js" type="module" as="GLTFLoader" />
 					<file resource="webjar:org.webjars.npm/three:/webjars/three:examples/jsm/loaders/DRACOLoader.js" type="module" as="DRACOLoader" />
 					<file resource="webjar:org.webjars.npm/three:/webjars/three:examples/jsm/loaders/KTX2Loader.js" type="module" as="KTX2Loader" />
