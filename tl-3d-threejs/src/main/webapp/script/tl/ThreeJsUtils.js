@@ -354,6 +354,12 @@ export const CameraUtils = {
   },
 };
 
+/** Directional lights of the scene (y-up), see SceneUtils.addStandardLights(). */
+const STANDARD_LIGHTS = [
+  { intensity: 8, position: [0, 5000, 1000] },
+  { intensity: 3, position: [200, -3000, -3000] },
+];
+
 export const SceneUtils = {
   /**
    * The grid of the workplane in the x-y plane: lines every GRID_SMALL_CELL, stronger lines
@@ -399,39 +405,32 @@ export const SceneUtils = {
   },
 
   addStandardLights: function (scene) {
-    const light1 = new DirectionalLight(WHITE, 8);
-    light1.position.set(0, 5000, 1000);
-    scene.add(light1);
-
-    const light2 = new DirectionalLight(WHITE, 3);
-    light2.position.set(200, -3000, -3000);
-    scene.add(light2);
-
-    return { mainLight: light1, secondaryLight: light2 };
+    const [mainLight, secondaryLight] = STANDARD_LIGHTS.map(
+      ({ intensity, position }) => {
+        const light = new DirectionalLight(WHITE, intensity);
+        light.position.set(...position);
+        scene.add(light);
+        return light;
+      },
+    );
+    return { mainLight, secondaryLight };
   },
 
+  /**
+   * Lights the capture of impostors like the scene (addStandardLights()), so that an impostor
+   * has the brightness of the model it replaces. The model is captured in its own z-up
+   * coordinates, while the scene is y-up (zUpRoot is rotated by -90 degrees about x): a scene
+   * position (x, y, z) is (x, -z, y) in the model. Instances that are rotated about the up
+   * axis see the lights from another side than the capture; that is the limit of an impostor
+   * without normals.
+   */
   addImpostorCaptureLights: function (scene) {
-    // Six directional lights - one for each axis direction
-    const lightIntensity = 4;
-
-    const lights = [
-      new DirectionalLight(WHITE, lightIntensity), // +X
-      new DirectionalLight(WHITE, lightIntensity), // -X
-      new DirectionalLight(WHITE, lightIntensity), // +Y
-      new DirectionalLight(WHITE, lightIntensity), // -Y
-      new DirectionalLight(WHITE, lightIntensity), // +Z
-      new DirectionalLight(WHITE, lightIntensity), // -Z
-    ];
-
-    lights[0].position.set(5000, 0, 0);
-    lights[1].position.set(-5000, 0, 0);
-    lights[2].position.set(0, 5000, 0);
-    lights[3].position.set(0, -5000, 0);
-    lights[4].position.set(0, 0, 5000);
-    lights[5].position.set(0, 0, -5000);
-
-    lights.forEach((light) => scene.add(light));
-
+    const lights = STANDARD_LIGHTS.map(({ intensity, position: [x, y, z] }) => {
+      const light = new DirectionalLight(WHITE, intensity);
+      light.position.set(x, -z, y);
+      scene.add(light);
+      return light;
+    });
     return { lights };
   },
 
