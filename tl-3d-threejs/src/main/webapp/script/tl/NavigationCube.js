@@ -321,6 +321,14 @@ export class NavigationCube {
     const raycaster = getRaycaster(event, this.cubeCamera, this.cubeCanvas);
     const cubeMesh = this.axesCube.children[0];
     const intersects = raycaster.intersectObject(cubeMesh, true);
+    const hoveredFace =
+      intersects.length > 0 ? (intersects[0].face?.materialIndex ?? -1) : -1;
+
+    // Only a change of the highlighted face needs drawing, and only of the cube.
+    if (hoveredFace === this.hoveredFace) {
+      return;
+    }
+    this.hoveredFace = hoveredFace;
 
     const materials = Array.isArray(cubeMesh.material)
       ? cubeMesh.material
@@ -333,14 +341,11 @@ export class NavigationCube {
       }
     });
 
-    if (intersects.length > 0) {
-      const intersectedFace = intersects[0].face;
-      if (intersectedFace && materials[intersectedFace.materialIndex]) {
-        materials[intersectedFace.materialIndex].color.set("#66bbff");
-      }
+    if (materials[hoveredFace]) {
+      materials[hoveredFace].color.set("#66bbff");
     }
 
-    this.renderManager.invalidate();
+    this.render();
   }
 
   /**
