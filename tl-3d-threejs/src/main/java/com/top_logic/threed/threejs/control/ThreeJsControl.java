@@ -19,6 +19,7 @@ import com.top_logic.base.services.simpleajax.JSFunctionCall;
 import com.top_logic.basic.col.MapBuilder;
 import com.top_logic.basic.io.BinaryContent;
 import com.top_logic.basic.io.StreamUtilities;
+import com.top_logic.basic.io.binary.BinaryDataSource;
 import com.top_logic.basic.json.JSON;
 import com.top_logic.basic.json.JSON.ParseException;
 import com.top_logic.basic.util.ResKey;
@@ -63,6 +64,12 @@ import jakarta.servlet.http.HttpServletResponse;
 public class ThreeJsControl extends AbstractControl implements ContentHandler {
 
 	private static final String THREEJS_JS_NS = "window.services.threejs";
+
+	/** Common prefix of the content types of glTF data (JSON and binary). */
+	private static final String GLTF_CONTENT_TYPE_PREFIX = "model/gltf";
+
+	/** Content type of binary glTF data. */
+	private static final String GLTF_BINARY_CONTENT_TYPE = "model/gltf-binary";
 
 	/** Type of the command setting a property in a scene change of the client. */
 	private static final String SET_PROPERTY = "S";
@@ -215,10 +222,33 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 				return;
 			}
 
-			response.setContentType("model/gltf-binary");
+			response.setContentType(contentType(image));
+			if (image instanceof BinaryDataSource data) {
+				long size = data.getSize();
+				if (size >= 0) {
+					response.setContentLengthLong(size);
+				}
+			}
+			// The URL contains the ID of the control and changes when the view is rendered again,
+			// an image with the same ID may have new content (uploaded again): not worth caching.
+			response.setHeader("Cache-Control", "no-store");
 			try (InputStream content = ((BinaryContent) image).getStream()) {
 				StreamUtilities.copyStreamContents(content, response.getOutputStream());
 			}
+		}
+
+		/**
+		 * The content type of the given glTF data: binary glTF unless the data declares the JSON
+		 * form. A generic type, as often stored for uploaded files, is not passed on.
+		 */
+		private String contentType(Object image) {
+			if (image instanceof BinaryDataSource data) {
+				String contentType = data.getContentType();
+				if (contentType != null && contentType.startsWith(GLTF_CONTENT_TYPE_PREFIX)) {
+					return contentType;
+				}
+			}
+			return GLTF_BINARY_CONTENT_TYPE;
 		}
 	};
 
