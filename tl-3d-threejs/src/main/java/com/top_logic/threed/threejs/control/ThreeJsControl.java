@@ -10,14 +10,17 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.top_logic.base.services.simpleajax.JSFunctionCall;
 import com.top_logic.basic.col.MapBuilder;
 import com.top_logic.basic.io.BinaryContent;
 import com.top_logic.basic.io.StreamUtilities;
 import com.top_logic.basic.json.JSON;
+import com.top_logic.basic.json.JSON.ParseException;
 import com.top_logic.basic.util.ResKey;
 import com.top_logic.basic.xml.TagWriter;
 import com.top_logic.layout.ContentHandler;
@@ -60,6 +63,9 @@ import jakarta.servlet.http.HttpServletResponse;
 public class ThreeJsControl extends AbstractControl implements ContentHandler {
 
 	private static final String THREEJS_JS_NS = "window.services.threejs";
+
+	/** Type of the command setting a property in a scene change of the client. */
+	private static final String SET_PROPERTY = "S";
 
 	private static final Map<String, ControlCommand> COMMANDS = createCommandMap(ApplySceneChange.INSTANCE);
 
@@ -513,15 +519,62 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 	 * Applies commands from the UI.
 	 */
 	void applyChange(String changes) {
-		if (_nodeScope.hasChanges()) {
-			throw new IllegalStateException("Scope has changes which were not delivered to the client.");
-		}
+		applyClientChanges(_nodeScope, changes);
+	}
+
+	/**
+	 * Applies the changes made by the client to the scene graph of the server.
+	 * 
+	 * <p>
+	 * The server may have changes that are not yet delivered to the client, e.g. because another
+	 * component changed the model while the client sent its change. These changes are kept and
+	 * delivered with the next update. For nodes with such changes, the client may have worked on
+	 * an outdated state:
+	 * </p>
+	 * <ul>
+	 * <li>A new value of a property is applied (the last change wins), and the server sends the
+	 * complete value back, which replaces pending list updates of this property.</li>
+	 * <li>A list update of the client refers to indices in the outdated list. It is not applied;
+	 * the server sends the complete list instead, which reverts the change on the client.</li>
+	 * </ul>
+	 */
+	static void applyClientChanges(DefaultScope scope, String changes) {
 		try {
-			_nodeScope.applyChanges(new JsonReader(new StringR(changes)));
-		} catch (IOException ex) {
-			throw new UncheckedIOException(ex);
+			if (!scope.hasChanges()) {
+				scope.applyChanges(new JsonReader(new StringR(changes)));
+				return;
+			}
+
+			Set<SharedGraphNode> dirty = new HashSet<>(scope.getDirty());
+			for (Object entry : (List<?>) JSON.fromString(changes)) {
+				List<?> header = (List<?>) ((List<?>) entry).get(0);
+				String type = (String) header.get(0);
+				Map<?, ?> properties = (Map<?, ?>) header.get(1);
+				int id = ((Number) properties.get("id")).intValue();
+				String property = (String) properties.get("p");
+
+				SharedGraphNode node = scope.index().get(id);
+				if (node == null) {
+					// Removed on the server, the client is informed by the pending changes.
+					continue;
+				}
+				if (!dirty.contains(node)) {
+					applySingle(scope, entry);
+					continue;
+				}
+				if (SET_PROPERTY.equals(type)) {
+					applySingle(scope, entry);
+				}
+				// Deliver the complete value of the property with the next update.
+				scope.beforeSet((Observable) node, property, null);
+			}
+		} catch (IOException | ParseException ex) {
+			throw new IllegalArgumentException("Invalid scene change: " + changes, ex);
 		}
-		_nodeScope.dropChanges();
+	}
+
+	private static void applySingle(DefaultScope scope, Object command) throws IOException {
+		scope.applyChanges(new JsonReader(new StringR(JSON.toString(List.of(command)))));
 	}
 
 	/**
