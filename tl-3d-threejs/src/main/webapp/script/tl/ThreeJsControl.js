@@ -586,6 +586,8 @@ class ThreeJsControl {
       } else {
         // The snapping point marked while dragging is only a preview.
         this.clearSnappingHighlight();
+        // The object may have left the bounds (zoomOut, clipping planes).
+        this.createBoundingBox();
       }
     });
 
@@ -637,6 +639,9 @@ class ThreeJsControl {
     this.rotateControls.addEventListener("dragging-changed", (event) => {
       if (event.value) {
         this.gizmoDragged = true;
+      } else {
+        // The rotated object may reach beyond the bounds (zoomOut, clipping planes).
+        this.createBoundingBox();
       }
     });
     this.rotateControls.addEventListener("objectChange", (event) => {
@@ -1934,6 +1939,8 @@ class ThreeJsControl {
         ) {
           this.buildSceneOctree();
           this.refreshInstancedSnappingPoints();
+          // Parts may have been added or moved beyond the bounds (zoomOut, clipping planes).
+          this.createBoundingBox();
         }
         this.invalidate();
       }
