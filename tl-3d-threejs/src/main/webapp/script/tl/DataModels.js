@@ -799,6 +799,36 @@ export class Scope {
 
     // Shared render target is no longer needed after all impostors are generated
     impostorManager.disposeSharedRenderTarget();
+    this.releaseInstancedGltfGeometries(ctrl);
+  }
+
+  /**
+   * Releases the GPU buffers of the GLTF geometries of instanced assets. Rendering the impostors
+   * uploads them, but the scene draws the instanced copies only. The data stays in memory (for a
+   * reload or new impostors); three.js uploads it again if it is drawn once more.
+   */
+  releaseInstancedGltfGeometries(ctrl) {
+    if (!this.instanceGroups) {
+      return;
+    }
+    // GLTFs also shown as normal (not instanced) parts are drawn and keep their buffers.
+    const drawn = new Set();
+    for (const asset of this.assets) {
+      if (asset._clonedModel && asset.gltf) {
+        drawn.add(asset.gltf);
+      }
+    }
+    for (const group of this.instanceGroups.values()) {
+      const gltf = this.gltfs[gltfUrlOf(ctrl, group.asset)];
+      if (!gltf || drawn.has(gltf)) {
+        continue;
+      }
+      gltf.scene.traverse((object) => {
+        if (object.isMesh) {
+          object.geometry.dispose();
+        }
+      });
+    }
   }
 
   /**
@@ -839,6 +869,7 @@ export class Scope {
       }
     }
     impostorManager.disposeSharedRenderTarget();
+    this.releaseInstancedGltfGeometries(ctrl);
   }
 
   setGLTF(ctrl, url, assetsByURL) {
