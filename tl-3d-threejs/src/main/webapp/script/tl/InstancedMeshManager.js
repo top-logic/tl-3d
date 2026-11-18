@@ -43,6 +43,34 @@ function markLayersForUpload(texture, layers) {
   texture.needsUpdate = true;
 }
 
+/**
+ * Which instances a material of an instanced mesh draws (uniform opacityPass): all of them, only
+ * those with full opacity, or only the translucent ones. In the transparency mode, an instanced
+ * mesh is drawn in two passes, see setTransparentMode().
+ */
+const PASS_ALL = 0;
+const PASS_OPAQUE = 1;
+const PASS_TRANSLUCENT = 2;
+
+/**
+ * Sets the pass of a material of an instanced mesh: the translucent pass is transparent and
+ * does not write depth, like normal objects in the transparency mode; the other passes keep the
+ * flags of the GLTF material. The shader program changes only with the transparent flag.
+ */
+function applyOpacityPass(material, pass) {
+  material.userData.opacityPass.value = pass;
+  const translucent = pass === PASS_TRANSLUCENT;
+  const transparent = material.userData.baseTransparent || translucent;
+  if (material.transparent !== transparent) {
+    material.transparent = transparent;
+    material.needsUpdate = true;
+  }
+  material.depthWrite = translucent ? false : material.userData.baseDepthWrite;
+  // A transparent double sided material is otherwise drawn twice (back faces, then front faces);
+  // with the additional opaque pass that would triple the triangles of the transparency mode.
+  material.forceSinglePass = translucent;
+}
+
 export class InstancedMeshManager {
   constructor() {
     // Map of assetKey -> InstancedMeshData
@@ -95,6 +123,7 @@ export class InstancedMeshManager {
       existingData.matrixTexture?.dispose();
       existingData.geometry?.dispose();
       disposeMaterial(existingData.mesh.material);
+      this.removeOpaquePass(existingData);
     }
 
     // Calculate optimal texture dimensions
@@ -133,6 +162,7 @@ export class InstancedMeshManager {
         textureWidth,
         textureHeight,
         selectionColor,
+        this.transparentMode ? PASS_TRANSLUCENT : PASS_ALL,
       );
     const customMaterial = Array.isArray(baseMaterial)
       ? baseMaterial.map(toLookupMaterial)
@@ -161,10 +191,16 @@ export class InstancedMeshManager {
         partNode: d.partNode || null,
       })),
       triangleCount: triangleCount,
+      baseMaterial,
+      selectionColor,
     });
 
     // Compute proper bounding box and sphere
     this.computeBounds(assetKey);
+
+    if (this.transparentMode) {
+      this.addOpaquePass(this.managedMeshes.get(assetKey));
+    }
 
     return mesh;
   }
@@ -249,6 +285,7 @@ export class InstancedMeshManager {
     textureWidth,
     textureHeight,
     selectionColor,
+    opacityPass = PASS_ALL,
   ) {
     // Clone the material to avoid modifying the original
     const material = baseMaterial.clone();
@@ -256,7 +293,9 @@ export class InstancedMeshManager {
     // double sided material is drawn in two passes (back faces, then front faces), which
     // doubles the triangles of all instances.
     material.userData.baseTransparent = baseMaterial.transparent;
-    material.transparent = baseMaterial.transparent || this.transparentMode;
+    material.userData.baseDepthWrite = baseMaterial.depthWrite;
+    material.userData.opacityPass = { value: opacityPass };
+    applyOpacityPass(material, opacityPass);
 
     // Patch the shader using onBeforeCompile
     material.onBeforeCompile = (shader) => {
@@ -265,6 +304,8 @@ export class InstancedMeshManager {
       shader.uniforms.textureWidth = { value: textureWidth };
       shader.uniforms.textureHeight = { value: textureHeight };
       shader.uniforms.selectionColor = { value: selectionColor };
+      // Shared with userData: setTransparentMode() changes the value without recompiling.
+      shader.uniforms.opacityPass = material.userData.opacityPass;
 
       // Add custom attribute and uniforms at the top
       shader.vertexShader = `
@@ -311,6 +352,7 @@ export class InstancedMeshManager {
       shader.fragmentShader = `
         uniform highp sampler2DArray matrixTexture;
         uniform vec3 selectionColor;
+        uniform int opacityPass;
         varying vec2 vInstanceUV;
         float instanceOpacity;
 
@@ -328,6 +370,10 @@ export class InstancedMeshManager {
         instanceOpacity = instanceState.g;
 
         if (instanceState.b > 0.5) discard;
+        // Two passes in the transparency mode: opaque instances (the selected ones) with depth,
+        // then the translucent ones without.
+        if (opacityPass == ${PASS_OPAQUE} && instanceOpacity < 0.99) discard;
+        if (opacityPass == ${PASS_TRANSLUCENT} && instanceOpacity >= 0.99) discard;
 
         if (instanceState.r > 0.5) {
           diffuseColor.rgb = selectionColor;
@@ -1050,12 +1096,53 @@ export class InstancedMeshManager {
       if (assetKey.endsWith("_impostor")) continue;
       // One material per merged mesh for GLTFs with several meshes.
       for (const material of materialsOf(data.mesh)) {
-        const transparent = material.userData.baseTransparent || enabled;
-        if (material.transparent !== transparent) {
-          material.transparent = transparent;
-          material.needsUpdate = true;
-        }
+        applyOpacityPass(material, enabled ? PASS_TRANSLUCENT : PASS_ALL);
       }
+      if (enabled) {
+        this.addOpaquePass(data);
+      } else {
+        this.removeOpaquePass(data);
+      }
+    }
+  }
+
+  /**
+   * Adds a second mesh to the given instanced mesh, which draws its opaque instances (the
+   * selected ones in the transparency mode) with depth before the translucent ones. In a single
+   * transparent pass, a translucent instance in front would write its depth and hide the
+   * selected instance behind it, unlike normal objects, which do not write depth when
+   * transparent.
+   */
+  addOpaquePass(data) {
+    if (data.opaquePass || !data.baseMaterial) {
+      return;
+    }
+    const toOpaque = (material) =>
+      this.createMatrixLookupMaterial(
+        material,
+        data.matrixTexture,
+        data.textureWidth,
+        data.textureHeight,
+        data.selectionColor,
+        PASS_OPAQUE,
+      );
+    const material = Array.isArray(data.baseMaterial)
+      ? data.baseMaterial.map(toOpaque)
+      : toOpaque(data.baseMaterial);
+    // Same geometry: the instance count and visible IDs of the instanced mesh apply.
+    const mesh = new Mesh(data.geometry, material);
+    mesh.userData.isInstancedMesh = true;
+    mesh.userData.isOpaquePass = true;
+    mesh.frustumCulled = data.mesh.frustumCulled;
+    data.mesh.add(mesh);
+    data.opaquePass = mesh;
+  }
+
+  removeOpaquePass(data) {
+    if (data.opaquePass) {
+      data.opaquePass.removeFromParent();
+      disposeMaterial(data.opaquePass.material);
+      data.opaquePass = null;
     }
   }
 
@@ -1064,6 +1151,7 @@ export class InstancedMeshManager {
    */
   dispose() {
     for (const [assetKey, data] of this.managedMeshes) {
+      this.removeOpaquePass(data);
       data.matrixTexture?.dispose();
       data.faceCornerTexture?.dispose();
       data.mesh.geometry.dispose();
