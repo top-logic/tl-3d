@@ -125,4 +125,18 @@
        <!-- <session-timeout>2</session-timeout> -->
     </session-config>
     
+    <!-- glTF models of the 3D viewer (static assets): without a type the server sends none. -->
+    <mime-mapping>
+        <extension>glb</extension>
+        <mime-type>model/gltf-binary</mime-type>
+    </mime-mapping>
+    <mime-mapping>
+        <extension>gltf</extension>
+        <mime-type>model/gltf+json</mime-type>
+    </mime-mapping>
+    <mime-mapping>
+        <extension>ktx2</extension>
+        <mime-type>image/ktx2</mime-type>
+    </mime-mapping>
+
 </web-app>
