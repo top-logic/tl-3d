@@ -1990,36 +1990,55 @@ class ThreeJsControl {
     }
   }
 
+  /**
+   * Sets the colour of the given 3D object and its descendants (e.g. the selection colour), or,
+   * with WHITE, restores their own colours: the colour of the nearest coloured ancestor (as set
+   * by the scene, userData.color) for meshes, otherwise the original material colour.
+   */
   setColor(node, color) {
     if (!node) {
       return;
     }
 
-    if (color === WHITE) {
-      let rootNode = node;
-      while (rootNode?.parent) {
-        const c = rootNode.userData?.color;
-        if (typeof c === "string") {
-          applyColorToObject(node, c);
-          break;
+    if (color !== WHITE) {
+      node.traverse((object) => {
+        for (const material of this.getMaterials(object)) {
+          material?.color?.set(color);
         }
-        rootNode = rootNode.parent;
-      }
+      });
+      return;
+    }
 
-      if (!rootNode?.userData?.color) {
-        if (node.material?.userData?.originalColor) {
-          node.material.color.copy(node.material.userData.originalColor);
-        }
-      }
-    } else {
-      if (node.material) {
-        node.material.color.set(color);
+    // Colour inherited from the nearest coloured ancestor (or the node itself); the topmost
+    // object (the scene) is not considered.
+    let inherited = null;
+    for (let ancestor = node; ancestor?.parent; ancestor = ancestor.parent) {
+      if (typeof ancestor.userData?.color === "string") {
+        inherited = ancestor.userData.color;
+        break;
       }
     }
 
-    for (const child of node.children) {
-      this.setColor(child, color);
-    }
+    // One pass over the subtree, passing the effective colour down.
+    const restore = (object, inheritedColor) => {
+      const own = object.userData?.color;
+      const effective =
+        object.parent && typeof own === "string" ? own : inheritedColor;
+      if (effective) {
+        if (object.isMesh && object.material) {
+          const c = new Color(effective);
+          for (const material of this.getMaterials(object)) {
+            material.color.copy(c);
+          }
+        }
+      } else if (object.material?.userData?.originalColor) {
+        object.material.color.copy(object.material.userData.originalColor);
+      }
+      for (const child of object.children) {
+        restore(child, effective);
+      }
+    };
+    restore(node, inherited);
   }
 
   /** Updates the selection from a click on the canvas. */
