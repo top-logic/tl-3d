@@ -83,6 +83,32 @@ function isShown(object) {
   return true;
 }
 
+/**
+ * The hits of the given ray on the shown objects below the given roots that can be picked, the
+ * nearest first. Hidden subtrees, instanced and impostor meshes (picked by their instances, see
+ * raycastInstancedMeshes()) and the workplane are not tested at all: testing them costs time
+ * with every click (the merged triangles of an instanced asset, thousands of grid lines).
+ */
+function raycastPickable(raycaster, roots, excluded) {
+  const hits = [];
+  const visit = (object) => {
+    if (
+      !object.visible ||
+      object.userData.isInstancedMesh ||
+      object.userData.isImpostorMesh ||
+      excluded.includes(object)
+    ) {
+      return;
+    }
+    object.raycast(raycaster, hits);
+    for (const child of object.children) {
+      visit(child);
+    }
+  };
+  roots.forEach(visit);
+  return hits.sort((a, b) => a.distance - b.distance);
+}
+
 /** The selectable scene node the given 3D object belongs to, or null. */
 function selectableNodeOf(object) {
   for (let o = object; o != null; o = o.parent) {
@@ -1495,12 +1521,13 @@ class ThreeJsControl {
     const raycaster = getRaycaster(event, this.camera, this.canvas);
     const toggleMode = event.ctrlKey || event.metaKey;
 
-    // Nearest shown and selectable regular object. The raycaster does not check the visibility
-    // of descendants, so hidden nodes are filtered out here.
-    const visibleObjects = this.scene.children.filter((obj) => obj.visible);
-    const regularHit = raycaster
-      .intersectObjects(visibleObjects, true)
-      .find((hit) => isShown(hit.object) && selectableNodeOf(hit.object) != null);
+    // Nearest shown and selectable regular object: parts are below zUpRoot, or in
+    // multiTransformGroup while a multi-selection is moved.
+    const regularHit = raycastPickable(
+      raycaster,
+      [this.zUpRoot, this.multiTransformGroup],
+      [this.workplane],
+    ).find((hit) => isShown(hit.object) && selectableNodeOf(hit.object) != null);
 
     // Nearest instance; the nearer of both is selected.
     const instancedHit = this.raycastInstancedMeshes(raycaster);
