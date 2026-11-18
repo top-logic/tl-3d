@@ -19,6 +19,8 @@
 					<file resource="webjar:org.webjars.npm/three:/webjars/three:examples/jsm/controls/FlyControls.js" type="module" as="FlyControls" />
 					<file resource="webjar:org.webjars.npm/three:/webjars/three:examples/jsm/loaders/GLTFLoader.js" type="module" as="GLTFLoader" />
 					<file resource="webjar:org.webjars.npm/three:/webjars/three:examples/jsm/loaders/DRACOLoader.js" type="module" as="DRACOLoader" />
+					<file resource="webjar:org.webjars.npm/three:/webjars/three:examples/jsm/loaders/KTX2Loader.js" type="module" as="KTX2Loader" />
+					<file resource="webjar:org.webjars.npm/three:/webjars/three:examples/jsm/libs/meshopt_decoder.module.js" type="module" as="MeshoptDecoder" />
 					<file resource="webjar:org.webjars.npm/three:/webjars/three:examples/jsm/utils/BufferGeometryUtils.js" type="module" as="BufferGeometryUtils" />
 					<file resource="webjar:org.webjars.npm/gsap:/webjars/gsap:index.js" type="module" as="gsap" />
 					<file resource="tl/ThreeJsControl.js" type="module" />

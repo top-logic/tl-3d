@@ -37,6 +37,8 @@ import { ImpostorManager } from "./ImpostorManager.js";
 import { GLTFLoader } from "GLTFLoader";
 import { mergeGeometries } from "BufferGeometryUtils";
 import { DRACOLoader } from "DRACOLoader";
+import { KTX2Loader } from "KTX2Loader";
+import { MeshoptDecoder } from "MeshoptDecoder";
 import { InsertElement, RemoveElement, SetProperty } from "./Commands.js";
 
 /**
@@ -156,6 +158,14 @@ function instanceTemplate(gltf, asset, assetKey) {
   const triangleCount =
     (geometry.index ? geometry.index.count : geometry.attributes.position.count) / 3;
   return { geometry, material, triangleCount };
+}
+
+/**
+ * The URL path of a library folder of the three.js examples (examples/jsm/libs/<folder>/), found
+ * relative to the loader module with the given import specifier.
+ */
+function libraryPath(loaderSpecifier, folder) {
+  return new URL(`../libs/${folder}/`, import.meta.resolve(loaderSpecifier)).pathname;
 }
 
 export class Scope {
@@ -538,38 +548,52 @@ export class Scope {
   /**
    * The GLTF loader of this scope, created on first use.
    *
-   * All loading pipelines share one loader with one DRACO decoder, so that there is only
-   * one pool of decoder web workers. The decoder is released when the current pipeline ends
-   * (see releaseDecoders()) and created again by the next pipeline.
+   * Besides plain glTF, the loader reads the compressions that tools like gltf-transform or
+   * gltfpack produce: geometry compressed with DRACO (KHR_draco_mesh_compression) or meshopt
+   * (EXT_meshopt_compression), and textures in the KTX2 / Basis Universal format
+   * (KHR_texture_basisu).
+   *
+   * All loading pipelines share one loader, so that there is only one DRACO decoder and one
+   * KTX2 transcoder, each with a pool of web workers. They are released when the current
+   * pipeline ends (see releaseDecoders()) and created again by the next pipeline.
+   *
+   * @param renderer The renderer that displays the textures; it determines the GPU texture
+   *        formats into which KTX2 textures are transcoded.
    */
-  gltfLoader() {
+  gltfLoader(renderer) {
     if (!this._gltfLoader) {
       this._gltfLoader = new GLTFLoader();
+      // Decodes in the main thread, does not need to be released.
+      this._gltfLoader.setMeshoptDecoder(MeshoptDecoder);
     }
     if (!this._dracoLoader) {
+      // The decoders lie next to the loaders in the examples of three.js. Since the path of
+      // the loader modules contains the version number, it is derived from the module URL.
       this._dracoLoader = new DRACOLoader();
-
-      // The decoder lies next to the examples of three.js. Since the path of the
-      // DRACOLoader module contains the version number, it is derived from the module URL.
-      const dracoModuleUrl = import.meta.resolve("DRACOLoader");
-      const decoderPath = new URL("../libs/draco/", dracoModuleUrl).pathname;
-      this._dracoLoader.setDecoderPath(decoderPath);
-
+      this._dracoLoader.setDecoderPath(libraryPath("DRACOLoader", "draco"));
       this._gltfLoader.setDRACOLoader(this._dracoLoader);
+
+      this._ktx2Loader = new KTX2Loader();
+      this._ktx2Loader.setTranscoderPath(libraryPath("KTX2Loader", "basis"));
+      this._ktx2Loader.detectSupport(renderer);
+      this._gltfLoader.setKTX2Loader(this._ktx2Loader);
     }
     return this._gltfLoader;
   }
 
   /**
-   * Terminates the web workers of the DRACO decoder and releases their WebAssembly memory.
+   * Terminates the web workers of the DRACO decoder and the KTX2 transcoder and releases their
+   * WebAssembly memory.
    *
-   * A disposed DRACOLoader cannot decode any more (it revokes the source URL of its workers),
-   * so the next call of gltfLoader() creates a new one. Must not be called while a pipeline
-   * decodes, since pending decodings of terminated workers never finish.
+   * A disposed DRACOLoader or KTX2Loader cannot be used any more (it revokes the source URL of
+   * its workers), so the next call of gltfLoader() creates new ones. Must not be called while a
+   * pipeline decodes, since pending decodings of terminated workers never finish.
    */
   releaseDecoders() {
     this._dracoLoader?.dispose();
     this._dracoLoader = null;
+    this._ktx2Loader?.dispose();
+    this._ktx2Loader = null;
   }
 
   /** Stops loading and releases the decoder. Called when the control is disposed. */
@@ -597,7 +621,7 @@ export class Scope {
     this._loadAbortController = abortController;
     const signal = abortController.signal;
 
-    const gltfLoader = this.gltfLoader();
+    const gltfLoader = this.gltfLoader(ctrl.renderer);
 
     const loadUrl = (url) => {
       return gltfLoader.loadAsync(url).then(
