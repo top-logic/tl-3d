@@ -1887,11 +1887,15 @@ class ThreeJsControl {
   }
 
   zoomToSelection() {
-    const selected = this.selection[0];
-    if (!selected) return;
-
-    const boundingBox = this.computeSelectionBoundingBox(selected);
-    if (!boundingBox || boundingBox.isEmpty()) return;
+    // All selected nodes, not only the first one.
+    const boundingBox = new Box3();
+    for (const selected of this.selection) {
+      const box = this.computeSelectionBoundingBox(selected);
+      if (box && !box.isEmpty()) {
+        boundingBox.union(box);
+      }
+    }
+    if (boundingBox.isEmpty()) return;
 
     const center = new Vector3();
     boundingBox.getCenter(center);
@@ -1909,7 +1913,8 @@ class ThreeJsControl {
     this.stopCameraAnimation();
     gsap.to(this.controls.object.position, {
       x: center.x,
-      y: center.y + 2000,
+      // Looking a bit from the top, relative to the distance.
+      y: center.y + targetDistance * VIEW_OFFSET,
       z: targetPositionZ,
       duration: CAMERA_MOVE_DURATION,
       ease: "power3.inOut",
@@ -1960,9 +1965,11 @@ class ThreeJsControl {
     const distance = maxSize / 2 / Math.tan(fov / 2);
 
     this.stopCameraAnimation();
+    // Looking a bit at the right side and from the top, relative to the distance, so that
+    // small and large scenes are seen from the same angle.
     const targetZoomOutPosition = new Vector3(
-      center.x + 12000, // for looking a bit at the right side
-      center.y + 12000, // for looking a bit from the top
+      center.x + distance * VIEW_OFFSET,
+      center.y + distance * VIEW_OFFSET,
       center.z + distance,
     );
 
@@ -2841,6 +2848,12 @@ class ThreeJsControl {
     this.renderManager.invalidate();
   }
 }
+
+/**
+ * Sideways and upwards offset of the camera after a flight (zoomOut, zoomToSelection), relative
+ * to its distance to the content.
+ */
+const VIEW_OFFSET = 0.45;
 
 /** Marks inserted or removed elements in the changes collected by applySceneCommands(). */
 const STRUCTURE_CHANGE = "#structure";
