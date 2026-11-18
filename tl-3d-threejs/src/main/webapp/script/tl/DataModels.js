@@ -168,6 +168,20 @@ function libraryPath(loaderSpecifier, folder) {
   return new URL(`../libs/${folder}/`, import.meta.resolve(loaderSpecifier)).pathname;
 }
 
+/** Number of GLTF files loaded at the same time. */
+const PARALLEL_DOWNLOADS = 6;
+
+/**
+ * Makes the material of a placeholder a red wire frame, which tells a part whose GLTF could not
+ * be loaded from one that is still loading. The colour is kept when selection colours are
+ * restored (originalColor).
+ */
+function markFailedPlaceholder(material) {
+  material.color.set(RED);
+  material.userData.originalColor = material.color.clone();
+  material.wireframe = true;
+}
+
 export class Scope {
   constructor() {
     this.objects = {};
@@ -356,6 +370,10 @@ export class Scope {
 
       if (!gltf) {
         console.warn(`GLTF not loaded for ${gltfUrl} (asset ${assetKey})`);
+        const placeholder = this.instanceManager.managedMeshes.get(assetKey)?.mesh;
+        if (placeholder) {
+          markFailedPlaceholder(placeholder.material);
+        }
         continue;
       }
 
@@ -598,50 +616,40 @@ export class Scope {
       );
     };
 
-    const loadURLs = (urls, assetsByURL) => {
-      // Checked when the batch starts, not when the chain is built.
-      if (signal.aborted) return Promise.resolve();
-      return Promise.all(urls.map(loadUrl)).then(() => {
-        if (signal.aborted) return;
-        for (const url of urls) {
-          this.setGLTF(ctrl, url, assetsByURL);
-        }
-        ctrl.invalidate();
-      });
-    };
-
-    // load assets in batches to prevent overwhelming the browser
     const assetsByURL = Map.groupBy(this.assets, (asset) =>
       gltfUrlOf(ctrl, asset),
     );
-
     // No need to load "null" URL.
     assetsByURL.delete(null);
-    const batchSize = 10;
-    const batches = [];
-    let urls = [];
 
-    for (const key of assetsByURL.keys()) {
-      if (urls.length === batchSize) {
-        batches.push(urls);
-        urls = [];
+    // URLs not loaded yet; the others are shown at once.
+    const urls = [...assetsByURL.keys()].filter(
+      (url) => !this.setGLTF(ctrl, url, assetsByURL),
+    );
+
+    // A fixed number of downloads at a time, each model shown as soon as it is loaded: a batch
+    // of downloads would wait for its slowest file before the next batch starts.
+    let next = 0;
+    const loadNext = async () => {
+      while (next < urls.length && !signal.aborted) {
+        const url = urls[next++];
+        await loadUrl(url);
+        if (signal.aborted) return;
+        if (!this.setGLTF(ctrl, url, assetsByURL)) {
+          // Without a model the parts would stay white boxes like those still loading.
+          for (const asset of assetsByURL.get(url)) {
+            asset.markLoadFailed();
+          }
+        }
+        ctrl.invalidate();
       }
-      if (this.setGLTF(ctrl, key, assetsByURL)) {
-        // URL already successfully loaded.
-        continue;
-      }
-      urls.push(key);
+    };
+    const loaders = [];
+    for (let i = 0; i < Math.min(PARALLEL_DOWNLOADS, urls.length); i++) {
+      loaders.push(loadNext());
     }
 
-    if (urls.length > 0) {
-      batches.push(urls);
-    }
-
-    return batches
-      .reduce(
-        (promise, batch) => promise.then(() => loadURLs(batch, assetsByURL)),
-        Promise.resolve(),
-      )
+    return Promise.all(loaders)
       .then(() => {
         // All GLTFs of this pipeline are decoded. A later pipeline that is already running
         // still needs the workers; it releases them when it ends.
@@ -709,7 +717,11 @@ export class Scope {
           }
           ctrl.invalidate();
         },
-        (reason) => console.error("Failed to load '" + url + "': " + reason),
+        (reason) => {
+          console.error("Failed to load '" + url + "': " + reason);
+          assets.forEach((asset) => asset.markLoadFailed());
+          ctrl.invalidate();
+        },
       )
       .finally(() => {
         this._additionalLoads--;
@@ -1786,6 +1798,14 @@ export class GltfAsset extends SharedObject {
       case "snappingPoints":
         this.snappingPoints.splice(idx, 1);
         break;
+    }
+  }
+
+  /** Shows the placeholder as a red wire frame: the GLTF of this asset could not be loaded. */
+  markLoadFailed() {
+    this.loadFailed = true;
+    if (this.placeholder) {
+      markFailedPlaceholder(this.placeholder.material);
     }
   }
 
