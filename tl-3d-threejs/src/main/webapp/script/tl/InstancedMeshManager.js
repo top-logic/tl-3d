@@ -29,6 +29,20 @@ import {
 import { SELECTION_COLOR } from "./Constants.js";
 import { disposeMaterial, sceneColor } from "./ThreeJsUtils.js";
 
+/**
+ * Marks layers of the matrix texture of an instanced mesh as changed (layers 0-3: matrices,
+ * 4: state, 5: colour), so that only these are uploaded instead of the whole texture. Until the
+ * texture has been uploaded once, it is uploaded completely.
+ */
+function markLayersForUpload(texture, layers) {
+  if (texture.userData.uploaded) {
+    for (const layer of layers) {
+      texture.addLayerUpdate(layer);
+    }
+  }
+  texture.needsUpdate = true;
+}
+
 export class InstancedMeshManager {
   constructor() {
     // Map of assetKey -> InstancedMeshData
@@ -215,6 +229,11 @@ export class InstancedMeshManager {
     );
     matrixTexture.format = RGBAFormat;
     matrixTexture.type = FloatType;
+    // The first upload transfers all layers; afterwards only the changed ones, see
+    // markLayersForUpload().
+    matrixTexture.onUpdate = () => {
+      matrixTexture.userData.uploaded = true;
+    };
     matrixTexture.needsUpdate = true;
 
     return { matrixTexture, matrixTextureData };
@@ -402,15 +421,24 @@ export class InstancedMeshManager {
 
     const { geometry, instanceIDs, instanceIDAttribute, mesh } = data;
 
-    // Update the instance ID buffer with new visible IDs
+    // Update the instance ID buffer with new visible IDs. The render loop calls this for every
+    // frame: upload the buffer only when the list has changed, and only its used part.
     const count = Math.min(visibleInstanceIDs.length, data.maxInstances);
 
+    let changed = count !== geometry.instanceCount;
     for (let i = 0; i < count; i++) {
-      instanceIDs[i] = visibleInstanceIDs[i];
+      const id = visibleInstanceIDs[i];
+      if (instanceIDs[i] !== id) {
+        instanceIDs[i] = id;
+        changed = true;
+      }
     }
 
-    // Mark attribute for update
-    instanceIDAttribute.needsUpdate = true;
+    if (changed && count > 0) {
+      instanceIDAttribute.clearUpdateRanges();
+      instanceIDAttribute.addUpdateRange(0, count);
+      instanceIDAttribute.needsUpdate = true;
+    }
 
     // Update instance count (this is what actually controls rendering!)
     geometry.instanceCount = count;
@@ -470,7 +498,7 @@ export class InstancedMeshManager {
     }
 
     // Mark texture for update
-    matrixTexture.needsUpdate = true;
+    markLayersForUpload(matrixTexture, [0, 1, 2, 3]);
 
     // Grow the bounds of the mesh, so that frustum culling does not drop the moved instance.
     const bounds = data.mesh.geometry.boundingBox;
@@ -500,7 +528,7 @@ export class InstancedMeshManager {
     if (!data) return;
     const offset = this._getLayerPixelOffset(data, instanceID, 4);
     data.matrixTextureData[offset + 0] = selected ? 1.0 : 0.0;
-    data.matrixTexture.needsUpdate = true;
+    markLayersForUpload(data.matrixTexture, [4]);
   }
 
   /**
@@ -511,7 +539,7 @@ export class InstancedMeshManager {
     if (!data) return;
     const offset = this._getLayerPixelOffset(data, instanceID, 4);
     data.matrixTextureData[offset + 1] = opacity;
-    data.matrixTexture.needsUpdate = true;
+    markLayersForUpload(data.matrixTexture, [4]);
   }
 
   /**
@@ -576,7 +604,7 @@ export class InstancedMeshManager {
     if (!data) return;
     const offset = this._getLayerPixelOffset(data, instanceID, 4);
     data.matrixTextureData[offset + 2] = hidden ? 1.0 : 0.0;
-    data.matrixTexture.needsUpdate = true;
+    markLayersForUpload(data.matrixTexture, [4]);
   }
 
   /**
@@ -602,7 +630,7 @@ export class InstancedMeshManager {
     data.matrixTextureData[offset + 1] = g;
     data.matrixTextureData[offset + 2] = b;
     data.matrixTextureData[offset + 3] = 1.0; // hasColorOverride
-    data.matrixTexture.needsUpdate = true;
+    markLayersForUpload(data.matrixTexture, [5]);
   }
 
   /**
@@ -616,7 +644,7 @@ export class InstancedMeshManager {
     data.matrixTextureData[offset + 1] = 0.0;
     data.matrixTextureData[offset + 2] = 0.0;
     data.matrixTextureData[offset + 3] = 0.0; // no override
-    data.matrixTexture.needsUpdate = true;
+    markLayersForUpload(data.matrixTexture, [5]);
   }
 
   /**
@@ -631,7 +659,7 @@ export class InstancedMeshManager {
     for (let i = 0; i < textureWidth * textureHeight; i++) {
       matrixTextureData[layer4Offset + i * 4 + 1] = 1.0;
     }
-    data.matrixTexture.needsUpdate = true;
+    markLayersForUpload(data.matrixTexture, [4]);
   }
 
   /**
@@ -993,6 +1021,22 @@ export class InstancedMeshManager {
       total += data.triangleCount * data.instanceData.length;
     }
     return total;
+  }
+
+  /**
+   * Uploads the matrix textures completely when the WebGL context has been restored: changes
+   * collected while the context was lost must not be uploaded as single layers of a texture that
+   * does not exist on the GPU yet.
+   */
+  onContextRestored() {
+    for (const data of this.managedMeshes.values()) {
+      const texture = data.matrixTexture;
+      if (texture) {
+        texture.userData.uploaded = false;
+        texture.clearLayerUpdates();
+        texture.needsUpdate = true;
+      }
+    }
   }
 
   /**

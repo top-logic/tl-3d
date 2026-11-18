@@ -1422,6 +1422,7 @@ class ThreeJsControl {
     if (this.disposed) {
       return;
     }
+    this.scope.instanceManager.onContextRestored();
     this.scope.regenerateImpostors(this);
     this.renderManager.forceRender();
   }
