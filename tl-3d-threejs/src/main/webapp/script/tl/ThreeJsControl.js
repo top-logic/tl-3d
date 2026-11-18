@@ -2282,6 +2282,9 @@ class ThreeJsControl {
     for (const sharedNode of this.selection) {
       if (sharedNode.willBeInstanced) {
         this.setInstancedSelectionState(sharedNode, false);
+        // The proxy of an instanced part exists only while it is selected (in edit mode);
+        // disableEditing() below no longer sees the deselected nodes.
+        this.removeInstanceProxy(sharedNode);
       } else {
         this.setColor(sharedNode.node, WHITE);
       }
