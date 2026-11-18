@@ -60,6 +60,10 @@ export function disposeMaterialWithTextures(material) {
     for (const value of Object.values(m)) {
       if (value?.isTexture) {
         value.dispose();
+        // ImageBitmaps (GLTFLoader) hold their memory until they are closed.
+        if (typeof ImageBitmap !== "undefined" && value.image instanceof ImageBitmap) {
+          value.image.close();
+        }
       }
     }
     m.dispose();

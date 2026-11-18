@@ -2383,6 +2383,7 @@ class ThreeJsControl {
     this.instancedSnappingPoints?.dispose();
     this.renderManager?.dispose();
 
+    this.impostorManager?.dispose();
     if (this.renderer) {
       this.renderer.dispose();
       this.renderer.forceContextLoss();

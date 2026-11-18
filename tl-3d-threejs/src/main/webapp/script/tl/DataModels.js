@@ -581,6 +581,10 @@ export class Scope {
   dispose() {
     this.abortAssetLoading();
     this.releaseDecoders();
+    // The GLTFs with their images (ImageBitmaps are not garbage collected by themselves) and
+    // the instanced meshes are no longer shown.
+    this.clearStaleGltfs(new Set());
+    this.instanceManager.dispose();
   }
 
   /**
