@@ -25,6 +25,9 @@ export class RenderManager {
 
     this.renderTargets = [];
 
+    // Optional function called before each frame is rendered.
+    this.beforeRender = null;
+
     this.stats = {
       frameCount: 0,
       lastFrameTime: 0,
@@ -140,6 +143,9 @@ export class RenderManager {
     this.isDirty = false;
 
     try {
+      // Adjusts the camera, e.g. its clipping planes, before the frustum is computed.
+      this.beforeRender?.();
+
       if (this.instanceManager) {
         if (!this.useOctree) {
           // Simple path: show every real instance, hide impostors.

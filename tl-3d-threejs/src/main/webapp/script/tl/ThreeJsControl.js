@@ -12,6 +12,7 @@ import {
   Group,
   Matrix4,
   Scene,
+  Sphere,
   SphereGeometry,
   Vector3,
   WebGLRenderer,
@@ -132,6 +133,7 @@ class ThreeJsControl {
       this.scene,
       this.camera,
     );
+    this.renderManager.beforeRender = () => this.updateClippingPlanes();
 
     this.impostorManager = null;
 
@@ -1321,6 +1323,47 @@ class ThreeJsControl {
         this.boundingBox.expandByObject(object);
       }
     });
+  }
+
+  /**
+   * Fits the near and far clipping planes of the camera to the displayed content.
+   *
+   * The depth buffer resolves a ratio far / near of about 1e5 (24 bit); fixed planes for all
+   * scene sizes make distant parts flicker (z-fighting) or cut off objects close to the camera.
+   * The far plane lies just behind the content; the near plane just in front of it when the
+   * camera is outside, otherwise at a small fraction of the distance to the orbit target.
+   */
+  updateClippingPlanes() {
+    const content = new Box3();
+    if (this.boundingBox) {
+      content.union(this.boundingBox);
+    }
+    // Skybox, floors and workplane extend beyond the parts.
+    content.union(new Box3().setFromObject(this.zUpEnvironment));
+    if (this.workplane?.parent) {
+      content.union(new Box3().setFromObject(this.workplane));
+    }
+    if (content.isEmpty()) {
+      return;
+    }
+
+    const sphere = content.getBoundingSphere(new Sphere());
+    const position = this.camera.position;
+    const distance = position.distanceTo(sphere.center);
+    // Margin for objects moved beyond the bounds that are not yet updated.
+    const far = (distance + sphere.radius) * 1.5;
+    const near = Math.max(
+      far * 1e-5,
+      distance > sphere.radius
+        ? (distance - sphere.radius) * 0.9
+        : position.distanceTo(this.controls.target) * 0.01,
+    );
+
+    if (this.camera.near !== near || this.camera.far !== far) {
+      this.camera.near = near;
+      this.camera.far = far;
+      this.camera.updateProjectionMatrix();
+    }
   }
 
   /** Renders the scene again after the WebGL context has been restored. */
