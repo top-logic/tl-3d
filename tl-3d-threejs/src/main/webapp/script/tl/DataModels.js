@@ -1590,9 +1590,6 @@ export class GltfAsset extends SharedObject {
       return;
     }
 
-    // Save colour before disposing the placeholder
-    const currentColor = this.placeholder?.material.color.clone();
-
     // Dispose placeholder resources
     if (this.placeholder) {
       this.group.remove(this.placeholder);
@@ -1620,9 +1617,10 @@ export class GltfAsset extends SharedObject {
     this._clonedModel = model;
     this.group.add(model);
 
-    if (currentColor) {
-      ctrl.setColor(this.group, currentColor);
-    }
+    // The model keeps the colours of its materials unless the scene colours the part or it is
+    // selected. The colour of the placeholder must not be taken over: it would overwrite the
+    // colours of all materials (and of the point markers).
+    ctrl.restoreColor(this.group);
   }
 
   loadJson(scope, json) {

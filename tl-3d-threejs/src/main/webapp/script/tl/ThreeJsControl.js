@@ -36,6 +36,7 @@ import {
   getMatrixDiff,
   getRaycaster,
   isDescendantOfAny,
+  isPointMarker,
   throttle,
   toMatrix,
 } from "./ThreeJsUtils.js";
@@ -2081,6 +2082,9 @@ class ThreeJsControl {
 
     if (color !== WHITE) {
       node.traverse((object) => {
+        if (isPointMarker(object)) {
+          return;
+        }
         for (const material of this.getMaterials(object)) {
           material?.color?.set(color);
         }
@@ -2100,6 +2104,9 @@ class ThreeJsControl {
 
     // One pass over the subtree, passing the effective colour down.
     const restore = (object, inheritedColor) => {
+      if (isPointMarker(object)) {
+        return;
+      }
       const own = object.userData?.color;
       const effective =
         object.parent && typeof own === "string" ? own : inheritedColor;
@@ -2118,6 +2125,22 @@ class ThreeJsControl {
       }
     };
     restore(node, inherited);
+  }
+
+  /**
+   * Gives the given 3D object (e.g. a model that has just replaced its placeholder) the colour
+   * it must have: the selection colour, if it belongs to a selected node, otherwise its own or
+   * inherited colour.
+   */
+  restoreColor(object) {
+    const selectedNodes = this.selection
+      .filter((shared) => !shared.willBeInstanced && shared.node)
+      .map((shared) => shared.node);
+    if (selectedNodes.includes(object) || isDescendantOfAny(object, selectedNodes)) {
+      this.setColor(object, SELECTION_COLOR);
+    } else {
+      this.setColor(object, WHITE);
+    }
   }
 
   /** Updates the selection from a click on the canvas. */

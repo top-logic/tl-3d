@@ -54,11 +54,20 @@ export function disposeMaterialWithTextures(material) {
   }
 }
 
+/**
+ * Whether the given 3D object marks a connection or layout point. Such markers keep their own
+ * colour (green / red, yellow while snapping) and are not coloured with the part.
+ */
+export function isPointMarker(object) {
+  return !!(object.userData?.isConnectionPoint || object.userData?.isLayoutPoint);
+}
+
+/** Colours all meshes of the given 3D object and its descendants, except point markers. */
 export function applyColorToObject(object, colorString) {
   const color = new Color(colorString);
 
   object.traverse((child) => {
-    if (child.isMesh && child.material) {
+    if (child.isMesh && child.material && !isPointMarker(child)) {
       // Handle array of materials
       if (Array.isArray(child.material)) {
         child.material.forEach((material) => {
