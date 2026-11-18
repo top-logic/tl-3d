@@ -291,7 +291,6 @@ export class Scope {
       // Mark userData for later identification
       instancedMesh.userData.isInstancedMesh = true;
       instancedMesh.userData.assetKey = assetKey;
-      instancedMesh.userData.instances = instances.map((i) => i.partNode);
 
       // Add to scene
       ctrl.zUpRoot.add(instancedMesh);
@@ -407,9 +406,6 @@ export class Scope {
       // Copy over important userData
       newInstancedMesh.userData.isInstancedMesh = true;
       newInstancedMesh.userData.assetKey = assetKey;
-      newInstancedMesh.userData.instances = group.instances.map(
-        (i) => i.partNode,
-      );
 
       // Add to scene
       ctrl.zUpRoot.add(newInstancedMesh);
@@ -462,14 +458,6 @@ export class Scope {
    */
   updateVisibleInstances(assetKey, visibleInstanceIDs) {
     this.instanceManager.updateVisibleInstances(assetKey, visibleInstanceIDs);
-  }
-
-  /**
-   * Update a specific instance's transform
-   * This will be called when an instance is moved/rotated
-   */
-  updateInstanceTransform(assetKey, instanceID, newMatrix) {
-    this.instanceManager.updateInstanceMatrix(assetKey, instanceID, newMatrix);
   }
 
   /**
@@ -1480,7 +1468,6 @@ export class GltfAsset extends SharedObject {
       const geometry = new BoxGeometry(500, 500, 500);
       const material = new MeshBasicMaterial({ wireframe: false });
       const mesh = new Mesh(geometry, material);
-      mesh.userData.originalMaterial = mesh.material;
       mesh.material = mesh.material.clone();
       mesh.material.userData.originalColor = mesh.material.color.clone();
 
@@ -1526,7 +1513,6 @@ export class GltfAsset extends SharedObject {
     const model = this.gltf.scene.clone();
     model.traverse((obj) => {
       if (obj.isMesh && obj.material) {
-        obj.userData.originalMaterial = obj.material;
         obj.material = obj.material.clone();
         obj.material.userData.originalColor = obj.material.color.clone();
       }

@@ -23,7 +23,6 @@ export const WIDTH_SEGMENTS = 8;
 export const HEIGHT_SEGMENTS = 8;
 export const _90_DEGREE = Math.PI / 2;
 export const OPTIMIZED_PIXEL_RATIO = Math.min(window.devicePixelRatio, 1.7);
-export const INTERACTIVE_PIXEL_RATIO = Math.min(window.devicePixelRatio, 1.0);
 export const GRID_SMALL_CELL = 500;
 export const SNAP_THRESHOLD = 50;
 export const GRID_SNAP_THRESHOLD = 200;
@@ -34,12 +33,6 @@ export const TRANSPARENCY_LEVEL = 0.3;
 // all managed meshes) above which BVH-accelerated visibility culling kicks in.
 // Below this, all instances are rendered every frame unconditionally.
 export const INSTANCING_BVH_TRIANGLE_THRESHOLD = 8_000_000;
-// Maximum triangles the BVH is allowed to accumulate in its visible set
-// before it starts rejecting new hits. Should be higher than the threshold above.
-export const INSTANCING_BVH_MAX_TRIANGLES = 10_000_000;
-// Number of frames an instance can go undetected by BVH raycasting before
-// it gets pruned from the visible set.
-export const INSTANCING_BVH_STALE_FRAME_THRESHOLD = 30;
 // Maximum triangles to render per frame when triangle budgeting is active.
 export const MAX_TRIANGLES_PER_FRAME = 10_000_000;
 // Minimum number of copies of a GLTF asset required before it is

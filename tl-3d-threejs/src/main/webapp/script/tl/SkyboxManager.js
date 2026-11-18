@@ -27,12 +27,10 @@ export class SkyboxManager {
     this.environmentBackground = null;
     this.factoryFloors = [];
     this.floorSizes = null;
-    this.skyboxEnabled = true;
     this.isSkyboxVisible = false;
   }
 
   async initSkybox() {
-    if (!this.skyboxEnabled) return;
     // Load cube texture and create skybox environment
     await this.loadCubeTexture();
     this.control.invalidate();
@@ -307,14 +305,6 @@ export class SkyboxManager {
   // Getter methods for accessing from ThreeJsControl
   getEnvironmentBackground() {
     return this.environmentBackground;
-  }
-
-  setEnabled(enabled) {
-    this.skyboxEnabled = enabled;
-  }
-
-  isEnabled() {
-    return this.skyboxEnabled;
   }
 
   zoomToSkyboxDistance() {

@@ -248,24 +248,6 @@ export class RenderManager {
     }
   }
 
-  startContinuousRender() {
-    let stopped = false;
-
-    const animate = () => {
-      if (stopped) return;
-
-      this.isDirty = true;
-      this.render();
-      requestAnimationFrame(animate);
-    };
-
-    animate();
-
-    return () => {
-      stopped = true;
-    };
-  }
-
   updateStats() {
     const now = performance.now();
     this.stats.frameCount++;
@@ -275,43 +257,6 @@ export class RenderManager {
       this.stats.frameCount = 0;
       this.stats.lastFrameTime = now;
     }
-  }
-
-  /**
-   * Get current rendering statistics
-   * @returns {Object} Statistics object with FPS, triangle count, etc.
-   */
-  getStats() {
-    return {
-      fps: this.stats.fps,
-      renderedTriangles: this.stats.renderedTriangles,
-      visibleInstances: this.stats.visibleInstances,
-      culledInstances: this.stats.culledInstances,
-      triangleBudget: this.maxTrianglesPerFrame,
-      budgetUsage:
-        (
-          (this.stats.renderedTriangles / this.maxTrianglesPerFrame) *
-          100
-        ).toFixed(1) + "%",
-    };
-  }
-
-  /**
-   * Set the triangle budget for rendering
-   * @param {number} maxTriangles - Maximum triangles to render per frame
-   */
-  setTriangleBudget(maxTriangles) {
-    this.maxTrianglesPerFrame = maxTriangles;
-    this.invalidate();
-  }
-
-  /**
-   * Enable or disable triangle budget system
-   * @param {boolean} enabled - Whether to use triangle budgeting
-   */
-  setUseTriangleBudget(enabled) {
-    this.useTriangleBudget = enabled;
-    this.invalidate();
   }
 
   /**

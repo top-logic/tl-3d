@@ -7,7 +7,6 @@ import {
   AxesHelper,
   Box3,
   Box3Helper,
-  BoxHelper,
   Color,
   Frustum,
   Group,
@@ -124,7 +123,6 @@ class ThreeJsControl {
     this.useScreenSpaceSnapping = true;
 
     this.skyboxManager = new SkyboxManager(this);
-    this.skyboxManager.setEnabled(initialState.skyboxEnabled !== false);
     this.initScene();
     this.initRenderer();
     this.initControls();
@@ -247,7 +245,6 @@ class ThreeJsControl {
     this.controls.zoomSpeed = ZOOM_SPEED;
     this.controls.screenSpacePanning = true;
 
-    this.controlsIsUpdating = false;
 
     // The user takes over the camera: stop a running flight (zoomToSelection, zoomOut),
     // which would otherwise move the camera back.
@@ -330,17 +327,6 @@ class ThreeJsControl {
 
   toggleSkybox(visible) {
     this.skyboxManager.toggleSkybox(visible);
-  }
-
-  updateFactoryFloors() {
-    // Update floors when scene changes
-    if (
-      this.skyboxManager.isEnabled() &&
-      this.skyboxManager.getEnvironmentBackground()
-    ) {
-      this.skyboxManager.createFactoryFloors(null);
-      this.invalidate();
-    }
   }
 
   initTransformControls() {
@@ -1309,54 +1295,6 @@ class ThreeJsControl {
     axesHelper.rotation.x = -_90_DEGREE;
   }
 
-  addBoxHelpers() {
-    // show bounding box around all objects
-    this.boundingBoxHelper = new Box3Helper(this.boundingBox, YELLOW);
-    this.scene.add(this.boundingBoxHelper);
-    this.invalidate();
-    this.removeBoxHelpers();
-
-    if (this.selection.length === 0) {
-      return;
-    }
-
-    this.boxHelpers = [];
-
-    if (
-      this.selection.length > 1 &&
-      this.multiTransformGroup.children.length > 0
-    ) {
-      // create a box helper for the entire multigroup
-      const multiGroupHelper = new BoxHelper(this.multiTransformGroup, YELLOW);
-      this.scene.add(multiGroupHelper);
-      this.boxHelpers.push(multiGroupHelper);
-    } else {
-      // create individual box helpers for each selected object
-      for (const sharedNode of this.selection) {
-        if (sharedNode && sharedNode.node) {
-          const boxHelper = new BoxHelper(sharedNode.node, YELLOW);
-          this.scene.add(boxHelper);
-          this.boxHelpers.push(boxHelper);
-        }
-      }
-    }
-    this.invalidate();
-  }
-
-  removeBoxHelpers() {
-    if (this.boxHelpers && this.boxHelpers.length > 0) {
-      for (const helper of this.boxHelpers) {
-        this.scene.remove(helper);
-      }
-      this.boxHelpers = [];
-    }
-
-    if (this.lastSelectedBoxHelper) {
-      this.scene.remove(this.lastSelectedBoxHelper);
-      this.lastSelectedBoxHelper = null;
-    }
-  }
-
   /**
    * Computes the bounding box of the scene (used by zoomOut() and for the size of the
    * workplane). Instanced meshes count with the bounds of all their instances; impostors are
@@ -2239,9 +2177,7 @@ class ThreeJsControl {
     this.scope.createInstancedMeshes(this);
 
     // Create floors
-    if (this.skyboxManager.isEnabled()) {
-      this.skyboxManager.createFactoryFloors(null);
-    }
+    this.skyboxManager.createFactoryFloors(null);
 
     await this.scope.loadAssets(this).then((loaded) => {
       // Aborted by a reload or by dispose(); the reload completes the scene setup.

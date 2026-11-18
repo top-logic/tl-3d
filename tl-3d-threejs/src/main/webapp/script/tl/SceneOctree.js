@@ -20,7 +20,7 @@
  *   // in approximate front-to-back order
  */
 
-import { Box3, Box3Helper, Frustum, Group, Vector3 } from "three";
+import { Box3, Box3Helper, Vector3 } from "three";
 
 export class SceneOctree {
   constructor(boundingBox, maxDepth = 8, maxObjectsPerNode = 16) {
@@ -168,29 +168,6 @@ export class SceneOctree {
   }
 
   /**
-   * Query objects within distance from point.
-   * @param {Vector3} point - Centre point
-   * @param {number} radius - Search radius
-   * @returns {Array} Array of objects within radius
-   */
-  queryRadius(point, radius) {
-    const results = new Set();
-    this.root.queryRadius(point, radius, results);
-    return Array.from(results);
-  }
-
-  /**
-   * Query objects within a bounding box.
-   * @param {Box3} box - Bounding box to query
-   * @returns {Array} Array of objects within box
-   */
-  queryBox(box) {
-    const results = new Set();
-    this.root.queryBox(box, results);
-    return Array.from(results);
-  }
-
-  /**
    * Get all leaf nodes (for debugging or analysis).
    * @returns {Array} Array of leaf nodes
    */
@@ -210,42 +187,12 @@ export class SceneOctree {
   }
 
   /**
-   * Get octree statistics.
-   * @returns {Object} Statistics object
-   */
-  getStats() {
-    this.updateStats();
-    return { ...this.stats };
-  }
-
-  /**
    * Release references held by the octree.
    * The octree holds no GPU resources, but clearing the root allows the
    * node tree and its object references to be garbage-collected.
    */
   dispose() {
     this.root = null;
-  }
-
-  /**
-   * Create debug visualisation of octree structure.
-   * @param {Scene} scene - Three.js scene to add visualisation to
-   * @returns {Group} Debug helper group
-   */
-  createDebugVisualisation(scene) {
-    // Remove existing debug helper
-    const existing = scene.getObjectByName("OctreeDebugHelper");
-    if (existing) {
-      scene.remove(existing);
-    }
-
-    const helper = new Group();
-    helper.name = "OctreeDebugHelper";
-
-    this.root.addDebugLines(helper);
-    scene.add(helper);
-
-    return helper;
   }
 
   /**
@@ -519,43 +466,6 @@ class OctreeNode {
     if (!this.isLeaf) {
       for (const child of this.children) {
         child.queryRay(ray, results);
-      }
-    }
-  }
-
-  queryRadius(point, radius, results) {
-    // Quick rejection test
-    const distance = this.boundingBox.distanceToPoint(point);
-    if (distance > radius) {
-      return;
-    }
-
-    for (const { object, boundingBox } of this.objects) {
-      if (boundingBox.distanceToPoint(point) <= radius) {
-        results.add(object);
-      }
-    }
-    if (!this.isLeaf) {
-      for (const child of this.children) {
-        child.queryRadius(point, radius, results);
-      }
-    }
-  }
-
-  queryBox(box, results) {
-    // Check if boxes intersect
-    if (!this.boundingBox.intersectsBox(box)) {
-      return;
-    }
-
-    for (const { object, boundingBox } of this.objects) {
-      if (box.intersectsBox(boundingBox)) {
-        results.add(object);
-      }
-    }
-    if (!this.isLeaf) {
-      for (const child of this.children) {
-        child.queryBox(box, results);
       }
     }
   }

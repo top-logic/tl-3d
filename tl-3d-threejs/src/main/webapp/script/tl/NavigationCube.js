@@ -391,15 +391,6 @@ export class NavigationCube {
   }
 
   /**
-   * Changes the position of the navigation cube.
-   * @param {string} position - New position: 'top-left', 'top-right', 'bottom-left', 'bottom-right'
-   */
-  setPosition(position) {
-    this.options.position = position;
-    this.updateCubePosition();
-  }
-
-  /**
    * Changes the size of the navigation cube.
    * @param {number} size - New size in pixels
    */
