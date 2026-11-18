@@ -913,8 +913,8 @@ class ThreeJsControl {
     const selectedWorldPosition = new Vector3();
     selectedObj.getWorldPosition(selectedWorldPosition);
 
+    // The world matrices of all objects were updated above (zUpRoot).
     for (const otherObject of snappableObjects) {
-      otherObject.updateMatrixWorld(true);
 
       // Get asset either directly or through nodeRef
       const otherObjectAsset =
@@ -1410,13 +1410,12 @@ class ThreeJsControl {
     } else {
       // Linear scan over all instances
       candidates = [];
+      this.zUpRoot.updateMatrixWorld(true);
+      const zUpTransform = this.zUpRoot.matrixWorld;
       for (const [assetKey, data] of instanceManager.managedMeshes) {
         if (assetKey.endsWith("_impostor")) continue;
         const baseBox = data.baseBoundingBox;
         if (!baseBox) continue;
-
-        this.zUpRoot.updateMatrixWorld(true);
-        const zUpTransform = this.zUpRoot.matrixWorld;
 
         for (const instance of data.instanceData) {
           const instanceBox = baseBox.clone();
