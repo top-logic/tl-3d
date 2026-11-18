@@ -318,19 +318,7 @@ export class Scope {
     for (const instance of instances) {
       const partNode = instance.partNode;
 
-      // Hidden: check own flag + ancestor chain
-      let hidden = partNode.hidden;
-      if (!hidden) {
-        let ancestor = partNode.parent;
-        while (ancestor) {
-          if (ancestor.hidden) {
-            hidden = true;
-            break;
-          }
-          ancestor = ancestor.parent;
-        }
-      }
-      if (hidden) {
+      if (isEffectivelyHidden(partNode)) {
         this.instanceManager.setInstanceHidden(assetKey, partNode.instanceID, true);
       }
 
@@ -1217,6 +1205,19 @@ export class ConnectionPoint extends SharedObject {
  * the parent has no 3D object either (because it is hidden as well), nothing happens: the
  * node is built together with its parent.
  */
+/**
+ * Whether the given scene node is not shown: it or one of its ancestors is hidden. Instances
+ * are not part of the 3D object tree of their ancestors and do not inherit its visibility.
+ */
+function isEffectivelyHidden(node) {
+  for (let n = node; n; n = n.parent) {
+    if (n.hidden) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function buildWhenShown(node) {
   const parent = node.parent;
   let ctrl = null;
@@ -1331,7 +1332,8 @@ export class GroupNode extends SharedObject {
         } else if (wasHidden && !value) {
           buildWhenShown(this);
         }
-        this.setInstancedChildrenHidden(scope, value);
+        // A hidden ancestor keeps the instances hidden when this group is shown.
+        this.setInstancedChildrenHidden(scope, isEffectivelyHidden(this));
         break;
       }
       case "selectable":
@@ -1571,7 +1573,12 @@ export class PartNode extends SharedObject {
         const wasHidden = this.hidden;
         this.hidden = value;
         if (this.willBeInstanced && this.assetKey != null) {
-          scope.instanceManager.setInstanceHidden(this.assetKey, this.instanceID, value);
+          // A hidden ancestor keeps the instance hidden when this part is shown.
+          scope.instanceManager.setInstanceHidden(
+            this.assetKey,
+            this.instanceID,
+            isEffectivelyHidden(this),
+          );
         } else if (this.node) {
           this.node.visible = !value;
         } else if (wasHidden && !value) {
