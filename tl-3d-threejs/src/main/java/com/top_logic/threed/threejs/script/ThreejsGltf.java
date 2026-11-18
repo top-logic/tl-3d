@@ -91,6 +91,23 @@ public class ThreejsGltf extends ThreejsSceneNode<PartNode> {
 			I18NConstants.ERROR_IMAGE_DATA_EXPECTED__ACTUAL_EXPR.fill(data.getClass().getName(), this));
 	}
 
+	/**
+	 * The given {@link ConnectionPoint}, or a copy of it if it already belongs to an asset.
+	 * 
+	 * <p>
+	 * A connection point is part of exactly one asset. A script may pass the same point for
+	 * several parts (e.g. a point computed once); adding it to a second asset would fail.
+	 * </p>
+	 */
+	static ConnectionPoint unowned(ConnectionPoint point) {
+		if (!point.hasOwner()) {
+			return point;
+		}
+		return ConnectionPoint.create()
+			.setTransform(point.getTransform())
+			.setClassifiers(point.getClassifiers());
+	}
+
 	private List<ConnectionPoint> toConnectionPointList(SearchExpression expr, Object value) {
 		List<?> valueList = asList(value);
 		return valueList.stream().map(v -> toConnectionPointNonNull(expr, v)).toList();
@@ -101,8 +118,8 @@ public class ThreejsGltf extends ThreejsSceneNode<PartNode> {
 	}
 
 	private ConnectionPoint toConnectionPoint(SearchExpression expr, Object value) {
-		if (value instanceof ConnectionPoint) {
-			return (ConnectionPoint) value;
+		if (value instanceof ConnectionPoint point) {
+			return unowned(point);
 		}
 		Transformation tx = asTransformation(expr, value);
 		if (tx == null) {
