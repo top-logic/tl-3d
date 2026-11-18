@@ -73,7 +73,7 @@ export function layoutPointInverse(asset) {
  * present, its layout point. Assets with the same key are rendered identically and can share
  * one instanced mesh (and impostor). Null if the asset has no GLTF.
  */
-function instanceKey(ctrl, asset) {
+export function instanceKey(ctrl, asset) {
   const gltfUrl = gltfUrlOf(ctrl, asset);
   if (gltfUrl == null) {
     return null;

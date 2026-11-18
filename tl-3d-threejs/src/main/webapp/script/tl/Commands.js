@@ -3,6 +3,7 @@
  * Contains all command classes used for scene modifications
  */
 import { INCREMENTAL_ADD_RELOAD_THRESHOLD } from "./Constants.js";
+import { instanceKey } from "./DataModels.js";
 
 /**
  * Recursively cleans up a removed node: detaches non-instanced Three.js nodes
@@ -128,6 +129,17 @@ export class InsertElement extends ListUpdate {
       return true;
     }
 
+    // A part that shows another model (other GLTF or layout point) cannot take over the 3D
+    // object of the former part.
+    if (
+      oldSharedObject.asset &&
+      newSharedObject.asset &&
+      InsertElement.fingerprint(oldSharedObject, scope.ctrl) !==
+        InsertElement.fingerprint(newSharedObject, scope.ctrl)
+    ) {
+      return false;
+    }
+
     // Transfer instancing annotations if present
     if (oldSharedObject.willBeInstanced) {
       newSharedObject.willBeInstanced = true;
@@ -152,8 +164,15 @@ export class InsertElement extends ListUpdate {
 
     // Recursively transfer for GroupNode children
     if (oldSharedObject.contents && newSharedObject.contents) {
-      if (oldSharedObject.contents.length !== newSharedObject.contents.length) {
-        // Contents length changed — use fingerprint matching instead of index
+      const sameChildren =
+        oldSharedObject.contents.length === newSharedObject.contents.length &&
+        oldSharedObject.contents.every(
+          (child, i) =>
+            InsertElement.fingerprint(child, scope.ctrl) ===
+            InsertElement.fingerprint(newSharedObject.contents[i], scope.ctrl),
+        );
+      if (!sameChildren) {
+        // Children added, removed or changed — use fingerprint matching instead of index
         if (!this.matchChildren(scope, oldSharedObject, newSharedObject)) {
           return false;
         }
@@ -184,10 +203,13 @@ export class InsertElement extends ListUpdate {
    * group: without it, removing the first of several equal parts matched the remaining
    * parts to the wrong instances and hid the last one instead of the removed one.
    */
-  static fingerprint(node) {
+  static fingerprint(node, ctrl) {
     const tx = node.transform ? "@" + node.transform.join(",") : "";
     if (node.asset) {
-      const key = node.asset.url || (node.asset.dynamicImage ? "dyn:" + node.asset.dynamicImage.imageID : null);
+      // The same key as for loading and instancing: the GLTF actually shown (an uploaded image
+      // takes precedence over the URL) and the layout point. Otherwise a part whose asset now
+      // has another image or layout point would keep showing the former model.
+      const key = instanceKey(ctrl, node.asset);
       return "P:" + (key || "?") + tx;
     } else if (node.contents) {
       return "G:" + node.contents.length + tx;
@@ -205,6 +227,7 @@ export class InsertElement extends ListUpdate {
     const oldContents = oldGroupNode.contents;
     const newContents = newGroupNode.contents;
     const parentThreeJsNode = oldGroupNode.node;
+    const ctrl = scope.ctrl;
 
     // If many children were added, fall back to a full reload so
     // analyzeForInstancing can fold them into instanced groups.
@@ -217,8 +240,8 @@ export class InsertElement extends ListUpdate {
     let j = 0; // new pointer
 
     while (i < oldContents.length && j < newContents.length) {
-      const oldFp = InsertElement.fingerprint(oldContents[i]);
-      const newFp = InsertElement.fingerprint(newContents[j]);
+      const oldFp = InsertElement.fingerprint(oldContents[i], ctrl);
+      const newFp = InsertElement.fingerprint(newContents[j], ctrl);
 
       if (oldFp === newFp) {
         // Match — transfer recursively
@@ -229,8 +252,8 @@ export class InsertElement extends ListUpdate {
         j++;
       } else {
         // Mismatch — peek ahead to determine if it's a deletion or addition
-        const nextOldFp = (i + 1 < oldContents.length) ? InsertElement.fingerprint(oldContents[i + 1]) : null;
-        const nextNewFp = (j + 1 < newContents.length) ? InsertElement.fingerprint(newContents[j + 1]) : null;
+        const nextOldFp = (i + 1 < oldContents.length) ? InsertElement.fingerprint(oldContents[i + 1], ctrl) : null;
+        const nextNewFp = (j + 1 < newContents.length) ? InsertElement.fingerprint(newContents[j + 1], ctrl) : null;
 
         if (nextOldFp === newFp) {
           // old[i] was removed, old[i+1] matches new[j]
