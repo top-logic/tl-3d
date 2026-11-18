@@ -25,6 +25,7 @@ import {
   applyColorToObject,
   disposeMaterial,
   disposeMaterialWithTextures,
+  materialsOf,
   toMatrix,
   toTX,
   transform,
@@ -172,14 +173,16 @@ function libraryPath(loaderSpecifier, folder) {
 const PARALLEL_DOWNLOADS = 6;
 
 /**
- * Makes the material of a placeholder a red wire frame, which tells a part whose GLTF could not
- * be loaded from one that is still loading. The colour is kept when selection colours are
+ * Makes the materials of a placeholder mesh a red wire frame, which tells a part whose GLTF
+ * could not be loaded from one that is still loading. The colour is kept when selection colours are
  * restored (originalColor).
  */
-function markFailedPlaceholder(material) {
-  material.color.set(RED);
-  material.userData.originalColor = material.color.clone();
-  material.wireframe = true;
+function markFailedPlaceholder(mesh) {
+  for (const material of materialsOf(mesh)) {
+    material.color.set(RED);
+    material.userData.originalColor = material.color.clone();
+    material.wireframe = true;
+  }
 }
 
 export class Scope {
@@ -372,7 +375,7 @@ export class Scope {
         console.warn(`GLTF not loaded for ${gltfUrl} (asset ${assetKey})`);
         const placeholder = this.instanceManager.managedMeshes.get(assetKey)?.mesh;
         if (placeholder) {
-          markFailedPlaceholder(placeholder.material);
+          markFailedPlaceholder(placeholder);
         }
         continue;
       }
@@ -1751,8 +1754,13 @@ export class GltfAsset extends SharedObject {
     const model = this.gltf.scene.clone();
     model.traverse((obj) => {
       if (obj.isMesh && obj.material) {
-        obj.material = obj.material.clone();
-        obj.material.userData.originalColor = obj.material.color.clone();
+        // Own materials per part: colours and transparency are set per part.
+        const clones = materialsOf(obj).map((material) => {
+          const clone = material.clone();
+          clone.userData.originalColor = clone.color.clone();
+          return clone;
+        });
+        obj.material = Array.isArray(obj.material) ? clones : clones[0];
       }
     });
     this._clonedModel = model;
@@ -1810,7 +1818,7 @@ export class GltfAsset extends SharedObject {
   markLoadFailed() {
     this.loadFailed = true;
     if (this.placeholder) {
-      markFailedPlaceholder(this.placeholder.material);
+      markFailedPlaceholder(this.placeholder);
     }
   }
 

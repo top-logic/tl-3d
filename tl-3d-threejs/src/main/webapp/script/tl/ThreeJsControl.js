@@ -37,6 +37,7 @@ import {
   getRaycaster,
   isDescendantOfAny,
   isPointMarker,
+  materialsOf,
   sceneColor,
   throttle,
   toMatrix,
@@ -2210,8 +2211,12 @@ class ThreeJsControl {
             material.color.copy(c);
           }
         }
-      } else if (object.material?.userData?.originalColor) {
-        object.material.color.copy(object.material.userData.originalColor);
+      } else {
+        for (const material of materialsOf(object)) {
+          if (material.userData?.originalColor) {
+            material.color.copy(material.userData.originalColor);
+          }
+        }
       }
       for (const child of object.children) {
         restore(child, effective);

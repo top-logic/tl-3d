@@ -30,6 +30,18 @@ import {
 /**
  * Disposes a material or an array of materials (one per geometry group).
  */
+/**
+ * The materials of the given 3D object as an array: a mesh has one material, or one per
+ * geometry group (e.g. the merged meshes of an instanced GLTF). Empty without a material.
+ */
+export function materialsOf(object) {
+  const material = object?.material;
+  if (!material) {
+    return [];
+  }
+  return Array.isArray(material) ? material : [material];
+}
+
 export function disposeMaterial(material) {
   if (Array.isArray(material)) {
     material.forEach((m) => m.dispose());
@@ -94,16 +106,9 @@ export function applyColorToObject(object, colorString) {
   }
 
   object.traverse((child) => {
-    if (child.isMesh && child.material && !isPointMarker(child)) {
-      // Handle array of materials
-      if (Array.isArray(child.material)) {
-        child.material.forEach((material) => {
-          material.color.copy(color);
-        });
-      } else {
-        // Apply new color by copying values (not replacing the object)
-        child.material.color.copy(color);
-      }
+    if (child.isMesh && !isPointMarker(child)) {
+      // Copy the values, the material objects stay.
+      materialsOf(child).forEach((material) => material.color.copy(color));
     }
   });
 }

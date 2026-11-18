@@ -27,7 +27,7 @@ import {
 } from "three";
 
 import { SELECTION_COLOR } from "./Constants.js";
-import { disposeMaterial, sceneColor } from "./ThreeJsUtils.js";
+import { disposeMaterial, materialsOf, sceneColor } from "./ThreeJsUtils.js";
 
 /**
  * Marks layers of the matrix texture of an instanced mesh as changed (layers 0-3: matrices,
@@ -1048,11 +1048,13 @@ export class InstancedMeshManager {
     this.transparentMode = enabled;
     for (const [assetKey, data] of this.managedMeshes) {
       if (assetKey.endsWith("_impostor")) continue;
-      const material = data.mesh.material;
-      const transparent = material.userData.baseTransparent || enabled;
-      if (material.transparent !== transparent) {
-        material.transparent = transparent;
-        material.needsUpdate = true;
+      // One material per merged mesh for GLTFs with several meshes.
+      for (const material of materialsOf(data.mesh)) {
+        const transparent = material.userData.baseTransparent || enabled;
+        if (material.transparent !== transparent) {
+          material.transparent = transparent;
+          material.needsUpdate = true;
+        }
       }
     }
   }
