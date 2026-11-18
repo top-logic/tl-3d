@@ -72,6 +72,9 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 	/** Content type of binary glTF data. */
 	private static final String GLTF_BINARY_CONTENT_TYPE = "model/gltf-binary";
 
+	/** Response header with the {@link #_revision} contained in the scene data. */
+	private static final String SCENE_REVISION_HEADER = "X-Scene-Revision";
+
 	/** Type of the command setting a property in a scene change of the client. */
 	private static final String SET_PROPERTY = "S";
 
@@ -82,6 +85,14 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 	private final Map<String, ImageData> _imageByID;
 
 	private final ExternalScope _nodeScope;
+
+	/**
+	 * Number of the last scene change sent to the client. The scene data delivered by
+	 * {@link #handleContent(DisplayContext, String, URLParser)} contains all changes up to this
+	 * number; the client applies only later changes to it, independent of the order in which
+	 * data and changes arrive.
+	 */
+	private int _revision;
 
 	private boolean _isWorkplaneVisible;
 
@@ -465,7 +476,10 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 			} catch (IOException ex) {
 				throw new UncheckedIOException(ex);
 			}
-			actions.add(new JSFunctionCall(getID(), THREEJS_JS_NS, "sceneChanged", out.toString()));
+			_revision++;
+			// As string: the client side decoder of function call arguments supports no numbers.
+			actions.add(new JSFunctionCall(getID(), THREEJS_JS_NS, "sceneChanged", out.toString(),
+				Integer.toString(_revision)));
 		}
 
 	}
@@ -510,6 +524,8 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 		HttpServletResponse response = context.asResponse();
 		response.setContentType("application/json");
 		response.setCharacterEncoding("utf-8");
+		// The data contains all changes sent so far: undelivered changes are dropped below.
+		response.setHeader(SCENE_REVISION_HEADER, Integer.toString(_revision));
 
 		_nodeScope.clear();
 		_nodeScope.writeRefOrData(new JsonWriter(new WriterAdapter(response.getWriter())), _model);

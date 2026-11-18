@@ -241,8 +241,9 @@ class ThreeJsControl {
   initScene() {
     // Filled in loadScene().
     this.sceneGraph = null;
-    // Scene changes received while the scene data is loading, see loadScene().
-    this.pendingChanges = null;
+    // Scene changes received before the scene data is loaded, with their revision, see
+    // loadScene().
+    this.pendingChanges = [];
     this.selection = [];
 
     this.scene = new Scene();
@@ -1941,12 +1942,16 @@ class ThreeJsControl {
   }
 
   /** Applies the changes in the scene as received from the server. */
-  applySceneChanges(changesString) {
+  /**
+   * Applies changes of the scene sent by the server.
+   *
+   * @param revision Number of the change on the server (increasing, as string). The data loaded
+   *        by loadScene() contains the changes up to its revision.
+   */
+  applySceneChanges(changesString, revision) {
     if (this.sceneGraph == null) {
-      // The scene data is still loading (see loadScene()). Changes the server made after it
-      // delivered the data are applied as soon as the data is loaded; earlier changes are
-      // contained in the data.
-      this.pendingChanges?.push(changesString);
+      // The scene data is still loading (see loadScene()); a failed load has no buffer.
+      this.pendingChanges?.push({ changes: changesString, revision });
       return;
     }
     try {
@@ -2395,9 +2400,10 @@ class ThreeJsControl {
         `Scene data: HTTP ${dataResponse.status} ${dataResponse.statusText}`,
       );
     }
-    // The server has delivered the data: it contains all changes made so far, later changes are
-    // sent as sceneChanged and must be applied to the data once it is loaded.
-    this.pendingChanges = [];
+    // The data contains all changes up to its revision. Changes are buffered from the start of
+    // the control, since they may arrive before or after the data, independent of when the
+    // server made them; only the later ones are applied.
+    const dataRevision = Number(dataResponse.headers.get("X-Scene-Revision"));
     const dataJson = await dataResponse.json();
 
     this.sceneGraph = this.scope.loadJson(dataJson);
@@ -2406,8 +2412,11 @@ class ThreeJsControl {
     // is built afterwards, so the commands only need to change the data model.
     const pendingChanges = this.pendingChanges;
     this.pendingChanges = null;
-    for (const changes of pendingChanges) {
-      this.applySceneCommands(changes);
+    for (const { changes, revision } of pendingChanges) {
+      // Without revisions (NaN), every change is applied.
+      if (!(Number(revision) <= dataRevision)) {
+        this.applySceneCommands(changes);
+      }
     }
 
     // Analyse for instancing
@@ -2810,10 +2819,10 @@ window.services.threejs = {
     activeControls.add(control);
   },
 
-  sceneChanged: function (container, changes) {
+  sceneChanged: function (container, changes, revision) {
     const control = ThreeJsControl.control(container);
     if (control != null) {
-      control.applySceneChanges(changes);
+      control.applySceneChanges(changes, revision);
     }
   },
 
