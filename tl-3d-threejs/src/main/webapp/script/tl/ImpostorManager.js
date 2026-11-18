@@ -378,6 +378,16 @@ export class ImpostorManager {
     });
   }
 
+  /** Releases the impostors of all assets except the given ones. */
+  retain(assetKeys) {
+    for (const [assetKey, data] of this.impostorData) {
+      if (!assetKeys.has(assetKey)) {
+        data.colorTexture?.dispose();
+        this.impostorData.delete(assetKey);
+      }
+    }
+  }
+
   dispose() {
     for (const data of this.impostorData.values()) {
       data.colorTexture?.dispose();

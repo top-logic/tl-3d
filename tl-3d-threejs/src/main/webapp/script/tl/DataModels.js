@@ -779,7 +779,16 @@ export class Scope {
    * passes and a read back of the atlas per asset. Called when the octree path is switched on.
    */
   ensureImpostors(ctrl) {
-    if (!this.instanceGroups || this.instanceGroups.size === 0 || ctrl.impostorManager) {
+    if (!this.instanceGroups || this.instanceGroups.size === 0) {
+      return;
+    }
+    // Generating already, or all impostors exist (e.g. kept over a reload).
+    const running =
+      this._impostorAbortController && !this._impostorAbortController.signal.aborted;
+    const missing = [...this.instanceGroups.keys()].some(
+      (assetKey) => !ctrl.impostorManager?.impostorData.has(assetKey),
+    );
+    if (running || !missing) {
       return;
     }
     const abortController = new AbortController();
@@ -811,14 +820,17 @@ export class Scope {
         ctrl.contextPath,
       );
     }
-    // Keep the manager of this pipeline: a reload replaces ctrl.impostorManager.
     const impostorManager = ctrl.impostorManager;
 
     // Only generate impostors for instanced assets — non-instanced models
     // don't use impostors and generating atlases for all of them is extremely
-    // expensive (26 render passes per model).
+    // expensive (26 render passes per model). Impostors kept over a reload are not generated
+    // again.
     const entries = [];
     for (const [assetKey, group] of this.instanceGroups) {
+      if (impostorManager.impostorData.has(assetKey)) {
+        continue;
+      }
       const gltfUrl = gltfUrlOf(ctrl, group.asset);
       const gltf = gltfUrl ? this.gltfs[gltfUrl] : null;
       if (gltf) {
@@ -841,6 +853,9 @@ export class Scope {
     // Shared render target is no longer needed after all impostors are generated
     impostorManager.disposeSharedRenderTarget();
     this.releaseInstancedGltfGeometries(ctrl);
+    if (this._impostorAbortController?.signal === signal) {
+      this._impostorAbortController = null;
+    }
   }
 
   /**
@@ -1097,8 +1112,7 @@ export class SceneGraph extends SharedObject {
     scope.instanceManager.dispose();
     this.ctrl.resetSceneOctree();
     this.ctrl.instancedSnappingPoints.dispose();
-    this.ctrl.impostorManager?.dispose();
-    this.ctrl.impostorManager = null;
+    // The impostors are kept: the atlas of an asset does not change with the scene (see below).
 
     // Compute needed URLs from the NEW scene's assets only
     const neededUrls = new Set();
@@ -1125,6 +1139,10 @@ export class SceneGraph extends SharedObject {
 
     // Re-analyse for instancing
     scope.analyzeForInstancing(this.ctrl);
+
+    // Keep the impostors of assets that are still instanced; generating an atlas costs 26
+    // render passes and a read back per asset.
+    this.ctrl.impostorManager?.retain(new Set(scope.instanceGroups?.keys() ?? []));
 
     this.build(this.ctrl.zUpRoot);
 
