@@ -2141,8 +2141,8 @@ class ThreeJsControl {
     }
     this.disposed = true;
 
-    // Stop loading assets for a scene that is no longer displayed.
-    this.scope?.abortAssetLoading();
+    // Stop loading assets for a scene that is no longer displayed, release the decoder.
+    this.scope?.dispose();
 
     this.resizeObserver?.disconnect();
     this.mutationObserver?.disconnect();

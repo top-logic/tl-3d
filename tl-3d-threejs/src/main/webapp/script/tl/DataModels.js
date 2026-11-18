@@ -535,17 +535,47 @@ export class Scope {
     this._loadAbortController = null;
   }
 
-  newDracoLoader() {
-    const dracoLoader = new DRACOLoader();
-    
-    // The decoder path is relative to the DracoLoader path. Since the
-    // DracoLoader path includes the version number and this is dynamic,
-    // the path must be calculated dynamically. 
-    const dracoModuleUrl = import.meta.resolve("DRACOLoader");
-    const decoderPath = new URL('../libs/draco/', dracoModuleUrl).pathname;
-	dracoLoader.setDecoderPath(decoderPath);
-	
-	return dracoLoader;
+  /**
+   * The GLTF loader of this scope, created on first use.
+   *
+   * All loading pipelines share one loader with one DRACO decoder, so that there is only
+   * one pool of decoder web workers. The decoder is released when the current pipeline ends
+   * (see releaseDecoders()) and created again by the next pipeline.
+   */
+  gltfLoader() {
+    if (!this._gltfLoader) {
+      this._gltfLoader = new GLTFLoader();
+    }
+    if (!this._dracoLoader) {
+      this._dracoLoader = new DRACOLoader();
+
+      // The decoder lies next to the examples of three.js. Since the path of the
+      // DRACOLoader module contains the version number, it is derived from the module URL.
+      const dracoModuleUrl = import.meta.resolve("DRACOLoader");
+      const decoderPath = new URL("../libs/draco/", dracoModuleUrl).pathname;
+      this._dracoLoader.setDecoderPath(decoderPath);
+
+      this._gltfLoader.setDRACOLoader(this._dracoLoader);
+    }
+    return this._gltfLoader;
+  }
+
+  /**
+   * Terminates the web workers of the DRACO decoder and releases their WebAssembly memory.
+   *
+   * A disposed DRACOLoader cannot decode any more (it revokes the source URL of its workers),
+   * so the next call of gltfLoader() creates a new one. Must not be called while a pipeline
+   * decodes, since pending decodings of terminated workers never finish.
+   */
+  releaseDecoders() {
+    this._dracoLoader?.dispose();
+    this._dracoLoader = null;
+  }
+
+  /** Stops loading and releases the decoder. Called when the control is disposed. */
+  dispose() {
+    this.abortAssetLoading();
+    this.releaseDecoders();
   }
 
   /**
@@ -567,8 +597,7 @@ export class Scope {
     this._loadAbortController = abortController;
     const signal = abortController.signal;
 
-    const gltfLoader = new GLTFLoader();
-    gltfLoader.setDRACOLoader(this.newDracoLoader());
+    const gltfLoader = this.gltfLoader();
 
     const loadUrl = (url) => {
       return gltfLoader.loadAsync(url).then(
@@ -637,7 +666,14 @@ export class Scope {
         if (signal.aborted) return;
         return this.generateImpostors(ctrl, signal);
       })
-      .then(() => !signal.aborted);
+      .then(() => {
+        // All GLTFs of this pipeline are decoded. A later pipeline that is already running
+        // still needs the workers; it releases them when it ends.
+        if (this._loadAbortController === abortController) {
+          this.releaseDecoders();
+        }
+        return !signal.aborted;
+      });
   }
 
   async generateImpostors(ctrl, signal) {
