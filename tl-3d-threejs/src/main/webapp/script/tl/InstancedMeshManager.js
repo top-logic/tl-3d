@@ -468,6 +468,8 @@ export class InstancedMeshManager {
     }
 
     const { geometry, instanceIDs, instanceIDAttribute, mesh } = data;
+    // Another list than the one of showShownInstances() (octree path, tests).
+    data.shownInstancesApplied = false;
 
     // Update the instance ID buffer with new visible IDs. The render loop calls this for every
     // frame: upload the buffer only when the list has changed, and only its used part.
@@ -653,6 +655,26 @@ export class InstancedMeshManager {
     const offset = this._getLayerPixelOffset(data, instanceID, 4);
     data.matrixTextureData[offset + 2] = hidden ? 1.0 : 0.0;
     markLayersForUpload(data.matrixTexture, [4]);
+    data.shownInstancesDirty = true;
+  }
+
+  /**
+   * Draws all shown (not hidden) instances of the given asset, as the render loop does when
+   * there is no octree. The list is built only after a change of the hidden state or of the
+   * drawn instances: hidden instances would otherwise be drawn and discarded per fragment.
+   */
+  showShownInstances(assetKey) {
+    const data = this.managedMeshes.get(assetKey);
+    if (!data || (data.shownInstancesApplied && !data.shownInstancesDirty)) return;
+    const ids = [];
+    for (const instance of data.instanceData) {
+      if (!this.isInstanceHidden(assetKey, instance.id)) {
+        ids.push(instance.id);
+      }
+    }
+    this.updateVisibleInstances(assetKey, ids);
+    data.shownInstancesDirty = false;
+    data.shownInstancesApplied = true;
   }
 
   /**

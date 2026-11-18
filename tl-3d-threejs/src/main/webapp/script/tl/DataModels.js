@@ -796,18 +796,21 @@ export class Scope {
     this._impostorAbortController = abortController;
     const signal = abortController.signal;
 
-    this.generateImpostors(ctrl, signal).then(() => {
-      if (signal.aborted || ctrl.disposed) {
+    // Each impostor is shown as soon as it is generated; until then the render loop draws the
+    // instances of the asset in full.
+    this.generateImpostors(ctrl, signal, (assetKey) => {
+      if (ctrl.disposed) {
         return;
       }
-      for (const [assetKey, group] of this.instanceGroups) {
-        this.createImpostorMesh(ctrl, assetKey, group);
-      }
+      this.createImpostorMesh(ctrl, assetKey, this.instanceGroups.get(assetKey));
       ctrl.invalidate();
     });
   }
 
-  async generateImpostors(ctrl, signal) {
+  /**
+   * @param onGenerated Optional function called with the asset key of each generated impostor.
+   */
+  async generateImpostors(ctrl, signal, onGenerated) {
     if (!this.instanceGroups || this.instanceGroups.size === 0) {
       return;
     }
@@ -842,6 +845,7 @@ export class Scope {
         return;
       }
       impostorManager.generateImpostorForAsset(assetKey, gltf, layoutInverse);
+      onGenerated?.(assetKey);
     }
 
     // Shared render target is no longer needed after all impostors are generated

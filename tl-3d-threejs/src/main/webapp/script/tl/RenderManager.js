@@ -27,6 +27,10 @@ export class RenderManager {
     // Optional function called before each frame is rendered.
     this.beforeRender = null;
 
+    // Reused for the frustum query of every frame.
+    this._frustum = new Frustum();
+    this._projScreenMatrix = new Matrix4();
+
     this.stats = {
       frameCount: 0,
       lastFrameTime: 0,
@@ -128,21 +132,19 @@ export class RenderManager {
       if (this.instanceManager) {
         if (!this.useOctree) {
           // Simple path: show every real instance, hide impostors.
-          for (const [assetKey, meshData] of this.instanceManager
-            .managedMeshes) {
+          for (const assetKey of this.instanceManager.managedMeshes.keys()) {
             if (assetKey.endsWith("_impostor")) {
               this.instanceManager.updateVisibleInstances(assetKey, []);
               continue;
             }
-            const allIDs = meshData.instanceData.map((d) => d.id);
-            this.instanceManager.updateVisibleInstances(assetKey, allIDs);
+            this.instanceManager.showShownInstances(assetKey);
           }
         } else if (this.sceneOctree) {
           // Octree path: use frustum culling. The camera may have moved since the last frame;
           // its world matrix is updated only when rendering, which comes after this query.
           this.camera.updateMatrixWorld();
-          const frustum = new Frustum();
-          const projScreenMatrix = new Matrix4();
+          const frustum = this._frustum;
+          const projScreenMatrix = this._projScreenMatrix;
           projScreenMatrix.multiplyMatrices(
             this.camera.projectionMatrix,
             this.camera.matrixWorldInverse,
@@ -175,12 +177,18 @@ export class RenderManager {
           const impostorByAsset = new Map();
           for (const obj of impostors) {
             const impostorKey = obj.assetKey + "_impostor";
-            // Only add if impostor mesh actually exists
             if (this.instanceManager.managedMeshes.has(impostorKey)) {
               if (!impostorByAsset.has(impostorKey)) {
                 impostorByAsset.set(impostorKey, []);
               }
               impostorByAsset.get(impostorKey).push(obj.instanceID);
+            } else {
+              // The impostor of the asset is not generated yet (see Scope.ensureImpostors()):
+              // draw the instance in full instead of leaving a gap.
+              if (!visibleByAsset.has(obj.assetKey)) {
+                visibleByAsset.set(obj.assetKey, []);
+              }
+              visibleByAsset.get(obj.assetKey).push(obj.instanceID);
             }
           }
 
