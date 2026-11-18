@@ -2602,6 +2602,7 @@ class ThreeJsControl {
       };
     }
 
+    const wasTransparent = material.transparent;
     if (opacity === null) {
       // Restore original properties
       const orig = material.userData.originalProperties;
@@ -2614,7 +2615,11 @@ class ThreeJsControl {
       material.opacity = opacity;
       material.depthWrite = false;
     }
-    material.needsUpdate = true;
+    // Only the transparent flag changes the shader program; opacity and depthWrite are
+    // applied per draw call.
+    if (material.transparent !== wasTransparent) {
+      material.needsUpdate = true;
+    }
   }
 
   clearObjectsTransparency() {
@@ -2650,17 +2655,24 @@ class ThreeJsControl {
         }
       });
 
-      // Make non-instanced objects transparent
+      // Make non-instanced objects transparent, the selected ones opaque
       this.scene.traverse((object) => {
         if (object.userData.isInstancedMesh || object.userData.isImpostorMesh) return;
         if (
           object.material &&
-          !selectedIds.has(object.id) &&
           object !== this.workplane &&
           !this.isWorkplaneChild(object)
         ) {
+          const selected = selectedIds.has(object.id);
           this.getMaterials(object).forEach((material) => {
-            this.setObjectTransparency(material, TRANSPARENCY_LEVEL);
+            if (selected) {
+              // Restore only materials made transparent before.
+              if (material.userData.originalProperties) {
+                this.setObjectTransparency(material, null);
+              }
+            } else {
+              this.setObjectTransparency(material, TRANSPARENCY_LEVEL);
+            }
           });
         }
       });
@@ -2726,11 +2738,14 @@ class ThreeJsControl {
       return; // Don't do anything if transparency is disabled
     }
 
-    // Clear transparency first
-    this.clearObjectsTransparency();
-
-    // Make objects transparent
-    this.setObjectsTransparency();
+    // One pass that sets the final state of each material: clearing first and then setting
+    // would switch the transparent flag twice and make three.js check the shader programs of
+    // all materials.
+    if (this.selection.length > 0) {
+      this.setObjectsTransparency();
+    } else {
+      this.clearObjectsTransparency();
+    }
 
     this.invalidate();
   }
