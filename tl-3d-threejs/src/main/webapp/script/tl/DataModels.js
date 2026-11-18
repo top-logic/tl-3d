@@ -749,14 +749,7 @@ export class Scope {
     if (!impostorData || !this.instanceManager.managedMeshes.has(assetKey)) {
       return;
     }
-    const {
-      colorTexture,
-      depthTexture,
-      boundingRadius,
-      centerOffset,
-      captureOrientations,
-      faceCornerUVData,
-    } = impostorData;
+    const { colorTexture, centerOffset, faceCornerUVData } = impostorData;
 
     // Prepare instance data (same as for real meshes)
     const instanceData = group.instances.map((instance, index) => ({
@@ -768,12 +761,9 @@ export class Scope {
     const impostorMesh = this.instanceManager.createImpostorMesh(
       assetKey,
       colorTexture,
-      depthTexture,
-      boundingRadius,
       centerOffset,
       group.instances.length,
       instanceData,
-      captureOrientations,
       faceCornerUVData,
     );
     if (impostorMesh) {

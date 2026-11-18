@@ -739,8 +739,6 @@ class ThreeJsControl {
   }
 
   prepareMultiGroup() {
-    const box = new Box3();
-
     // remove all children from multiTransformGroup
     this.multiTransformGroup.clear();
 
@@ -806,7 +804,6 @@ class ThreeJsControl {
         .multiply(node.matrix.clone().invert());
 
       node.applyMatrix4(localMatrix);
-      box.expandByObject(node);
     }
   }
 

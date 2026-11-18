@@ -736,8 +736,7 @@ export class InstancedMeshManager {
    * Create instanced billboard quads for impostors
    * @param {string} assetKey - Unique key for this asset type
    * @param {Texture} colorTexture - Atlas texture with 26 views
-   * @param {Texture} depthTexture - Depth atlas texture
-   * @param {number} boundingRadius - Radius of the original model's bounding sphere
+   * @param {Vector3} centerOffset - Offset of the model centre from the origin of the asset
    * @param {number} maxInstances - Maximum number of instances
    * @param {Array} instanceData - Array of {id, matrix} objects
    * @param {Float32Array} faceCornerUVData - Flattened array of atlas UVs per capture/face/corner
@@ -745,12 +744,9 @@ export class InstancedMeshManager {
   createImpostorMesh(
     assetKey,
     colorTexture,
-    depthTexture,
-    boundingRadius,
     centerOffset,
     maxInstances,
     instanceData,
-    captureOrientations,
     faceCornerUVData,
   ) {
     const existingMeshData = this.managedMeshes.get(assetKey);
@@ -807,13 +803,10 @@ export class InstancedMeshManager {
     // Create impostor material
     const material = this.createImpostorMaterial(
       colorTexture,
-      depthTexture,
-      boundingRadius,
       centerOffset,
       matrixTexture,
       textureWidth,
       textureHeight,
-      captureOrientations,
       boundingBoxSize,
       faceCornerTexture,
     );
@@ -842,13 +835,10 @@ export class InstancedMeshManager {
 
   createImpostorMaterial(
     colorTexture,
-    depthTexture,
-    boundingRadius,
     centerOffset,
     matrixTexture,
     textureWidth,
     textureHeight,
-    captureOrientations,
     boundingBoxSize,
     faceCornerTexture,
   ) {
@@ -861,7 +851,6 @@ export class InstancedMeshManager {
         textureHeight: { value: textureHeight },
         atlasResolution: { value: 256 },
         centerOffset: { value: centerOffset },
-        boundingRadius: { value: boundingRadius },
         boundingBoxSize: { value: boundingBoxSize },
         faceCornerTexture: { value: faceCornerTexture },
         selectionColor: { value: selectionColor },
@@ -876,7 +865,6 @@ export class InstancedMeshManager {
 
         flat varying int vCaptureIndex;
         varying vec3 vModelPos;
-        varying vec3 vWorldNormal;
         varying vec3 vLocalNormal;
         varying vec2 vInstanceUV;
 
@@ -982,7 +970,6 @@ export class InstancedMeshManager {
 
         flat varying int vCaptureIndex;
         varying vec3 vModelPos;
-        varying vec3 vWorldNormal;
         varying vec3 vLocalNormal;
         varying vec2 vInstanceUV;
 

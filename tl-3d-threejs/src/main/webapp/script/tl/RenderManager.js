@@ -13,7 +13,6 @@ export class RenderManager {
     this.camera = camera;
 
     this.isDirty = false;
-    this.isRendering = false;
     this.rafId = null;
 
     this.useOctree = false;
@@ -100,10 +99,7 @@ export class RenderManager {
     if (this.isDirty) return;
 
     this.isDirty = true;
-
-    if (!this.isRendering) {
-      this.scheduleRender();
-    }
+    this.scheduleRender();
   }
 
   scheduleRender() {

@@ -29,7 +29,7 @@ export class ImpostorManager {
     this.renderer = renderer;
     this.contextPath = contextPath;
 
-    // Map of assetKey -> {colorTexture, depthTexture, boundingRadius}
+    // Map of assetKey -> {colorTexture, centerOffset, faceCornerUVData}
     this.impostorData = new Map();
 
     // The 26 cardinal directions (6 faces + 12 edges + 8 vertices)
@@ -277,7 +277,6 @@ export class ImpostorManager {
     this.renderer.setRenderTarget(atlasTarget);
     this.renderer.clear();
 
-    const captureOrientations = [];
 
     // Model's up is Z-up (matches how models are authored)
     const modelUpWorld = new Vector3(0, 0, 1);
@@ -306,15 +305,6 @@ export class ImpostorManager {
 
       camera.lookAt(0, 0, 0);
       camera.updateMatrixWorld(true);
-
-      // Extract the actual camera orientation after lookAt
-      const cameraRight = new Vector3();
-      const cameraUp = new Vector3();
-      const cameraForward = new Vector3();
-      camera.matrix.extractBasis(cameraRight, cameraUp, cameraForward);
-
-      // Store the camera's up vector for this view
-      captureOrientations.push(cameraUp.clone());
 
       // Project bounding box face corners to atlas UV space for this capture
       this.computeFaceCornerUVs(
@@ -383,10 +373,7 @@ export class ImpostorManager {
 
     this.impostorData.set(assetKey, {
       colorTexture,
-      depthTexture: null,
-      boundingRadius: radius,
       centerOffset: center,
-      captureOrientations,
       faceCornerUVData,
     });
   }
