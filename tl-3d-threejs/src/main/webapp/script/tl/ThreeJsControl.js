@@ -369,11 +369,9 @@ class ThreeJsControl {
     }
 
     if (!this.workplane) {
-      const boxSize = new Vector3();
-      this.boundingBox.getSize(boxSize);
-      const gridSize = Math.max(boxSize.x, boxSize.y, boxSize.z) * 1.2;
-
+      const gridSize = this.workplaneSize();
       this.workplane = SceneUtils.createDetailedGrid(gridSize);
+      this.workplane.userData.size = gridSize;
       this.snapToWorkplaneEnabled = true;
     }
 
@@ -396,6 +394,35 @@ class ThreeJsControl {
     }
 
     this.invalidate();
+  }
+
+  /** The edge length of the workplane for the current bounds of the scene. */
+  workplaneSize() {
+    const boxSize = new Vector3();
+    this.boundingBox.getSize(boxSize);
+    return Math.max(boxSize.x, boxSize.y, boxSize.z) * 1.2;
+  }
+
+  /**
+   * Builds the workplane again when the scene has outgrown it or has become much smaller (the
+   * size is fixed when the workplane is created).
+   */
+  fitWorkplane() {
+    if (!this.workplane || !this.boundingBox || this.boundingBox.isEmpty()) {
+      return;
+    }
+    const size = this.workplaneSize();
+    const current = this.workplane.userData.size;
+    if (size <= current && size >= current / 2) {
+      return;
+    }
+    this.workplane.removeFromParent();
+    this.workplane.traverse((object) => {
+      object.geometry?.dispose();
+      object.material?.dispose();
+    });
+    this.workplane = null;
+    this.toggleWorkplane(this.isWorkplaneVisible);
   }
 
   updateWorkplanePosition() {
@@ -1415,6 +1442,7 @@ class ThreeJsControl {
         this.boundingBox.expandByObject(object);
       }
     });
+    this.fitWorkplane();
   }
 
   /**
