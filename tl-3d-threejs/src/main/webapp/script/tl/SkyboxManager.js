@@ -13,6 +13,7 @@ import {
   ImageLoader,
   Mesh,
   MeshBasicMaterial,
+  SRGBColorSpace,
   Vector3,
 } from "three";
 
@@ -20,6 +21,12 @@ import { gsap } from "gsap";
 
 import { CAMERA_MOVE_DURATION, FLOOR_PADDING, WHITE } from "./Constants.js";
 import { disposeMaterialWithTextures } from "./ThreeJsUtils.js";
+
+/** Marks a texture of a photo or drawing as sRGB, so that its colours are displayed correctly. */
+function srgbTexture(texture) {
+  texture.colorSpace = SRGBColorSpace;
+  return texture;
+}
 
 export class SkyboxManager {
   constructor(threeJsControl) {
@@ -32,7 +39,11 @@ export class SkyboxManager {
 
   async initSkybox() {
     // Load cube texture and create skybox environment
-    await this.loadCubeTexture();
+    try {
+      await this.loadCubeTexture();
+    } catch (error) {
+      console.warn("Skybox could not be created.", error);
+    }
     this.control.invalidate();
   }
 
@@ -66,6 +77,9 @@ export class SkyboxManager {
   }
 
   createTiledTexture(image) {
+    if (!image) {
+      return undefined;
+    }
     // Create a 4x4 tiled texture to make textures appear smaller and more realistic (poor performance)
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
@@ -114,28 +128,31 @@ export class SkyboxManager {
     ctx.fillText(text, 50, canvas.height - 50);
 
     // Create texture from canvas
-    return new CanvasTexture(canvas);
+    return srgbTexture(new CanvasTexture(canvas));
   }
 
   async loadCubeTexture() {
     const texture = new CubeTexture();
     const loader = new ImageLoader();
 
-    // Define texture URLs for different surfaces
-    const lrWallUrl =
-      "https://as2.ftcdn.net/v2/jpg/03/24/83/79/1000_F_324837965_WzkElQWESPpFBltfwddlJaQIYH8X9D5V.jpg"; // Left/Right walls
-    const fbWallUrl =
-      "https://as2.ftcdn.net/v2/jpg/01/98/99/89/1000_F_198998931_VZjbdpDglkKPjbqaXa3bnH8fB6axUTcp.jpg"; // Front/Back walls
-    const floorUrl =
-      "https://as1.ftcdn.net/v2/jpg/01/79/71/02/1000_F_179710260_hVhHw5vQNsXyb9qvIkRbIHBzWUuVcmF7.jpg"; // Floor/Ceiling
+    // The textures are delivered with the application (see artifacts/skybox/LICENSE.txt), so
+    // that no external server is contacted and the skybox also works offline.
+    const base = `${this.control.contextPath}/artifacts/skybox/`;
+    const urls = [
+      base + "side-wall.jpg", // Left/Right walls
+      base + "end-wall.jpg", // Front/Back walls
+      base + "floor.jpg", // Floor/Ceiling
+    ];
 
-    const urls = [lrWallUrl, fbWallUrl, floorUrl];
-
+    // A texture that cannot be loaded leaves its faces plain.
     const [lrWallImg, fbWallImg, floorImg] = await Promise.all(
       urls.map(
         (url) =>
           new Promise((resolve) =>
-            loader.load(url, resolve, undefined, () => resolve(undefined)),
+            loader.load(url, resolve, undefined, () => {
+              console.warn(`Skybox texture could not be loaded: ${url}`);
+              resolve(undefined);
+            }),
           ),
       ),
     );
@@ -199,7 +216,7 @@ export class SkyboxManager {
         cubeTexture.images.map(
           (img) =>
             new MeshBasicMaterial({
-              map: img ? new CanvasTexture(img) : null,
+              map: img ? srgbTexture(new CanvasTexture(img)) : null,
               side: FrontSide,
             }),
         ),

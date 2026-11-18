@@ -1,0 +1,8 @@
+Textures of the skybox of the 3D viewer (colour maps, resized to 1024 px).
+
+  side-wall.jpg  CorrugatedSteel007A
+  end-wall.jpg   PaintedPlaster017
+  floor.jpg      Concrete048
+
+Source: ambientCG (https://ambientcg.com), licensed under the Creative Commons CC0 1.0
+Universal License (https://creativecommons.org/publicdomain/zero/1.0/).
