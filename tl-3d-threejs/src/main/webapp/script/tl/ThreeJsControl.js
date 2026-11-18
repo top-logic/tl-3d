@@ -1465,11 +1465,16 @@ class ThreeJsControl {
     const distance = position.distanceTo(sphere.center);
     // Margin for objects moved beyond the bounds that are not yet updated.
     const far = (distance + sphere.radius) * 1.5;
+    // Inside the content, a part may be close to the camera although the orbit target is far
+    // away: at most NEAR_PLANE_INSIDE_MAX in front of the camera is cut off.
     const near = Math.max(
       far * 1e-5,
       distance > sphere.radius
         ? (distance - sphere.radius) * 0.9
-        : position.distanceTo(this.controls.target) * 0.01,
+        : Math.min(
+            position.distanceTo(this.controls.target) * 0.01,
+            NEAR_PLANE_INSIDE_MAX,
+          ),
     );
 
     if (this.camera.near !== near || this.camera.far !== far) {
@@ -2856,6 +2861,12 @@ class ThreeJsControl {
  * to its distance to the content.
  */
 const VIEW_OFFSET = 0.45;
+
+/**
+ * Largest distance of the near clipping plane (mm) while the camera is inside the content. The
+ * far plane lies behind the content, so the depth resolution stays sufficient.
+ */
+const NEAR_PLANE_INSIDE_MAX = 100;
 
 /** Marks inserted or removed elements in the changes collected by applySceneCommands(). */
 const STRUCTURE_CHANGE = "#structure";
