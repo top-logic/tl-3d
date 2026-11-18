@@ -423,7 +423,6 @@ class ThreeJsControl {
 
             // The gizmo moves the group, not its children: the step size applies to the group.
             object.userData.dragStartPosition = object.position.clone();
-            object.userData.dragStartRotation = object.rotation.clone();
 
             for (const node of outer.multiTransformGroup.children) {
               lastWorldMatrixes[node.id] = node.matrixWorld.clone();
@@ -507,9 +506,8 @@ class ThreeJsControl {
 
           if (event.value) {
             lastMatrix.copy(currentMatrix);
-            // Store starting position and rotation for incremental snapping
+            // Store the starting position for incremental snapping
             object.userData.dragStartPosition = object.position.clone();
-            object.userData.dragStartRotation = object.rotation.clone();
 
             // Snapshot instanced descendant matrices for GroupNodes
             const sharedObject = outer.selection[0];
@@ -639,6 +637,8 @@ class ThreeJsControl {
     this.rotateControls.addEventListener("dragging-changed", (event) => {
       if (event.value) {
         this.gizmoDragged = true;
+        // The step size may have changed since the last drag.
+        this.rotateControls.setRotationSnap(this.rotationSnap());
       } else {
         // The rotated object may reach beyond the bounds (zoomOut, clipping planes).
         this.createBoundingBox();
@@ -1143,9 +1143,7 @@ class ThreeJsControl {
 
   snapToStepSize(obj) {
     const translateStepSize = this.sceneGraph.translateStepSize;
-    const rotateStepSize = this.sceneGraph.rotateStepSize;
     const startPos = obj.userData.dragStartPosition;
-    const startRot = obj.userData.dragStartRotation;
 
     if (startPos && translateStepSize > 0) {
       const stepsX = Math.round(
@@ -1165,18 +1163,15 @@ class ThreeJsControl {
       );
     }
 
-    if (startRot && rotateStepSize > 0) {
-      const stepRad = (rotateStepSize * Math.PI) / 180;
-      const stepsX = Math.round((obj.rotation.x - startRot.x) / stepRad);
-      const stepsY = Math.round((obj.rotation.y - startRot.y) / stepRad);
-      const stepsZ = Math.round((obj.rotation.z - startRot.z) / stepRad);
+    // The rotation is snapped by the rotate gizmo (see rotationSnap()): it rounds the angle about
+    // the dragged axis. Rounding the Euler angles one by one would tilt the axis of a rotation
+    // about a local x or y axis of an object that is already rotated.
+  }
 
-      obj.rotation.set(
-        startRot.x + stepsX * stepRad,
-        startRot.y + stepsY * stepRad,
-        startRot.z + stepsZ * stepRad,
-      );
-    }
+  /** The step of the rotate gizmo in radians, null for free rotation. */
+  rotationSnap() {
+    const rotateStepSize = this.sceneGraph?.rotateStepSize;
+    return rotateStepSize > 0 ? (rotateStepSize * Math.PI) / 180 : null;
   }
 
   snapObjectToWorkplane(object) {
