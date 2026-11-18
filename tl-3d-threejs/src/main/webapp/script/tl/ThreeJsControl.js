@@ -37,6 +37,7 @@ import {
   getRaycaster,
   isDescendantOfAny,
   isPointMarker,
+  sceneColor,
   throttle,
   toMatrix,
 } from "./ThreeJsUtils.js";
@@ -2112,8 +2113,8 @@ class ThreeJsControl {
       const effective =
         object.parent && typeof own === "string" ? own : inheritedColor;
       if (effective) {
-        if (object.isMesh && object.material) {
-          const c = new Color(effective);
+        const c = sceneColor(effective);
+        if (object.isMesh && object.material && c) {
           for (const material of this.getMaterials(object)) {
             material.color.copy(c);
           }

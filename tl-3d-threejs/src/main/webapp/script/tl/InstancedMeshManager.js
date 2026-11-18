@@ -27,7 +27,7 @@ import {
 } from "three";
 
 import { SELECTION_COLOR } from "./Constants.js";
-import { disposeMaterial } from "./ThreeJsUtils.js";
+import { disposeMaterial, sceneColor } from "./ThreeJsUtils.js";
 
 export class InstancedMeshManager {
   constructor() {
@@ -576,27 +576,20 @@ export class InstancedMeshManager {
    * Set color override for an instance (layer 5, RGBA)
    * @param {string} assetKey
    * @param {number} instanceID
-   * @param {number|string} colorValue - hex color value (e.g. 0xff0000 or "#ff0000")
+   * @param {number|string} colorValue - colour as sent by the server, see sceneColor()
    */
   setInstanceColor(assetKey, instanceID, colorValue) {
     const data = this.managedMeshes.get(assetKey);
     if (!data) return;
     const offset = this._getLayerPixelOffset(data, instanceID, 5);
 
-    // Parse color to RGB floats
-    let r, g, b;
-    if (typeof colorValue === "number") {
-      r = ((colorValue >> 16) & 0xff) / 255;
-      g = ((colorValue >> 8) & 0xff) / 255;
-      b = (colorValue & 0xff) / 255;
-    } else if (typeof colorValue === "string") {
-      const hex = colorValue.replace("#", "");
-      r = parseInt(hex.substring(0, 2), 16) / 255;
-      g = parseInt(hex.substring(2, 4), 16) / 255;
-      b = parseInt(hex.substring(4, 6), 16) / 255;
-    } else {
+    // The shaders use the colour like a material colour, in the linear working colour space.
+    const color = sceneColor(colorValue);
+    if (!color) {
+      this.clearInstanceColor(assetKey, instanceID);
       return;
     }
+    const { r, g, b } = color;
 
     data.matrixTextureData[offset + 0] = r;
     data.matrixTextureData[offset + 1] = g;
@@ -949,8 +942,6 @@ export class InstancedMeshManager {
 
           if (color.a < 0.5) discard;
 
-          color.rgb = LinearTosRGB(color.rgb);
-
           // Per-instance state: selection and hidden
           vec4 instanceState = texture(matrixTexture, vec3(vInstanceUV, 4.0));
           if (instanceState.b > 0.5) discard;
@@ -966,6 +957,10 @@ export class InstancedMeshManager {
               color.rgb = colorOverride.rgb * luminance;
             }
           }
+
+          // The atlas, the selection colour and the colour override are linear; the luminance
+          // keeps the baked shading. Convert to the sRGB output only at the end.
+          color.rgb = LinearTosRGB(color.rgb);
 
           color.a *= instanceState.g;
           if (color.a < 0.01) discard;

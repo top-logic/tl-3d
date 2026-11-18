@@ -62,9 +62,36 @@ export function isPointMarker(object) {
   return !!(object.userData?.isConnectionPoint || object.userData?.isLayoutPoint);
 }
 
+/**
+ * The colour of a scene node as sent by the server (ColorFormat: "#rrggbb", "#rrggbbaa" or
+ * "transparent"; CSS colours are accepted, too), in the linear working colour space of three.js.
+ * Null for no colour, e.g. "transparent" or a value that is not understood.
+ */
+export function sceneColor(value) {
+  if (typeof value === "number") {
+    return new Color(value);
+  }
+  if (typeof value !== "string") {
+    return null;
+  }
+  let style = value.trim();
+  // The alpha of "#rrggbbaa" is not supported, the colour is shown opaque.
+  if (/^#[0-9a-f]{8}$/i.test(style)) {
+    style = style.substring(0, 7);
+  }
+  const known =
+    /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(style) ||
+    /^(rgb|hsl)a?\(/i.test(style) ||
+    Object.hasOwn(Color.NAMES, style.toLowerCase());
+  return known ? new Color().setStyle(style) : null;
+}
+
 /** Colours all meshes of the given 3D object and its descendants, except point markers. */
 export function applyColorToObject(object, colorString) {
-  const color = new Color(colorString);
+  const color = sceneColor(colorString);
+  if (!color) {
+    return;
+  }
 
   object.traverse((child) => {
     if (child.isMesh && child.material && !isPointMarker(child)) {
