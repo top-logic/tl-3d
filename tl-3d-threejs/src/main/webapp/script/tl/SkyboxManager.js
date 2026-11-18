@@ -22,6 +22,9 @@ import { gsap } from "gsap";
 import { CAMERA_MOVE_DURATION, FLOOR_PADDING, WHITE } from "./Constants.js";
 import { disposeMaterialWithTextures } from "./ThreeJsUtils.js";
 
+/** Height of the skybox room of an empty or flat scene, in mm. */
+const MIN_SKYBOX_HEIGHT = 5000;
+
 /** A repeating texture of a wall image, or null without image. */
 function wallTexture(image, repeat) {
   if (!image) {
@@ -185,7 +188,9 @@ export class SkyboxManager {
     this.control.boundingBox.getCenter(center);
 
     const boxSize = this.control.boundingBox.getSize(new Vector3());
-    const [x, y, z] = boxSize.toArray();
+    const [x, z] = [boxSize.x, boxSize.z];
+    // An empty or flat scene still gets a room (height in mm).
+    const y = Math.max(boxSize.y, MIN_SKYBOX_HEIGHT);
 
     const floorSizes = {
       x: x + FLOOR_PADDING,
@@ -211,7 +216,7 @@ export class SkyboxManager {
 
     // Adjusting the cube's Y position to match the bottom of the bounding box height
     const cubeYposition = center.y + y / 2 - 100;
-    this.environmentBackground.position.set(center.x, cubeYposition, center.z);
+    this.environmentBackground?.position.set(center.x, cubeYposition, center.z);
 
     this.createFactoryFloors(skybox);
   }
