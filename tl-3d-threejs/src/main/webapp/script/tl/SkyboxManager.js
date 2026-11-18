@@ -4,16 +4,16 @@
  */
 
 import {
-  Box3,
   BoxGeometry,
   CanvasTexture,
-  CubeTexture,
   DoubleSide,
   FrontSide,
   ImageLoader,
   Mesh,
   MeshBasicMaterial,
+  RepeatWrapping,
   SRGBColorSpace,
+  Texture,
   Vector3,
 } from "three";
 
@@ -21,6 +21,19 @@ import { gsap } from "gsap";
 
 import { CAMERA_MOVE_DURATION, FLOOR_PADDING, WHITE } from "./Constants.js";
 import { disposeMaterialWithTextures } from "./ThreeJsUtils.js";
+
+/** A repeating texture of a wall image, or null without image. */
+function wallTexture(image, repeat) {
+  if (!image) {
+    return null;
+  }
+  const texture = srgbTexture(new Texture(image));
+  texture.wrapS = RepeatWrapping;
+  texture.wrapT = RepeatWrapping;
+  texture.repeat.set(repeat, repeat);
+  texture.needsUpdate = true;
+  return texture;
+}
 
 /** Marks a texture of a photo or drawing as sRGB, so that its colours are displayed correctly. */
 function srgbTexture(texture) {
@@ -76,30 +89,6 @@ export class SkyboxManager {
     this.control.invalidate();
   }
 
-  createTiledTexture(image) {
-    if (!image) {
-      return undefined;
-    }
-    // Create a 4x4 tiled texture to make textures appear smaller and more realistic (poor performance)
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    const [tileW, tileH] = [image.width, image.height];
-    const koeff = 4;
-
-    [canvas.width, canvas.height] = [tileW * koeff, tileH * koeff];
-
-    // Draw 4x4 grid of rotated tiles
-    for (let x = 0; x < koeff; x++) {
-      for (let y = 0; y < koeff; y++) {
-        ctx.save();
-        ctx.translate((x + 0.5) * tileW, (y + 0.5) * tileH);
-        ctx.drawImage(image, -image.width / 2, -image.height / 2);
-        ctx.restore();
-      }
-    }
-    return canvas;
-  }
-
   createFloorTextTexture(text, backgroundImage = null) {
     // Create canvas for text
     const canvas = document.createElement("canvas");
@@ -132,7 +121,6 @@ export class SkyboxManager {
   }
 
   async loadCubeTexture() {
-    const texture = new CubeTexture();
     const loader = new ImageLoader();
 
     // The textures are delivered with the application (see artifacts/skybox/LICENSE.txt), so
@@ -157,18 +145,16 @@ export class SkyboxManager {
       ),
     );
 
-    const tiledFrontBackWall = this.createTiledTexture(fbWallImg);
-    // Create textures
-    texture.images = [
-      lrWallImg,
-      lrWallImg,
-      floorImg,
-      floorImg,
-      tiledFrontBackWall,
-      tiledFrontBackWall,
-    ];
-    texture.needsUpdate = true;
-    this.createEnvironmentCube(texture);
+    // One texture per image, shared by the two faces that show it. The front and back walls
+    // repeat their image 4 x 4 times, so that it appears smaller.
+    const sideWall = wallTexture(lrWallImg, 1);
+    const endWall = wallTexture(fbWallImg, 4);
+    const floor = wallTexture(floorImg, 1);
+    this.createEnvironmentCube({
+      // Order of the faces of a BoxGeometry: +x, -x, +y, -y, +z, -z.
+      faces: [sideWall, sideWall, floor, floor, endWall, endWall],
+      floorImage: floorImg,
+    });
   }
 
   /** Removes a 3D object of the environment and releases its geometry, materials and maps. */
@@ -187,7 +173,11 @@ export class SkyboxManager {
     this.factoryFloors = [];
   }
 
-  createEnvironmentCube(cubeTexture = null) {
+  /**
+   * @param skybox The textures of the faces and the image of the floors, or null for the floors
+   *        only.
+   */
+  createEnvironmentCube(skybox = null) {
     this.disposeObject(this.environmentBackground);
     this.environmentBackground = null;
 
@@ -204,7 +194,7 @@ export class SkyboxManager {
 
     this.floorSizes = floorSizes;
 
-    if (cubeTexture) {
+    if (skybox) {
       // Create textured skybox cube
       const geometry = new BoxGeometry(floorSizes.x, y * 2, floorSizes.z).scale(
         -1,
@@ -213,12 +203,8 @@ export class SkyboxManager {
       );
       this.environmentBackground = new Mesh(
         geometry,
-        cubeTexture.images.map(
-          (img) =>
-            new MeshBasicMaterial({
-              map: img ? srgbTexture(new CanvasTexture(img)) : null,
-              side: FrontSide,
-            }),
+        skybox.faces.map(
+          (texture) => new MeshBasicMaterial({ map: texture, side: FrontSide }),
         ),
       );
     }
@@ -227,10 +213,10 @@ export class SkyboxManager {
     const cubeYposition = center.y + y / 2 - 100;
     this.environmentBackground.position.set(center.x, cubeYposition, center.z);
 
-    this.createFactoryFloors(cubeTexture);
+    this.createFactoryFloors(skybox);
   }
 
-  createFactoryFloors(cubeTexture) {
+  createFactoryFloors(skybox) {
     this.factoryFloors?.forEach((floor) => this.disposeObject(floor));
     this.factoryFloors = [];
 
@@ -248,19 +234,14 @@ export class SkyboxManager {
       floorsToCreate = Array.from({ length: numberOfFloors }, (_, i) => i);
     }
 
-    // Calculate scene size for floor dimensions
-    const sceneBox = new Box3();
-    sceneBox.setFromObject(this.control.zUpRoot);
     const floorSizes = this.floorSizes;
 
     if (!floorSizes) {
       return;
     }
 
-    let floorImage;
-    if (cubeTexture && cubeTexture.images && cubeTexture.images[3]) {
-      floorImage = cubeTexture.images[3]; // Use raw image instead of CanvasTexture
-    }
+    // The floors draw their label onto the floor image.
+    const floorImage = skybox?.floorImage;
 
     // Get bounding box center for floor positioning
     const center = new Vector3();
