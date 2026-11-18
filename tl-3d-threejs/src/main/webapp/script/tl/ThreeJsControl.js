@@ -197,9 +197,10 @@ class ThreeJsControl {
 
   initRenderer() {
     const container = this.container;
+    // Every frame is drawn completely, the drawing buffer need not be preserved (which would
+    // cost a copy per frame on many GPUs).
     this.renderer = new WebGLRenderer({
       powerPreference: "high-performance",
-      preserveDrawingBuffer: true,
     });
 
     this.renderer.setSize(container.clientWidth, container.clientHeight);
