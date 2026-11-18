@@ -238,7 +238,7 @@ export class InsertElement extends ListUpdate {
           i++;
         } else if (oldFp === nextNewFp) {
           // new[j] was added, old[i] matches new[j+1]
-          this.buildAddedChild(newContents[j], parentThreeJsNode);
+          this.buildAddedChild(scope, newContents[j], parentThreeJsNode);
           j++;
         } else {
           // Ambiguous — fall back to full reload
@@ -259,7 +259,7 @@ export class InsertElement extends ListUpdate {
 
     // Handle remaining new children (all added)
     while (j < newContents.length) {
-      this.buildAddedChild(newContents[j], parentThreeJsNode);
+      this.buildAddedChild(scope, newContents[j], parentThreeJsNode);
       j++;
     }
 
@@ -270,9 +270,13 @@ export class InsertElement extends ListUpdate {
     cleanUpRemovedNode(scope, oldChild);
   }
 
-  buildAddedChild(newChild, parentThreeJsNode) {
+  buildAddedChild(scope, newChild, parentThreeJsNode) {
     if (parentThreeJsNode && newChild.build) {
       newChild.build(parentThreeJsNode);
+      // Without its model, the added part would remain a placeholder.
+      if (scope.ctrl) {
+        scope.showModels(scope.ctrl, newChild);
+      }
     }
   }
 

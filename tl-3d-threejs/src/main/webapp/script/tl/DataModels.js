@@ -619,6 +619,7 @@ export class Scope {
     this.abortAssetLoading();
     const abortController = new AbortController();
     this._loadAbortController = abortController;
+    this._pipelineRunning = true;
     const signal = abortController.signal;
 
     const gltfLoader = this.gltfLoader(ctrl.renderer);
@@ -694,9 +695,74 @@ export class Scope {
         // All GLTFs of this pipeline are decoded. A later pipeline that is already running
         // still needs the workers; it releases them when it ends.
         if (this._loadAbortController === abortController) {
-          this.releaseDecoders();
+          this._pipelineRunning = false;
+          this.releaseDecodersWhenIdle();
         }
         return !signal.aborted;
+      });
+  }
+
+  /** Releases the decoders unless a loading pipeline or an additional loading is running. */
+  releaseDecodersWhenIdle() {
+    if (!this._pipelineRunning && !this._additionalLoads) {
+      this.releaseDecoders();
+    }
+  }
+
+  /**
+   * Shows the models of the parts in the given subtree that has just been built (e.g. parts
+   * the server added to the scene): from the cache, or loaded in addition to a running
+   * loading pipeline, which is not aborted.
+   */
+  showModels(ctrl, node) {
+    const missing = new Map();
+    const visit = (n) => {
+      if (n instanceof PartNode) {
+        if (!n.node || !n.asset) {
+          return;
+        }
+        const url = gltfUrlOf(ctrl, n.asset);
+        const gltf = n.asset.gltf ?? (url != null ? this.gltfs[url] : null);
+        if (gltf) {
+          n.asset.setGLTF(gltf, ctrl);
+        } else if (url != null) {
+          const assets = missing.get(url) ?? [];
+          assets.push(n.asset);
+          missing.set(url, assets);
+        }
+      } else if (n.contents) {
+        n.contents.forEach(visit);
+      }
+    };
+    visit(node);
+
+    for (const [url, assets] of missing) {
+      this.loadAdditionalGLTF(ctrl, url, assets);
+    }
+  }
+
+  /** Loads a GLTF that a loading pipeline did not load and shows it in the given assets. */
+  loadAdditionalGLTF(ctrl, url, assets) {
+    this._additionalLoads = (this._additionalLoads ?? 0) + 1;
+    this.gltfLoader(ctrl.renderer)
+      .loadAsync(url)
+      .then(
+        (gltf) => {
+          delete gltf.parser;
+          this.gltfs[url] = gltf;
+          for (const asset of assets) {
+            // Skip assets that have been removed from the scene meanwhile.
+            if (this.objects[asset.id] === asset && !ctrl.disposed) {
+              asset.setGLTF(gltf, ctrl);
+            }
+          }
+          ctrl.invalidate();
+        },
+        (reason) => console.error("Failed to load '" + url + "': " + reason),
+      )
+      .finally(() => {
+        this._additionalLoads--;
+        this.releaseDecodersWhenIdle();
       });
   }
 
@@ -1173,17 +1239,7 @@ function buildWhenShown(node) {
   }
 
   node.build(parentGroup, { color });
-
-  const showModels = (n) => {
-    if (n instanceof PartNode) {
-      if (n.node && n.asset?.gltf) {
-        n.asset.setGLTF(n.asset.gltf, ctrl);
-      }
-    } else if (n.contents) {
-      n.contents.forEach(showModels);
-    }
-  };
-  showModels(node);
+  ctrl.scope.showModels(ctrl, node);
 }
 
 export class GroupNode extends SharedObject {

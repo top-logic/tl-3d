@@ -118,6 +118,7 @@ class ThreeJsControl {
     this.dataUrl = initialState.dataUrl;
     this.imageUrl = initialState.imageUrl;
     this.scope = new Scope();
+    this.scope.ctrl = this;
 
     this.zUpRoot = new Group();
     this.zUpEnvironment = new Group();
