@@ -910,6 +910,11 @@ class ThreeJsControl {
       return { closestSnappingPoint: null, closestSnappingPointObject: null };
     }
 
+    // The dragged objects with all their descendants: neither their snapping points are targets
+    // nor do they occupy a snapping point.
+    const excludedNodes = this.selectedSceneNodes();
+    const excludedObjects = this.draggedObjects(selectedObj, excludedNodes);
+
     // find all other objects in the scene that have snapping points
     const snappableObjects = [];
 
@@ -918,7 +923,7 @@ class ThreeJsControl {
       const nodeAsset = node?.userData?.asset || node?.userData?.nodeRef?.asset;
 
       if (
-        node !== selectedObj &&
+        !excludedObjects.has(node) &&
         nodeAsset &&
         nodeAsset.snappingPoints &&
         nodeAsset.snappingPoints.length > 0
@@ -954,7 +959,7 @@ class ThreeJsControl {
           : selectedWorldPosition.distanceTo(position);
 
         if (distance < closestDistance) {
-          if (this.isConnectionPointOccupied(otherPoint, selectedObj)) {
+          if (this.isPositionOccupied(position, excludedObjects, excludedNodes)) {
             continue;
           }
 
@@ -967,7 +972,6 @@ class ThreeJsControl {
 
     // Snapping points of instanced parts, except those of the dragged parts.
     let instancedSnappingPoint = null;
-    const excludedNodes = this.selectedSceneNodes();
     const entries = this.instancedSnappingPoints.entries;
     const parentMatrixWorld = this.zUpRoot.matrixWorld;
     for (let i = 0; i < entries.length; i++) {
@@ -981,7 +985,7 @@ class ThreeJsControl {
         ? this.getScreenSpaceDistance(selectedWorldPosition, position)
         : selectedWorldPosition.distanceTo(position);
       if (distance < closestDistance) {
-        if (this.isPositionOccupied(position, selectedObj, excludedNodes)) {
+        if (this.isPositionOccupied(position, excludedObjects, excludedNodes)) {
           continue;
         }
         closestDistance = distance;
@@ -1200,22 +1204,27 @@ class ThreeJsControl {
   }
 
 
-  isConnectionPointOccupied(connectionPoint, excludeObject = null) {
-    // Get world position of connection point
-    const position = new Vector3();
-    connectionPoint.node.getWorldPosition(position);
-    return this.isPositionOccupied(
-      position,
-      excludeObject,
-      this.selectedSceneNodes(),
-    );
+  /**
+   * The 3D objects of a drag: the dragged object and the objects of the selected scene nodes,
+   * each with all descendants.
+   */
+  draggedObjects(selectedObj, selectedNodes) {
+    const objects = new Set();
+    const add = (object) => object.traverse((o) => objects.add(o));
+    add(selectedObj);
+    for (const node of selectedNodes) {
+      if (node.node) {
+        add(node.node);
+      }
+    }
+    return objects;
   }
 
   /**
-   * Whether a part (other than the excluded object and parts) is placed at the given world
-   * position, i.e. a snapping point there is occupied.
+   * Whether a part (other than the excluded 3D objects and scene nodes) is placed at the given
+   * world position, i.e. a snapping point there is occupied.
    */
-  isPositionOccupied(position, excludeObject, excludedNodes) {
+  isPositionOccupied(position, excludedObjects, excludedNodes) {
     const checkRadius = 50;
 
     // Instanced parts have no 3D objects; their positions are the instance matrices.
@@ -1240,8 +1249,8 @@ class ThreeJsControl {
     const nearbyObjects = [];
 
     this.zUpRoot.traverse((node) => {
-      // Skip the object being moved
-      if (node === excludeObject) {
+      // Skip the objects being moved (traverse visits their descendants, too)
+      if (excludedObjects.has(node)) {
         return;
       }
 
