@@ -1149,6 +1149,11 @@ export class SceneGraph extends SharedObject {
     // Recreate instanced meshes
     scope.createInstancedMeshes(this.ctrl);
 
+    // The selection and the gizmo refer to the new 3D objects at once: until the assets are
+    // loaded, the gizmo would otherwise stay at the removed object.
+    this.ctrl.applySelection(this.selection);
+    this.ctrl.updateTransformControls();
+
     scope.loadAssets(this.ctrl).then((loaded) => {
       // Aborted by a later reload, which continues with the then current scene.
       if (!loaded) return;
