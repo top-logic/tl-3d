@@ -575,9 +575,9 @@ class ThreeJsControl {
 
           outer.sendSceneChanges(commands);
 
-          // Rebuild octree if any instanced matrices changed
+          // Update the octree if any instanced matrices changed
           if (Object.keys(outer._instanceSnapshots).length > 0) {
-            outer.buildSceneOctree();
+            outer.updateSceneOctree(outer.selection);
           }
           outer._instanceSnapshots = {};
         } else {
@@ -628,8 +628,8 @@ class ThreeJsControl {
             const commands = [sharedObject.notifyTransform(diffMatrix)];
             outer.sendSceneChanges(commands);
 
-            // Rebuild the octree since instance positions have changed
-            outer.buildSceneOctree();
+            // Instance positions have changed
+            outer.updateSceneOctree([sharedObject]);
           } else {
             // REGULAR (non-instanced) SINGLE OBJECT MODE
             const updatedMatrix = object.matrix.clone();
@@ -643,7 +643,7 @@ class ThreeJsControl {
               // Recompute GPU matrices for instanced descendants of GroupNodes
               if (sharedObject instanceof GroupNode && outer.hasInstancedDescendants(sharedObject)) {
                 sharedObject.recomputeInstancedChildrenMatrices(outer.scope);
-                outer.buildSceneOctree();
+                outer.updateSceneOctree([sharedObject]);
               }
             }
           }
@@ -2050,19 +2050,26 @@ class ThreeJsControl {
       } else {
         // Rebuild only what depends on the changes: a selection made in another component
         // must not rebuild the octree of a large scene.
-        const structure = changed.has(STRUCTURE_CHANGE);
-        if (structure || changed.has("color")) {
+        const structure = changed.has(STRUCTURE_CHANGE) || changed.has("parent");
+        const colors = structure || changed.has("color");
+        if (colors) {
           this.applyColors();
         }
-        this.applySelection(this.sceneGraph.selection);
-        this.updateTransformControls();
-        if (
-          structure ||
-          changed.has("transform") ||
-          changed.has("hidden") ||
-          changed.has("parent")
-        ) {
+        // Colours overwrite the selection colour; in the transparency mode, this traverses the
+        // whole scene.
+        if (colors || changed.has("selection") || changed.has("hidden")) {
+          this.applySelection(this.sceneGraph.selection);
+        }
+        if (structure || changed.has("selection") || changed.has("transform")) {
+          this.updateTransformControls();
+        }
+        if (structure) {
           this.buildSceneOctree();
+        } else if (changed.has("transform")) {
+          // Only the moved instances (the octree also holds hidden instances).
+          this.updateSceneOctree(changed.transformed ?? []);
+        }
+        if (structure || changed.has("transform") || changed.has("hidden")) {
           this.refreshInstancedSnappingPoints();
           // Parts may have been added or moved beyond the bounds (zoomOut, clipping planes).
           this.createBoundingBox();
@@ -2173,10 +2180,17 @@ class ThreeJsControl {
       }
       // The changed properties, or STRUCTURE_CHANGE for inserted / removed elements.
       changed.add(command[0] === "S" ? cmdProps["p"] : STRUCTURE_CHANGE);
+      const movedId = command[0] === "S" && cmdProps["p"] === "transform" ? cmdProps["id"] : null;
 
       change.shift();
       cmd.loadJson(cmdProps, change);
       cmd.apply(this.scope);
+      if (movedId != null) {
+        // The moved scene nodes, see applySceneChanges().
+        changed.transformed = changed.transformed ?? [];
+        const moved = this.scope.getNode(movedId);
+        if (moved) changed.transformed.push(moved);
+      }
 
       if (cmd.needsFullReload) {
         needsFullReload = true;
@@ -2592,6 +2606,44 @@ class ThreeJsControl {
     this.updateTransformControls();
 
     this.invalidate();
+  }
+
+  /**
+   * Updates the octree after the given scene nodes have moved: only their instances are moved
+   * in the tree. Building it again costs time proportional to all instances of the scene.
+   */
+  updateSceneOctree(nodes) {
+    if (!this.sceneOctree) {
+      return;
+    }
+    const instanceManager = this.scope.instanceManager;
+    this.zUpRoot.updateMatrixWorld(true);
+    const zUpTransform = this.zUpRoot.matrixWorld;
+    let complete = true;
+    for (const node of nodes) {
+      this.forEachInstancedDescendant(node, (partNode) => {
+        if (!complete) return;
+        const data = instanceManager.managedMeshes.get(partNode.assetKey);
+        const instance = data?.instanceData[partNode.instanceID];
+        if (!instance || !data.baseBoundingBox) {
+          complete = false;
+          return;
+        }
+        const box = data.baseBoundingBox
+          .clone()
+          .applyMatrix4(instance.matrix)
+          .applyMatrix4(zUpTransform);
+        complete = this.sceneOctree.updateInstance(
+          partNode.assetKey,
+          partNode.instanceID,
+          box,
+        );
+      });
+    }
+    if (!complete) {
+      // An instance left the tree (or is unknown to it): build it again.
+      this.buildSceneOctree();
+    }
   }
 
   /**

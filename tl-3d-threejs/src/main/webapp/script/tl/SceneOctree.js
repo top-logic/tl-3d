@@ -29,6 +29,9 @@ export class SceneOctree {
     this.maxObjectsPerNode = maxObjectsPerNode;
     this.root = new OctreeNode(boundingBox, 0, this);
 
+    // Instance objects by asset key and instance ID, see updateInstance().
+    this.instanceObjects = new Map();
+
     // Statistics
     this.stats = {
       totalObjects: 0,
@@ -49,6 +52,7 @@ export class SceneOctree {
       this.stats.totalObjects++;
       if (object.type === "instance") {
         this.stats.totalInstances++;
+        this.instanceObjects.set(instanceKey(object.assetKey, object.instanceID), object);
       }
     }
     return inserted;
@@ -64,9 +68,26 @@ export class SceneOctree {
       this.stats.totalObjects--;
       if (object.type === "instance") {
         this.stats.totalInstances--;
+        this.instanceObjects.delete(instanceKey(object.assetKey, object.instanceID));
       }
     }
     return removed;
+  }
+
+  /**
+   * Moves the given instance to its new bounds, instead of building the whole tree again
+   * after an instance has been moved.
+   *
+   * @returns false if the instance is unknown or its new bounds leave the tree; then the tree
+   *          must be built again.
+   */
+  updateInstance(assetKey, instanceID, boundingBox) {
+    const object = this.instanceObjects.get(instanceKey(assetKey, instanceID));
+    if (!object || !this.boundingBox.containsBox(boundingBox)) {
+      return false;
+    }
+    this.remove(object);
+    return this.insert({ ...object, boundingBox });
   }
 
   /**
@@ -306,6 +327,11 @@ export class SceneOctree {
  * into all intersected children instead lets the tree explode for large, overlapping objects:
  * every child gets all of them again and is subdivided again, down to the maximum depth.)
  */
+/** Key of an instance in SceneOctree.instanceObjects. */
+function instanceKey(assetKey, instanceID) {
+  return assetKey + "#" + instanceID;
+}
+
 class OctreeNode {
   constructor(boundingBox, depth, octree) {
     this.boundingBox = boundingBox; // Box3
@@ -366,7 +392,13 @@ class OctreeNode {
       return true;
     }
     if (!this.isLeaf) {
+      // An object lies in the deepest node containing its box: look there first.
+      const likely = this.childContaining(object.boundingBox);
+      if (likely?.remove(object)) {
+        return true;
+      }
       for (const child of this.children) {
+        if (child === likely) continue;
         if (child.remove(object)) {
           return true;
         }
