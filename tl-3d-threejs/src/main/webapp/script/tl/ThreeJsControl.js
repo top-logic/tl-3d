@@ -1487,10 +1487,13 @@ class ThreeJsControl {
     const far = (distance + sphere.radius) * 1.5;
     // Inside the content, a part may be close to the camera although the orbit target is far
     // away: at most NEAR_PLANE_INSIDE_MAX in front of the camera is cut off.
+    // Outside the content, the near plane lies in front of it, with a margin for an object
+    // that is dragged towards the camera beyond the bounds (updated when the drag ends).
+    const margin = sphere.radius * 0.5;
     const near = Math.max(
       far * 1e-5,
-      distance > sphere.radius
-        ? (distance - sphere.radius) * 0.9
+      distance > sphere.radius + margin
+        ? (distance - sphere.radius - margin) * 0.9
         : Math.min(
             position.distanceTo(this.controls.target) * 0.01,
             NEAR_PLANE_INSIDE_MAX,
