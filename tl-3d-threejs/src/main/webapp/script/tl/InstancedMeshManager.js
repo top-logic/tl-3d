@@ -1083,6 +1083,18 @@ export class InstancedMeshManager {
     return total;
   }
 
+  /** Removes the impostor mesh of the given asset, if any. */
+  removeImpostorMesh(assetKey) {
+    const impostorKey = assetKey + "_impostor";
+    const data = this.managedMeshes.get(impostorKey);
+    if (!data) return;
+    data.mesh.removeFromParent();
+    data.faceCornerTexture?.dispose();
+    data.mesh.geometry.dispose();
+    disposeMaterial(data.mesh.material);
+    this.managedMeshes.delete(impostorKey);
+  }
+
   /**
    * Uploads the matrix textures completely when the WebGL context has been restored: changes
    * collected while the context was lost must not be uploaded as single layers of a texture that

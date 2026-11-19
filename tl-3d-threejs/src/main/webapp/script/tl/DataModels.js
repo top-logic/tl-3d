@@ -929,11 +929,14 @@ export class Scope {
         continue;
       }
       const gltf = this.gltfs[gltfUrlOf(ctrl, group.asset)];
-      if (!gltf) {
-        continue;
-      }
       // The old atlas belongs to the lost context, there is nothing to release.
       impostorManager.impostorData.delete(assetKey);
+      if (!gltf) {
+        // Its atlas cannot be rendered again: without impostor mesh, the render loop draws
+        // the instances in full instead of an empty impostor.
+        this.instanceManager.removeImpostorMesh(assetKey);
+        continue;
+      }
       impostorManager.generateImpostorForAsset(
         assetKey,
         gltf,
