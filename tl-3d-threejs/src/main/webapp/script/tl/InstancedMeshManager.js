@@ -1063,6 +1063,7 @@ export class InstancedMeshManager {
       // Pixels outside the model are discarded; blending is needed only for the opacity of the
       // transparency mode (see setTransparentMode()).
       transparent: this.transparentMode,
+      depthWrite: !this.transparentMode,
       side: FrontSide,
     });
   }
@@ -1111,6 +1112,8 @@ export class InstancedMeshManager {
           material.transparent = enabled;
           material.needsUpdate = true;
         }
+        // Like transparent normal parts, translucent impostors must not hide what is behind.
+        material.depthWrite = !enabled;
         continue;
       }
       // One material per merged mesh for GLTFs with several meshes.
