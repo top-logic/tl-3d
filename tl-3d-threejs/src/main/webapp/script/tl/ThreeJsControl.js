@@ -1464,6 +1464,7 @@ class ThreeJsControl {
       }
     });
     this.fitWorkplane();
+    this.skyboxManager?.fitToScene();
   }
 
   /**

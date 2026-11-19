@@ -19,7 +19,12 @@ import {
 
 import { gsap } from "gsap";
 
-import { CAMERA_MOVE_DURATION, FLOOR_PADDING, WHITE } from "./Constants.js";
+import {
+  CAMERA_MOVE_DURATION,
+  FLOOR_HEIGHT,
+  FLOOR_PADDING,
+  WHITE,
+} from "./Constants.js";
 import { disposeMaterialWithTextures } from "./ThreeJsUtils.js";
 
 /** Height of the skybox room of an empty or flat scene, in mm. */
@@ -92,6 +97,37 @@ export class SkyboxManager {
     this.control.invalidate();
   }
 
+  /**
+   * Builds the room (skybox and floors) again when the scene has changed its size or its floors
+   * since the room was built, e.g. after parts have been added or moved or a reload.
+   */
+  fitToScene() {
+    if (!this.skybox || !this.environmentBackground) {
+      return;
+    }
+    const signature = this.roomSignature();
+    if (signature === this._roomSignature) {
+      return;
+    }
+    this.createEnvironmentCube(this.skybox);
+    if (this.isSkyboxVisible) {
+      // Shown again without the camera flight of toggleSkybox().
+      [this.environmentBackground, ...this.factoryFloors].forEach((obj) =>
+        this.control.zUpEnvironment.add(obj),
+      );
+      this.control.invalidate();
+    }
+  }
+
+  /** What the room depends on: the bounds of the scene and its floors. */
+  roomSignature() {
+    const box = this.control.boundingBox;
+    const bounds = box && !box.isEmpty()
+      ? [...box.min.toArray(), ...box.max.toArray()].map(Math.round).join(",")
+      : "empty";
+    return bounds + "|" + this.getFloorLevels().join(",");
+  }
+
   createFloorTextTexture(text, backgroundImage = null) {
     // Create canvas for text
     const canvas = document.createElement("canvas");
@@ -153,11 +189,13 @@ export class SkyboxManager {
     const sideWall = wallTexture(lrWallImg, 1);
     const endWall = wallTexture(fbWallImg, 4);
     const floor = wallTexture(floorImg, 1);
-    this.createEnvironmentCube({
+    // Kept for fitting the room to a changed scene (fitToScene()).
+    this.skybox = {
       // Order of the faces of a BoxGeometry: +x, -x, +y, -y, +z, -z.
       faces: [sideWall, sideWall, floor, floor, endWall, endWall],
       floorImage: floorImg,
-    });
+    };
+    this.createEnvironmentCube(this.skybox);
   }
 
   /** Removes a 3D object of the environment and releases its geometry, materials and maps. */
@@ -219,6 +257,7 @@ export class SkyboxManager {
     this.environmentBackground?.position.set(center.x, cubeYposition, center.z);
 
     this.createFactoryFloors(skybox);
+    this._roomSignature = this.roomSignature();
   }
 
   createFactoryFloors(skybox) {
@@ -275,7 +314,7 @@ export class SkyboxManager {
         new MeshBasicMaterial(materialOptions),
       );
 
-      const floorY = level * 15000 - 100;
+      const floorY = level * FLOOR_HEIGHT - 100;
       floor.position.set(center.x, floorY, center.z);
 
       this.factoryFloors.push(floor);
