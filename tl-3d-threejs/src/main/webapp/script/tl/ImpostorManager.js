@@ -104,6 +104,35 @@ export class ImpostorManager {
    * Face index mapping (matches faceIndexFromNormal in fragment shader):
    *   0 = +X, 1 = -X, 2 = +Y, 3 = -Y, 4 = +Z, 5 = -Z
    */
+  /**
+   * Sets the frustum of the orthographic capture camera to the projection of the bounding box
+   * (with a small margin). The face corner UVs are computed with the same camera, so the
+   * impostor shader maps the stretched cell back.
+   */
+  fitCameraToBox(camera, boxCorners, radius) {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    const p = new Vector3();
+    for (const corner of boxCorners) {
+      p.copy(corner).applyMatrix4(camera.matrixWorldInverse);
+      minX = Math.min(minX, p.x);
+      maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y);
+      maxY = Math.max(maxY, p.y);
+    }
+    // A flat model seen from the side must not get an empty frustum.
+    const minExtent = radius * 0.02;
+    const padX = Math.max((maxX - minX) * 0.02, minExtent);
+    const padY = Math.max((maxY - minY) * 0.02, minExtent);
+    camera.left = minX - padX;
+    camera.right = maxX + padX;
+    camera.bottom = minY - padY;
+    camera.top = maxY + padY;
+    camera.updateProjectionMatrix();
+  }
+
   buildBoxFaceDefinitions(boundingBox) {
     const { max } = boundingBox;
     const hx = max.x;
@@ -312,6 +341,9 @@ export class ImpostorManager {
 
       camera.lookAt(0, 0, 0);
       camera.updateMatrixWorld(true);
+      // Fill the cell with the model as seen from this direction: a sphere around a long asset
+      // (a rail) would leave most of the cell empty and the impostor blurred.
+      this.fitCameraToBox(camera, boxCorners, radius);
 
       // Project bounding box face corners to atlas UV space for this capture
       this.computeFaceCornerUVs(
