@@ -869,7 +869,10 @@ export class Scope {
         // The scene was reloaded meanwhile, the manager is disposed or replaced.
         return;
       }
-      impostorManager.generateImpostorForAsset(assetKey, gltf, layoutInverse);
+      await impostorManager.generateImpostorForAsset(assetKey, gltf, layoutInverse);
+      if (signal?.aborted) {
+        return;
+      }
       onGenerated?.(assetKey);
     }
 
@@ -918,37 +921,39 @@ export class Scope {
    * textures again, but the atlases exist on the GPU only (their pixels are dropped after the
    * upload).
    */
-  regenerateImpostors(ctrl) {
+  async regenerateImpostors(ctrl) {
     const impostorManager = ctrl.impostorManager;
     if (!impostorManager || !this.instanceGroups) {
       return;
     }
+    // The atlases belong to the lost context (nothing to release). Until an atlas is rendered
+    // again, its asset has no impostor mesh and the render loop draws the instances in full.
+    const regenerate = [];
     for (const [assetKey, group] of this.instanceGroups) {
       if (!impostorManager.impostorData.has(assetKey)) {
         // Not yet generated, the loading pipeline still does that.
         continue;
       }
-      const gltf = this.gltfs[gltfUrlOf(ctrl, group.asset)];
-      // The old atlas belongs to the lost context, there is nothing to release.
       impostorManager.impostorData.delete(assetKey);
-      if (!gltf) {
-        // Its atlas cannot be rendered again: without impostor mesh, the render loop draws
-        // the instances in full instead of an empty impostor.
-        this.instanceManager.removeImpostorMesh(assetKey);
-        continue;
+      this.instanceManager.removeImpostorMesh(assetKey, false);
+      const gltf = this.gltfs[gltfUrlOf(ctrl, group.asset)];
+      if (gltf) {
+        regenerate.push([assetKey, group, gltf]);
       }
-      impostorManager.generateImpostorForAsset(
+    }
+    ctrl.invalidate();
+
+    for (const [assetKey, group, gltf] of regenerate) {
+      await impostorManager.generateImpostorForAsset(
         assetKey,
         gltf,
         layoutPointInverse(group.asset),
       );
-      const meshData = this.instanceManager.managedMeshes.get(
-        assetKey + "_impostor",
-      );
-      if (meshData) {
-        meshData.mesh.material.uniforms.colorAtlas.value =
-          impostorManager.impostorData.get(assetKey).colorTexture;
+      if (ctrl.disposed || ctrl.impostorManager !== impostorManager) {
+        return;
       }
+      this.createImpostorMesh(ctrl, assetKey, group);
+      ctrl.invalidate();
     }
     impostorManager.disposeSharedRenderTarget();
     this.releaseInstancedGltfGeometries(ctrl);
@@ -1740,6 +1745,13 @@ export class PartNode extends SharedObject {
   }
 }
 
+/**
+ * The model of a part, loaded from a GLTF.
+ *
+ * Holds the 3D objects of exactly one part (group, placeholder, model): the server creates an
+ * asset for each part (ThreejsGltf.createNode() on the server), scripts cannot pass an existing
+ * asset object. An asset shared by several parts would be shown for the last built part only.
+ */
 export class GltfAsset extends SharedObject {
   constructor(id) {
     super(id);

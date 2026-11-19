@@ -1083,15 +1083,22 @@ export class InstancedMeshManager {
     return total;
   }
 
-  /** Removes the impostor mesh of the given asset, if any. */
-  removeImpostorMesh(assetKey) {
+  /**
+   * Removes the impostor mesh of the given asset, if any.
+   *
+   * @param release Whether to release its GPU resources; not after a context loss, when they
+   *        belong to the lost context.
+   */
+  removeImpostorMesh(assetKey, release = true) {
     const impostorKey = assetKey + "_impostor";
     const data = this.managedMeshes.get(impostorKey);
     if (!data) return;
     data.mesh.removeFromParent();
-    data.faceCornerTexture?.dispose();
-    data.mesh.geometry.dispose();
-    disposeMaterial(data.mesh.material);
+    if (release) {
+      data.faceCornerTexture?.dispose();
+      data.mesh.geometry.dispose();
+      disposeMaterial(data.mesh.material);
+    }
     this.managedMeshes.delete(impostorKey);
   }
 

@@ -251,7 +251,21 @@ export class ImpostorManager {
    * @param layoutInverse Inverse of the layout point transformation of the asset (moves the
    *        model as in the normal rendering), or null.
    */
+  /**
+   * Generates the impostor of the given asset. Calls are processed one after the other: they
+   * share the render target.
+   *
+   * @returns a promise that resolves when the impostor data is stored (or the manager has been
+   *          disposed meanwhile).
+   */
   generateImpostorForAsset(assetKey, gltf, layoutInverse = null) {
+    this._queue = (this._queue ?? Promise.resolve()).then(() =>
+      this.disposed ? undefined : this.renderImpostor(assetKey, gltf, layoutInverse),
+    );
+    return this._queue;
+  }
+
+  async renderImpostor(assetKey, gltf, layoutInverse) {
     // Dispose old data if this asset was previously captured
     const existingData = this.impostorData.get(assetKey);
     if (existingData?.colorTexture) {
@@ -380,8 +394,9 @@ export class ImpostorManager {
 
     // Read back the rendered atlas to a DataTexture so we can release the
     // shared render target for the next asset instead of keeping one per asset.
+    // Read back without stalling the main thread: the GPU finishes the 26 passes meanwhile.
     const pixels = new Uint8Array(atlasWidth * atlasHeight * 4);
-    this.renderer.readRenderTargetPixels(
+    await this.renderer.readRenderTargetPixelsAsync(
       atlasTarget,
       0,
       0,
@@ -389,6 +404,9 @@ export class ImpostorManager {
       atlasHeight,
       pixels,
     );
+    if (this.disposed) {
+      return;
+    }
     const colorTexture = new DataTexture(
       pixels,
       atlasWidth,
@@ -428,6 +446,7 @@ export class ImpostorManager {
   }
 
   dispose() {
+    this.disposed = true;
     for (const data of this.impostorData.values()) {
       data.colorTexture?.dispose();
     }
