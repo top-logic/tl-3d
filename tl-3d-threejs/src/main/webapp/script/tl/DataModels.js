@@ -186,6 +186,16 @@ function markFailedPlaceholder(mesh) {
   }
 }
 
+/** Releases the geometries, materials and textures (with their image bitmaps) of a GLTF. */
+function disposeGltf(gltf) {
+  gltf.scene.traverse((obj) => {
+    if (obj.isMesh) {
+      obj.geometry.dispose();
+      disposeMaterialWithTextures(obj.material);
+    }
+  });
+}
+
 export class Scope {
   constructor() {
     this.objects = {};
@@ -452,13 +462,7 @@ export class Scope {
   clearStaleGltfs(keepUrls) {
     for (const [url, gltf] of Object.entries(this.gltfs)) {
       if (!keepUrls.has(url)) {
-        gltf.scene.traverse((obj) => {
-          if (obj.isMesh) {
-            obj.geometry.dispose();
-            // The textures of the GLTF are no longer used either.
-            disposeMaterialWithTextures(obj.material);
-          }
-        });
+        disposeGltf(gltf);
         delete this.gltfs[url];
       }
     }
@@ -588,6 +592,7 @@ export class Scope {
 
   /** Stops loading and releases the decoder. Called when the control is disposed. */
   dispose() {
+    this.disposed = true;
     this.abortAssetLoading();
     this.releaseDecoders();
     // The GLTFs with their images (ImageBitmaps are not garbage collected by themselves) and
@@ -621,7 +626,11 @@ export class Scope {
     const loadUrl = (url) => {
       return gltfLoader.loadAsync(url).then(
         (gltf) => {
-          if (signal.aborted) return;
+          if (signal.aborted) {
+            // Not used by the scene that replaced this one.
+            disposeGltf(gltf);
+            return;
+          }
           // Release the parser to free the raw ArrayBuffer data it retains.
           // The parser is only needed during the initial parse and is never
           // used after loadAsync resolves.
@@ -728,6 +737,11 @@ export class Scope {
       .loadAsync(url)
       .then(
         (gltf) => {
+          if (this.disposed) {
+            // The viewer has been closed meanwhile.
+            disposeGltf(gltf);
+            return;
+          }
           delete gltf.parser;
           this.gltfs[url] = gltf;
           for (const asset of assets) {
