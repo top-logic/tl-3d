@@ -2069,8 +2069,54 @@ class ThreeJsControl {
         this.invalidate();
       }
     } catch (ex) {
-      console.error(ex);
-      throw ex;
+      // The data model may be half patched; later changes refer to the state of the server.
+      this.resyncScene(ex);
+    }
+  }
+
+  /**
+   * Loads the scene again from the server, after a change could not be applied: otherwise
+   * client and server would differ from then on. The server sends the complete current state
+   * (and resets its references, see ThreeJsControl.handleContent() on the server); changes that
+   * arrive meanwhile are applied by their revision (see loadScene()).
+   */
+  async resyncScene(reason) {
+    if (this._resyncing || this.disposed) {
+      return;
+    }
+    this._resyncing = true;
+    console.error("3D viewer: a scene change failed, the scene is loaded again.", reason);
+    try {
+      this.selection = [];
+      this.updateTransformControls();
+      this.scope.dispose();
+      this.impostorManager?.dispose();
+      this.impostorManager = null;
+      this.resetSceneOctree();
+      this.instancedSnappingPoints.dispose();
+      this.zUpRoot.clear();
+      this.multiTransformGroup.clear();
+
+      this.scope = new Scope();
+      this.scope.ctrl = this;
+      this.renderManager.setInstanceManager(this.scope.instanceManager);
+      this.scope.instanceManager.setTransparentMode(this.areObjectsTransparent);
+      this.sceneGraph = null;
+      this.pendingChanges = [];
+
+      await this.loadScene();
+      if (this.disposed) {
+        return;
+      }
+      this.createBoundingBox();
+      // The workplane was a child of the cleared root.
+      this.toggleWorkplane(this.isWorkplaneVisible);
+      this.refreshInstancedSnappingPoints();
+      this.invalidate();
+    } catch (error) {
+      this.showLoadError(error);
+    } finally {
+      this._resyncing = false;
     }
   }
 
@@ -2486,7 +2532,8 @@ class ThreeJsControl {
   }
 
   async loadScene() {
-    const dataResponse = await fetch(this.dataUrl);
+    // Always the current state (the URL is the same when the scene is loaded again).
+    const dataResponse = await fetch(this.dataUrl, { cache: "no-store" });
     if (!dataResponse.ok) {
       throw new Error(
         `Scene data: HTTP ${dataResponse.status} ${dataResponse.statusText}`,
