@@ -36,8 +36,10 @@ import {
   getMatrixDiff,
   getRaycaster,
   isDescendantOfAny,
+  disposeOrbitControls,
   isPointMarker,
   materialsOf,
+  rememberRootNode,
   sceneColor,
   throttle,
   toMatrix,
@@ -291,22 +293,37 @@ class ThreeJsControl {
     // update objects' size when the size of the canvas changes
     this.resizeObserver = this.createResizeObserver(this.canvas);
     this.resizeObserver.observe(this.canvas);
-    this.canvas.addEventListener("mousedown", (event) =>
-      this.onMouseDown(event),
+    // Removed in dispose(): three.js may keep the canvas (and with it its listeners) alive after
+    // the renderer is disposed (a module wide texture caches the WebGL texture of each
+    // renderer), the listeners must not keep this control and its scene alive.
+    this.canvasListeners = new AbortController();
+    const signal = this.canvasListeners.signal;
+    this.canvas.addEventListener(
+      "mousedown",
+      (event) => this.onMouseDown(event),
+      { signal },
     );
-    this.canvas.addEventListener("mouseup", (event) => this.onMouseUp(event));
+    this.canvas.addEventListener("mouseup", (event) => this.onMouseUp(event), {
+      signal,
+    });
 
     // The browser may drop the WebGL context (GPU reset, driver update, too many contexts,
     // a mobile device in the background). three.js keeps the context restorable and sets up
     // its state again when it comes back; the viewer must render what exists on the GPU only.
-    this.canvas.addEventListener("webglcontextlost", () => {
-      // Disposing the control drops the context on purpose.
-      if (!this.disposed) {
-        console.warn("3D viewer: WebGL context lost, waiting for its restoration.");
-      }
-    });
-    this.canvas.addEventListener("webglcontextrestored", () =>
-      this.onContextRestored(),
+    this.canvas.addEventListener(
+      "webglcontextlost",
+      () => {
+        // Disposing the control drops the context on purpose.
+        if (!this.disposed) {
+          console.warn("3D viewer: WebGL context lost, waiting for its restoration.");
+        }
+      },
+      { signal },
+    );
+    this.canvas.addEventListener(
+      "webglcontextrestored",
+      () => this.onContextRestored(),
+      { signal },
     );
 
     // Create a MutationObserver to detect DOM changes that might affect layout
@@ -328,7 +345,9 @@ class ThreeJsControl {
   }
 
   initControls() {
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls = rememberRootNode(
+      new OrbitControls(this.camera, this.renderer.domElement),
+    );
     this.controls.reset();
     // Zooming with the mouse wheel is done by the OrbitControls only.
     this.controls.enableZoom = true;
@@ -2438,10 +2457,11 @@ class ThreeJsControl {
 
     this.resizeObserver?.disconnect();
     this.mutationObserver?.disconnect();
+    this.canvasListeners?.abort();
 
     if (this.controls) {
       gsap.killTweensOf([this.controls.object.position, this.controls.target]);
-      this.controls.dispose();
+      disposeOrbitControls(this.controls);
     }
     this.translateControls?.dispose();
     this.rotateControls?.dispose();
@@ -2460,6 +2480,9 @@ class ThreeJsControl {
     if (this.container && this.container.tlControl === this) {
       this.container.tlControl = null;
     }
+
+    // Should anything still refer to this control, it holds an empty scene only.
+    this.scene?.clear();
   }
 
   async loadScene() {

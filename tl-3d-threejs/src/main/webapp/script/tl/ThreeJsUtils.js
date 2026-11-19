@@ -31,6 +31,30 @@ import {
  * Disposes a material or an array of materials (one per geometry group).
  */
 /**
+ * Releases OrbitControls including the key listeners on the root node of its element.
+ *
+ * OrbitControls registers them at domElement.getRootNode() when it is created, but removes them
+ * from getRootNode() at the time of dispose(). A viewer is disposed after its element has been
+ * removed from the document; then getRootNode() is the detached element, the listeners stay on
+ * the document and keep the whole viewer in memory. The root node is therefore remembered when
+ * the controls are created (see rememberRootNode()).
+ */
+export function disposeOrbitControls(controls) {
+  const root = controls.userData?.rootNode;
+  if (root) {
+    root.removeEventListener("keydown", controls._interceptControlDown, { capture: true });
+    root.removeEventListener("keyup", controls._interceptControlUp, { capture: true });
+  }
+  controls.dispose();
+}
+
+/** Remembers the root node at which the given OrbitControls registered its key listeners. */
+export function rememberRootNode(controls) {
+  controls.userData = { ...controls.userData, rootNode: controls.domElement.getRootNode() };
+  return controls;
+}
+
+/**
  * The materials of the given 3D object as an array: a mesh has one material, or one per
  * geometry group (e.g. the merged meshes of an instanced GLTF). Empty without a material.
  */

@@ -26,7 +26,13 @@ import {
   LIGHT_GREY,
   _90_DEGREE,
 } from "./Constants.js";
-import { CameraUtils, SceneUtils, getRaycaster } from "./ThreeJsUtils.js";
+import {
+  CameraUtils,
+  SceneUtils,
+  disposeOrbitControls,
+  getRaycaster,
+  rememberRootNode,
+} from "./ThreeJsUtils.js";
 
 /**
  * NavigationCube class handles the 3D navigation cube functionality.
@@ -209,29 +215,37 @@ export class NavigationCube {
   }
 
   setupEventListeners() {
+    // Removed in dispose(), so that a canvas kept alive by three.js does not keep the cube and
+    // the viewer alive (see ThreeJsControl.initRenderer()).
+    this.canvasListeners = new AbortController();
+    const signal = this.canvasListeners.signal;
     // The cube is drawn with the main scene: render both when the context is back.
-    this.cubeCanvas.addEventListener("webglcontextrestored", () =>
-      this.renderManager.invalidate(),
+    this.cubeCanvas.addEventListener(
+      "webglcontextrestored",
+      () => this.renderManager.invalidate(),
+      { signal },
     );
     this.cubeCanvas.addEventListener(
       "mousemove",
       (event) => this.handleCubeHover(event),
-      false,
+      { signal },
     );
     this.cubeCanvas.addEventListener(
       "mousedown",
       (event) => this.onCubeMouseDown(event),
-      false,
+      { signal },
     );
     this.cubeCanvas.addEventListener(
       "click",
       (event) => this.onCubeClick(event),
-      false,
+      { signal },
     );
   }
 
   initControls() {
-    this.cubeControls = new OrbitControls(this.cubeCamera, this.cubeCanvas);
+    this.cubeControls = rememberRootNode(
+      new OrbitControls(this.cubeCamera, this.cubeCanvas),
+    );
     this.cubeControls.enableZoom = false;
     this.cubeControls.enablePan = false;
     this.cubeControls.target.set(0, 0, 0);
@@ -448,7 +462,8 @@ export class NavigationCube {
     this.renderManager.unregisterRenderTarget(this);
 
     gsap.killTweensOf(this.cubeControls.object.position);
-    this.cubeControls.dispose();
+    this.canvasListeners?.abort();
+    disposeOrbitControls(this.cubeControls);
     this.cubeRenderer.dispose();
     this.cubeRenderer.forceContextLoss();
   }
