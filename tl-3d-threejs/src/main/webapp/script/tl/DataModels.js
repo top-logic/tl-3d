@@ -18,6 +18,7 @@ import {
   Matrix4,
   Mesh,
   MeshBasicMaterial,
+  MeshStandardMaterial,
   SphereGeometry,
 } from "three";
 
@@ -496,6 +497,14 @@ export class Scope {
           break;
         case "ConnectionPoint":
           obj = new ConnectionPoint(id);
+          break;
+        case "Cube":
+          obj = new Cube(id);
+          break;
+        default:
+          // A type of a newer server: shown as nothing instead of stopping the whole scene.
+          console.error(`3D viewer: unknown scene object type '${json[0]}'.`);
+          obj = new UnknownObject(id);
           break;
       }
       this.objects[id] = obj;
@@ -1858,5 +1867,83 @@ export class GltfAsset extends SharedObject {
     this.layoutPoint?.dispose();
     this.snappingPoints?.forEach((point) => point.dispose());
     this.group = null;
+  }
+}
+
+/**
+ * An asset showing a box of the given size (protocol type Cube), with layout and snapping
+ * points like a GLTF asset.
+ */
+export class Cube extends GltfAsset {
+  constructor(id) {
+    super(id);
+  }
+
+  build(parentGroup) {
+    const group = super.build(parentGroup);
+    const material = new MeshStandardMaterial();
+    material.userData.originalColor = material.color.clone();
+    this.box = new Mesh(this.boxGeometry(), material);
+    group.add(this.box);
+    return group;
+  }
+
+  loadJson(scope, json) {
+    super.loadJson(scope, json);
+    this.setProperty(scope, "width", json.width);
+    this.setProperty(scope, "height", json.height);
+    this.setProperty(scope, "depth", json.depth);
+  }
+
+  setProperty(scope, property, value) {
+    switch (property) {
+      case "width":
+      case "height":
+      case "depth":
+        this[property] = value;
+        if (this.box) {
+          this.box.geometry.dispose();
+          this.box.geometry = this.boxGeometry();
+        }
+        break;
+      default:
+        super.setProperty(scope, property, value);
+        break;
+    }
+  }
+
+  /** The box in the z-up coordinates of the scene: the height is along z. */
+  boxGeometry() {
+    return new BoxGeometry(this.width || 0, this.depth || 0, this.height || 0);
+  }
+
+  dispose() {
+    if (this.box) {
+      this.box.geometry.dispose();
+      this.box.material.dispose();
+      this.box = null;
+    }
+    super.dispose();
+  }
+}
+
+/** An object of a type this client does not know (see Scope.loadJson()); shows nothing. */
+export class UnknownObject extends SharedObject {
+  constructor(id) {
+    super(id);
+  }
+
+  loadJson(scope, json) {}
+
+  setProperty(scope, property, value) {}
+
+  insertElementAt(scope, property, idx, value) {}
+
+  removeElementAt(scope, property, idx) {}
+
+  build(parentGroup) {
+    const group = new Group();
+    parentGroup.add(group);
+    return group;
   }
 }
