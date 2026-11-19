@@ -329,6 +329,11 @@ public class ThreeJsComponent extends BuilderComponent
 				if (!WrapperHistoryUtils.isCurrent(obj)) {
 					stringBuilder.append("_");
 					stringBuilder.append(obj.tHistoryContext());
+				} else {
+					// The version of the object: when a new model is uploaded, the ID and with it the
+					// URL change, so that the client does not show the model cached for the former one.
+					stringBuilder.append("_v");
+					stringBuilder.append(obj.tHandle().getLastUpdate());
 				}
 				return stringBuilder.toString();
 			}
