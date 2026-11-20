@@ -2430,7 +2430,10 @@ class ThreeJsControl {
           }
           this.invalidate();
 
-          this.sendSceneChanges(changes);
+          // Nothing to send when the part was selected already.
+          if (changes.length > 0) {
+            this.sendSceneChanges(changes);
+          }
           return;
         }
 
