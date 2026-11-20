@@ -195,6 +195,16 @@ export class InsertElement extends ListUpdate {
       }
     }
 
+    // The part keeps its 3D objects: the new asset takes them over (with the built snapping
+    // points, and releases them when the part is removed).
+    if (
+      oldSharedObject.node &&
+      oldSharedObject.asset &&
+      newSharedObject.asset?.takeOver?.(oldSharedObject.asset) === false
+    ) {
+      return false;
+    }
+
     // Update the nodeRef in the 3D object's userData
     if (oldSharedObject.node && oldSharedObject.node.userData) {
       oldSharedObject.node.userData.nodeRef = newSharedObject;

@@ -1071,6 +1071,10 @@ class ThreeJsControl {
         otherObject?.userData?.asset || otherObject?.userData?.nodeRef?.asset;
 
       for (const otherPoint of otherObjectAsset.snappingPoints) {
+        if (!otherPoint.node) {
+          // Not built (e.g. a part that is not shown).
+          continue;
+        }
         const position = new Vector3();
         otherPoint.node.getWorldPosition(position);
 

@@ -1254,6 +1254,21 @@ export class ConnectionPoint extends SharedObject {
     this.pointMaterial = null;
   }
 
+  /** Whether this point is at the same place as the given one. */
+  samePlace(other) {
+    return JSON.stringify(this.transform ?? []) === JSON.stringify(other.transform ?? []);
+  }
+
+  /** Takes over the marker of the given point of a replaced asset, see GltfAsset.takeOver(). */
+  takeOver(old) {
+    this.node = old.node;
+    this.pointGeometry = old.pointGeometry;
+    this.pointMaterial = old.pointMaterial;
+    old.node = null;
+    old.pointGeometry = null;
+    old.pointMaterial = null;
+  }
+
   build(parentGroup, layoutPoint) {
     this.dispose();
 
@@ -1779,7 +1794,49 @@ export class GltfAsset extends SharedObject {
     return this.group;
   }
 
+  /**
+   * Takes over the 3D objects of the asset of a replaced part (see
+   * InsertElement.updateNodeReferences()): the server sends a new asset object with the
+   * replacement part. Returns false if they do not fit this asset (other points), then the
+   * scene must be built again.
+   */
+  takeOver(old) {
+    if (old === this) {
+      return true;
+    }
+    if (old.constructor !== this.constructor) {
+      return false;
+    }
+    const oldPoints = old.snappingPoints ?? [];
+    const newPoints = this.snappingPoints ?? [];
+    if (
+      (old.layoutPoint == null) !== (this.layoutPoint == null) ||
+      (old.layoutPoint && !old.layoutPoint.samePlace(this.layoutPoint)) ||
+      oldPoints.length !== newPoints.length ||
+      !oldPoints.every((point, i) => point.samePlace(newPoints[i]))
+    ) {
+      return false;
+    }
+    this.group = old.group;
+    this.placeholder = old.placeholder;
+    this._clonedModel = old._clonedModel;
+    this.gltf = old.gltf;
+    this.loadFailed = old.loadFailed;
+    this.layoutPoint?.takeOver(old.layoutPoint);
+    newPoints.forEach((point, i) => point.takeOver(oldPoints[i]));
+    old.group = null;
+    old.placeholder = null;
+    old._clonedModel = null;
+    // A model still being loaded for the former asset is shown by this one.
+    old.replacedBy = this;
+    return true;
+  }
+
   setGLTF(newGLTF, ctrl) {
+    if (this.replacedBy) {
+      this.replacedBy.setGLTF(newGLTF, ctrl);
+      return;
+    }
     if (!newGLTF) {
       return;
     }
@@ -1873,6 +1930,10 @@ export class GltfAsset extends SharedObject {
 
   /** Shows the placeholder as a red wire frame: the GLTF of this asset could not be loaded. */
   markLoadFailed() {
+    if (this.replacedBy) {
+      this.replacedBy.markLoadFailed();
+      return;
+    }
     this.loadFailed = true;
     if (this.placeholder) {
       markFailedPlaceholder(this.placeholder);
@@ -1937,6 +1998,22 @@ export class Cube extends GltfAsset {
         super.setProperty(scope, property, value);
         break;
     }
+  }
+
+  takeOver(old) {
+    if (!super.takeOver(old)) {
+      return false;
+    }
+    this.box = old.box;
+    old.box = null;
+    if (
+      this.box &&
+      (old.width !== this.width || old.height !== this.height || old.depth !== this.depth)
+    ) {
+      this.box.geometry.dispose();
+      this.box.geometry = this.boxGeometry();
+    }
+    return true;
   }
 
   /** The box in the z-up coordinates of the scene: the height is along z. */
