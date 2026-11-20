@@ -975,15 +975,40 @@ export class Scope {
   }
 }
 
+/** Whether the given matrix is the identity, apart from rounding errors. */
+function isIdentity(matrix) {
+  const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+  // Rotation/scale entries are compared absolutely, translations in mm.
+  return matrix.elements.every((value, i) => Math.abs(value - identity[i]) < 1e-9);
+}
+
+/** The value rounded to multiples of 1 / factor. */
+function roundTo(value, factor) {
+  const rounded = Math.round(value * factor) / factor;
+  // No -0 in the transmitted values.
+  return rounded === 0 ? 0 : rounded;
+}
+
 export class SharedObject {
   constructor(id) {
     this.id = id;
   }
 
+  /**
+   * Applies the given change of the transformation to this node.
+   *
+   * @returns the command for the server, or null if the transformation does not change.
+   */
   notifyTransform(diffMatrix) {
+    if (isIdentity(diffMatrix)) {
+      return null;
+    }
     const currentTransformation = toMatrix(this.transform);
     const newTransformation = currentTransformation.multiply(diffMatrix);
-    this.transform = toTX(newTransformation);
+    // Without rounding noise (1999.9999999999998 instead of 2000, 1e-15 instead of 0).
+    this.transform = toTX(newTransformation).map((value, i) =>
+      i < 9 ? roundTo(value, 1e12) : roundTo(value, 1e6),
+    );
     return SetProperty.prototype.create(this.id, "transform", this.transform);
   }
 

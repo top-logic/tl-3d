@@ -656,8 +656,7 @@ class ThreeJsControl {
             const oldLocalMatrix = toMatrix(sharedObject.transform);
             const diffMatrix = oldLocalMatrix.clone().invert().multiply(newLocalMatrix);
 
-            const commands = [sharedObject.notifyTransform(diffMatrix)];
-            outer.sendSceneChanges(commands);
+            outer.sendSceneChanges([sharedObject.notifyTransform(diffMatrix)]);
 
             // Instance positions have changed
             outer.updateSceneOctree([sharedObject]);
@@ -668,8 +667,7 @@ class ThreeJsControl {
             diffMatrix.copy(lastMatrix.clone().invert()).multiply(updatedMatrix);
 
             if (sharedObject) {
-              const commands = [sharedObject.notifyTransform(diffMatrix)];
-              outer.sendSceneChanges(commands);
+              outer.sendSceneChanges([sharedObject.notifyTransform(diffMatrix)]);
 
               // Recompute GPU matrices for instanced descendants of GroupNodes
               if (sharedObject instanceof GroupNode && outer.hasInstancedDescendants(sharedObject)) {
@@ -2857,9 +2855,10 @@ class ThreeJsControl {
   }
 
   sendSceneChanges(commands) {
-    const cmds = [];
-    for (let i = 0; i < commands.length; i++) {
-      cmds.push(commands[i].extract());
+    // Commands without a change (e.g. a transformation by the identity) are null.
+    const cmds = commands.filter(Boolean).map((command) => command.extract());
+    if (cmds.length === 0) {
+      return;
     }
 
     const message = {
