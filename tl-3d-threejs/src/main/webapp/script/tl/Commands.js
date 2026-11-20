@@ -99,14 +99,13 @@ export class InsertElement extends ListUpdate {
       return;
     }
 
-    // Store old element for reference updating.
-    //
     // The server replaces a node with List.set(idx, newNode), which msgbuf
     // (ReferenceList.set) reports as an insert of the new node at idx followed by
-    // a remove of the old node at idx + 1. Therefore, the element at idx before
-    // the insert is the node being replaced. A plain insert without a following
-    // remove is not sent by the server; only appending an element is handled.
-    const oldElement = target[this.property] && target[this.property][this.idx];
+    // a remove of the old node at idx + 1 (see replaces, set by
+    // ThreeJsControl.applySceneCommands()). The element at idx before the insert is then the
+    // node being replaced. Any other insert adds a new element.
+    const oldElement =
+      this.replaces && target[this.property] ? target[this.property][this.idx] : null;
 
     target.insertElementAt(scope, this.property, this.idx, this.element);
 
@@ -131,7 +130,7 @@ export class InsertElement extends ListUpdate {
         refreshDisplay(scope, newElement);
       }
     } else if (target.node) {
-      // Appended element (not sent by the server today): build it, so that it does not stay
+      // Added element (not sent by the server today): build it, so that it does not stay
       // invisible until the next reload.
       this.buildAddedChild(scope, newElement, target.node);
     }

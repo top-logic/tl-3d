@@ -2212,7 +2212,8 @@ class ThreeJsControl {
     const changes = JSON.parse(changesString);
     let needsFullReload = false;
 
-    for (const change of changes) {
+    for (let index = 0; index < changes.length; index++) {
+      const change = changes[index];
       const command = change[0];
       const cmdProps = command[1];
 
@@ -2256,6 +2257,17 @@ class ThreeJsControl {
       // The changed properties, or STRUCTURE_CHANGE for inserted / removed elements.
       changed.add(command[0] === "S" ? cmdProps["p"] : STRUCTURE_CHANGE);
       const movedId = command[0] === "S" && cmdProps["p"] === "transform" ? cmdProps["id"] : null;
+
+      if (command[0] === "I") {
+        // The server replaces an element by an insert at its index followed by a remove at
+        // the next index (List.set), see InsertElement.apply().
+        const next = changes[index + 1]?.[0];
+        cmd.replaces =
+          next?.[0] === "R" &&
+          next[1].id === cmdProps.id &&
+          next[1].p === cmdProps.p &&
+          next[1].i === cmdProps.i + 1;
+      }
 
       change.shift();
       cmd.loadJson(cmdProps, change);
