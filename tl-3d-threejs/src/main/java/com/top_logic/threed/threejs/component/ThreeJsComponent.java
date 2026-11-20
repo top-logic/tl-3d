@@ -622,6 +622,9 @@ public class ThreeJsComponent extends BuilderComponent
 	}
 
 	private void buildScene() {
+		// Transformations made in the viewer belong to the nodes of the former scene: "apply" must
+		// not write them after the scene has been built again (e.g. for another model).
+		_transformedNodes.clear();
 		_nodeByModel.clear();
 		_parentNodes.clear();
 		_imageByID.clear();
