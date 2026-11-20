@@ -196,7 +196,12 @@ class ThreeJsControl {
     // Initial render
     this.renderManager.forceRender();
 
-    this.isEditMode = false;
+    // The modes wanted by the server. Switches arriving while the scene loads change them; they
+    // are applied when the scene has been loaded.
+    this.isEditMode = initialState.isInEditMode;
+    this.isRotateMode = initialState.isRotateMode;
+    this.isWorkplaneVisible = initialState.isWorkplaneVisible;
+    this.isSkyboxVisible = initialState.isSkyboxVisible;
 
     this.loadErrorMessage = initialState.loadErrorMessage;
     this.loadScene()
@@ -209,17 +214,15 @@ class ThreeJsControl {
             return;
           }
           this.createBoundingBox();
-          this.toggleWorkplane(initialState.isWorkplaneVisible);
+          this.toggleWorkplane(this.isWorkplaneVisible);
           this.updateWorkplanePosition();
-          this.toggleEditMode(initialState.isInEditMode);
-          this.toggleRotateMode(initialState.isRotateMode);
+          this.toggleEditMode(this.isEditMode);
+          this.toggleRotateMode(this.isRotateMode);
           this.zoomOut();
 
           this.skyboxManager
             .initSkybox()
-            .then(() =>
-              this.skyboxManager.toggleSkybox(initialState.isSkyboxVisible),
-            )
+            .then(() => this.skyboxManager.toggleSkybox(this.isSkyboxVisible))
             .catch((error) =>
               console.error("3D viewer: the skybox could not be set up.", error),
             );
@@ -422,6 +425,8 @@ class ThreeJsControl {
 
   toggleWorkplane(visible) {
     if (!this.boundingBox) {
+      // Shown when the scene has been loaded (see constructor).
+      this.isWorkplaneVisible = visible;
       return;
     }
 
@@ -500,6 +505,8 @@ class ThreeJsControl {
   }
 
   toggleSkybox(visible) {
+    // Before the skybox is set up, it is shown afterwards (see constructor).
+    this.isSkyboxVisible = visible;
     this.skyboxManager.toggleSkybox(visible);
   }
 
