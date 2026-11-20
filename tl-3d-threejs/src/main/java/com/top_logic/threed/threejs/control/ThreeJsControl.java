@@ -454,7 +454,13 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 
 				int maxIdx = 0;
 				for (int i = 1; i < selectionCnt; i++) {
-					maxIdx = Math.max(maxIdx, pathToRoot.indexOf(selection.get(i)));
+					int idx = pathToRoot.indexOf(selection.get(i));
+					if (idx < 0) {
+						// Nodes side by side: the 3D gizmo moves them together, the fields would move
+						// one of them only.
+						return null;
+					}
+					maxIdx = Math.max(maxIdx, idx);
 				}
 				return (SceneNode) pathToRoot.get(maxIdx);
 			}
