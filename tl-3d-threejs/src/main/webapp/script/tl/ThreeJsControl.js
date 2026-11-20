@@ -2166,6 +2166,10 @@ class ThreeJsControl {
       this._changesDuringDrag.push([changesString, revision]);
       return;
     }
+    if (Number(revision) <= this.sceneRevision) {
+      // Contained in the loaded scene data; refers to the IDs from before the data was loaded.
+      return;
+    }
     if (this.sceneGraph == null) {
       // The scene data is still loading (see loadScene()); a failed load has no buffer.
       this.pendingChanges?.push({ changes: changesString, revision });
@@ -2733,6 +2737,9 @@ class ThreeJsControl {
     // the control, since they may arrive before or after the data, independent of when the
     // server made them; only the later ones are applied.
     const dataRevision = Number(dataResponse.headers.get("X-Scene-Revision"));
+    // Changes up to this revision are contained in the data, also those arriving later (the data
+    // request and the AJAX requests are independent), see applySceneChanges().
+    this.sceneRevision = dataRevision;
     const dataJson = await dataResponse.json();
 
     this.sceneGraph = this.scope.loadJson(dataJson);
