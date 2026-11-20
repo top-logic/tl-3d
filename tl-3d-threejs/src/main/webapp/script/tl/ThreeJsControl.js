@@ -2729,6 +2729,10 @@ class ThreeJsControl {
     const helper = this.scene.getObjectByName("OctreeDebugHelper");
     if (helper) {
       this.scene.remove(helper);
+      helper.traverse((object) => {
+        object.geometry?.dispose();
+        object.material?.dispose();
+      });
     }
 
     if (visible && this.sceneOctree) {
