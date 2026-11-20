@@ -296,14 +296,18 @@ class ThreeJsControl {
     // renderer), the listeners must not keep this control and its scene alive.
     this.canvasListeners = new AbortController();
     const signal = this.canvasListeners.signal;
+    // Pointer events: parts are also selected by touch or pen. Only the primary pointer (the
+    // first finger) clicks; a second finger zooms or rotates the view (OrbitControls).
     this.canvas.addEventListener(
-      "mousedown",
-      (event) => this.onMouseDown(event),
+      "pointerdown",
+      (event) => event.isPrimary && this.onMouseDown(event),
       { signal },
     );
-    this.canvas.addEventListener("mouseup", (event) => this.onMouseUp(event), {
-      signal,
-    });
+    this.canvas.addEventListener(
+      "pointerup",
+      (event) => event.isPrimary && this.onMouseUp(event),
+      { signal },
+    );
 
     // The browser may drop the WebGL context (GPU reset, driver update, too many contexts,
     // a mobile device in the background). three.js keeps the context restorable and sets up
