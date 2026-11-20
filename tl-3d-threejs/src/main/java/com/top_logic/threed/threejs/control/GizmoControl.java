@@ -72,6 +72,12 @@ public class GizmoControl extends AbstractControl {
 
 	private Transformation _tx = Transformation.identity();
 
+	/**
+	 * Scaling (along the x, y and z axis) of the model, which the fields do not show: it is kept
+	 * when the fields are changed.
+	 */
+	private double _scaleX = 1, _scaleY = 1, _scaleZ = 1;
+
 	private Transformation _coordinateSystem;
 
 	private Format _translateFormat;
@@ -341,12 +347,26 @@ public class GizmoControl extends AbstractControl {
 		} else {
 			finalTransform = _coordinateSystem.inverse().after(model);
 		}
+		// The linear part is a rotation after a scaling: the columns are scaled.
+		_scaleX = columnLength(finalTransform.a(), finalTransform.d(), finalTransform.g());
+		_scaleY = columnLength(finalTransform.b(), finalTransform.e(), finalTransform.h());
+		_scaleZ = columnLength(finalTransform.c(), finalTransform.f(), finalTransform.i());
+		Transformation rotation = Transformation.rotate(
+			finalTransform.a() / _scaleX, finalTransform.b() / _scaleY, finalTransform.c() / _scaleZ,
+			finalTransform.d() / _scaleX, finalTransform.e() / _scaleY, finalTransform.f() / _scaleZ,
+			finalTransform.g() / _scaleX, finalTransform.h() / _scaleY, finalTransform.i() / _scaleZ);
 		field(TRANSLATE_X).initializeField(finalTransform.x());
 		field(TRANSLATE_Y).initializeField(finalTransform.y());
 		field(TRANSLATE_Z).initializeField(finalTransform.z());
-		field(ROTATE_X).initializeField(toDegrees(finalTransform.getRotationX()));
-		field(ROTATE_Y).initializeField(toDegrees(finalTransform.getRotationY()));
-		field(ROTATE_Z).initializeField(toDegrees(finalTransform.getRotationZ()));
+		field(ROTATE_X).initializeField(toDegrees(rotation.getRotationX()));
+		field(ROTATE_Y).initializeField(toDegrees(rotation.getRotationY()));
+		field(ROTATE_Z).initializeField(toDegrees(rotation.getRotationZ()));
+	}
+
+	private static double columnLength(double x, double y, double z) {
+		double length = Math.sqrt(x * x + y * y + z * z);
+		// A degenerated column cannot be normalized, it is kept as it is.
+		return length > 1e-12 ? length : 1;
 	}
 
 	private void internalSetModel(Transformation tx) {
@@ -431,7 +451,8 @@ public class GizmoControl extends AbstractControl {
 			.translate(translateValue(TRANSLATE_X), translateValue(TRANSLATE_Y), translateValue(TRANSLATE_Z))
 			.after(Transformation.rotateZ(rotateValue(ROTATE_Z)))
 			.after(Transformation.rotateY(rotateValue(ROTATE_Y)))
-			.after(Transformation.rotateX(rotateValue(ROTATE_X)));
+			.after(Transformation.rotateX(rotateValue(ROTATE_X)))
+			.after(Transformation.rotate(_scaleX, 0, 0, 0, _scaleY, 0, 0, 0, _scaleZ));
 		Transformation newTX = txFromFields;
 		if (_coordinateSystem == null) {
 			newTX = txFromFields;
