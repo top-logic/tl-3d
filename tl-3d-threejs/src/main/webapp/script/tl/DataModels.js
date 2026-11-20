@@ -1420,6 +1420,16 @@ export class ConnectionPoint extends SharedObject {
  * Whether the given scene node is not shown: it or one of its ancestors is hidden. Instances
  * are not part of the 3D object tree of their ancestors and do not inherit its visibility.
  */
+/** The colour the given scene node inherits from its nearest coloured ancestor, or null. */
+function inheritedColor(node) {
+  for (let ancestor = node.parent; ancestor; ancestor = ancestor.parent) {
+    if (ancestor.color) {
+      return ancestor.color;
+    }
+  }
+  return null;
+}
+
 function isEffectivelyHidden(node) {
   for (let n = node; n; n = n.parent) {
     if (n.hidden) {
@@ -1529,11 +1539,10 @@ export class GroupNode extends SharedObject {
         this.color = value;
         if (this.node) {
           this.node.userData.color = value || null;
-          if (value) {
-            applyColorToObject(this.node, value);
-          }
+          // Also when the colour is removed: the parts then show their own or an inherited one.
+          scope.ctrl?.restoreColor(this.node);
         }
-        this.setInstancedChildrenColor(scope, value);
+        this.setInstancedChildrenColor(scope, value || inheritedColor(this));
         break;
       case "hidden": {
         const wasHidden = this.hidden;
@@ -1807,16 +1816,16 @@ export class PartNode extends SharedObject {
         this.color = value;
         // Update 3D object colour
         if (this.willBeInstanced && this.assetKey != null) {
-          if (value) {
-            scope.instanceManager.setInstanceColor(this.assetKey, this.instanceID, value);
+          const color = value || inheritedColor(this);
+          if (color) {
+            scope.instanceManager.setInstanceColor(this.assetKey, this.instanceID, color);
           } else {
             scope.instanceManager.clearInstanceColor(this.assetKey, this.instanceID);
           }
         } else if (this.node) {
           this.node.userData.color = value || null;
-          if (value) {
-            applyColorToObject(this.node, value);
-          }
+          // Also when the colour is removed: the part then shows its own or an inherited one.
+          scope.ctrl?.restoreColor(this.node);
         }
         break;
       case "hidden": {
