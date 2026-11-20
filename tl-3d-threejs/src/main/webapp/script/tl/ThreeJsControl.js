@@ -205,6 +205,9 @@ class ThreeJsControl {
             .initSkybox()
             .then(() =>
               this.skyboxManager.toggleSkybox(initialState.isSkyboxVisible),
+            )
+            .catch((error) =>
+              console.error("3D viewer: the skybox could not be set up.", error),
             );
         }, 100),
       )
