@@ -13,7 +13,6 @@ import {
   Matrix4,
   Scene,
   Sphere,
-  SphereGeometry,
   Vector3,
   WebGLRenderer,
 } from "three";
@@ -48,21 +47,17 @@ import {
 import {
   ANTIALIAS_MAX_PIXEL_RATIO,
   CAMERA_MOVE_DURATION,
-  C_P_RADIUS,
   CLICK_MAX_DURATION,
   CLICK_MAX_MOVE,
   GREEN,
   GRID_SMALL_CELL,
   GRID_SNAP_THRESHOLD,
-  HEIGHT_SEGMENTS,
   INSTANCING_BVH_TRIANGLE_THRESHOLD,
   OPTIMIZED_PIXEL_RATIO,
   SELECTION_COLOR,
   SNAP_THRESHOLD,
   TRANSPARENCY_LEVEL,
   WHITE,
-  WIDTH_SEGMENTS,
-  YELLOW,
   ZOOM_SPEED,
   _90_DEGREE,
 } from "./Constants.js";
@@ -1152,19 +1147,7 @@ class ThreeJsControl {
     this.snappingHighlightKey = key;
 
     if (closestSnappingPoint) {
-      closestSnappingPoint.pointMaterial.color.set(YELLOW);
-      const mesh = closestSnappingPoint.node.children[0];
-      if (mesh && mesh.isMesh) {
-        const highResGeometry = new SphereGeometry(
-          C_P_RADIUS * 1.5,
-          WIDTH_SEGMENTS,
-          HEIGHT_SEGMENTS,
-        );
-        if (!mesh.userData.originalGeometry) {
-          mesh.userData.originalGeometry = mesh.geometry;
-        }
-        mesh.geometry = highResGeometry;
-      }
+      closestSnappingPoint.setHighlighted(true);
       this.prevClosestSnappingPoint = closestSnappingPoint;
     } else if (instancedSnappingPoint != null) {
       this.instancedSnappingPoints.highlight(instancedSnappingPoint);
@@ -1212,23 +1195,7 @@ class ThreeJsControl {
   }
 
   restoreSnappingPointColor(snappingPoint) {
-    if (!snappingPoint) return;
-
-    if (snappingPoint.pointMaterial) {
-      if (snappingPoint.pointMaterial.userData.originalColor) {
-        snappingPoint.pointMaterial.color.copy(
-          snappingPoint.pointMaterial.userData.originalColor,
-        );
-      } else {
-        snappingPoint.pointMaterial.color.set(GREEN);
-      }
-    }
-    const mesh = snappingPoint.node.children[0];
-    if (mesh && mesh.isMesh && mesh.userData.originalGeometry) {
-      mesh.geometry.dispose();
-      mesh.geometry = mesh.userData.originalGeometry;
-      delete mesh.userData.originalGeometry;
-    }
+    snappingPoint?.setHighlighted(false);
   }
 
   snapToStepSize(obj) {

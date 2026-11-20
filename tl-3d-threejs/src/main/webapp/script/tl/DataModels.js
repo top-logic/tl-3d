@@ -10,6 +10,7 @@ import {
   INSTANCING_MIN_COPIES,
   RED,
   WIDTH_SEGMENTS,
+  YELLOW,
 } from "./Constants.js";
 
 import {
@@ -1239,6 +1240,21 @@ export class ImageData extends SharedObject {
   }
 }
 
+/**
+ * Geometry and materials of the markers of all layout and snapping points: thousands of points in
+ * a large scene would otherwise each upload a sphere. They are never disposed.
+ */
+const POINT_GEOMETRY = new SphereGeometry(C_P_RADIUS, WIDTH_SEGMENTS, HEIGHT_SEGMENTS);
+const LAYOUT_POINT_MATERIAL = new MeshBasicMaterial({ color: RED });
+const SNAPPING_POINT_MATERIAL = new MeshBasicMaterial({ color: GREEN });
+const HIGHLIGHTED_POINT_MATERIAL = new MeshBasicMaterial({ color: YELLOW });
+
+/** Size of the marker of the snapping point closest to a dragged part, relative to the others. */
+const HIGHLIGHTED_POINT_SCALE = 1.5;
+
+/** Box shown for a part until its model is loaded (shared; each part has its own material). */
+const PLACEHOLDER_GEOMETRY = new BoxGeometry(500, 500, 500);
+
 export class ConnectionPoint extends SharedObject {
   constructor(id) {
     super(id);
@@ -1249,12 +1265,9 @@ export class ConnectionPoint extends SharedObject {
     this.setProperty(scope, "classifiers", json.classifiers);
   }
 
-  /** Releases the marker sphere of this point (geometry and material). */
+  /** Drops the marker of this point (its geometry and material are shared). */
   dispose() {
-    this.pointGeometry?.dispose();
-    this.pointMaterial?.dispose();
-    this.pointGeometry = null;
-    this.pointMaterial = null;
+    this.marker = null;
   }
 
   /** Whether this point is at the same place as the given one. */
@@ -1265,11 +1278,19 @@ export class ConnectionPoint extends SharedObject {
   /** Takes over the marker of the given point of a replaced asset, see GltfAsset.takeOver(). */
   takeOver(old) {
     this.node = old.node;
-    this.pointGeometry = old.pointGeometry;
-    this.pointMaterial = old.pointMaterial;
+    this.marker = old.marker;
     old.node = null;
-    old.pointGeometry = null;
-    old.pointMaterial = null;
+    old.marker = null;
+  }
+
+  /** Marks this point as the one closest to a dragged part, or removes that mark. */
+  setHighlighted(highlighted) {
+    const marker = this.marker;
+    if (!marker) {
+      return;
+    }
+    marker.material = highlighted ? HIGHLIGHTED_POINT_MATERIAL : marker.userData.baseMaterial;
+    marker.scale.setScalar(highlighted ? HIGHLIGHTED_POINT_SCALE : 1);
   }
 
   build(parentGroup, layoutPoint) {
@@ -1280,18 +1301,9 @@ export class ConnectionPoint extends SharedObject {
 
     transform(group, this.transform);
 
-    this.pointMaterial = new MeshBasicMaterial({
-      color: layoutPoint ? RED : GREEN,
-    });
-    this.pointGeometry = new SphereGeometry(
-      C_P_RADIUS,
-      WIDTH_SEGMENTS,
-      HEIGHT_SEGMENTS,
-    );
-    this.pointMaterial.userData.originalColor =
-      this.pointMaterial.color.clone();
-
-    const sphere = new Mesh(this.pointGeometry, this.pointMaterial);
+    const material = layoutPoint ? LAYOUT_POINT_MATERIAL : SNAPPING_POINT_MATERIAL;
+    const sphere = new Mesh(POINT_GEOMETRY, material);
+    sphere.userData.baseMaterial = material;
 
     if (layoutPoint) {
       // mark this as a layout point sphere
@@ -1304,6 +1316,7 @@ export class ConnectionPoint extends SharedObject {
 
     group.add(sphere);
 
+    this.marker = sphere;
     this.node = group;
     return group;
   }
@@ -1823,11 +1836,9 @@ export class GltfAsset extends SharedObject {
     this.snappingPoints?.forEach((point) => point.build(this.group, false));
 
     if (this.url || this.dynamicImage) {
-      const geometry = new BoxGeometry(500, 500, 500);
       const material = new MeshBasicMaterial({ wireframe: false });
-      const mesh = new Mesh(geometry, material);
-      mesh.material = mesh.material.clone();
-      mesh.material.userData.originalColor = mesh.material.color.clone();
+      material.userData.originalColor = material.color.clone();
+      const mesh = new Mesh(PLACEHOLDER_GEOMETRY, material);
 
       this.placeholder = mesh;
       this.group.add(this.placeholder);
@@ -1893,7 +1904,6 @@ export class GltfAsset extends SharedObject {
     // Dispose placeholder resources
     if (this.placeholder) {
       this.group.remove(this.placeholder);
-      this.placeholder.geometry.dispose();
       this.placeholder.material.dispose();
       this.placeholder = null;
     }
@@ -1984,7 +1994,6 @@ export class GltfAsset extends SharedObject {
 
   dispose() {
     if (this.placeholder) {
-      this.placeholder.geometry.dispose();
       this.placeholder.material.dispose();
       this.placeholder = null;
     }
