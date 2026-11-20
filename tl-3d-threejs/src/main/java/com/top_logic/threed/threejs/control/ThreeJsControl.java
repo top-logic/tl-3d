@@ -529,8 +529,17 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 		out.endTag(DIV);
 	}
 
+	/**
+	 * Writes the scene data.
+	 *
+	 * <p>
+	 * Content requests run under a shared (reader) lock of the session: two requests for the
+	 * scene data (a reload and a resynchronisation of the client) may run at the same time and
+	 * must not reset and fill the scope concurrently. Commands and revalidation run exclusively.
+	 * </p>
+	 */
 	@Override
-	public void handleContent(DisplayContext context, String id, URLParser url) throws IOException {
+	public synchronized void handleContent(DisplayContext context, String id, URLParser url) throws IOException {
 		HttpServletResponse response = context.asResponse();
 		response.setContentType("application/json");
 		response.setCharacterEncoding("utf-8");
