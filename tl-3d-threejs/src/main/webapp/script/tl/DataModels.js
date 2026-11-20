@@ -560,7 +560,8 @@ export class Scope {
       // The decoders lie next to the loaders in the examples of three.js. Since the path of
       // the loader modules contains the version number, it is derived from the module URL.
       this._dracoLoader = new DRACOLoader();
-      this._dracoLoader.setDecoderPath(libraryPath("DRACOLoader", "draco"));
+      // The glTF variant of the decoder: smaller, and sufficient for KHR_draco_mesh_compression.
+      this._dracoLoader.setDecoderPath(libraryPath("DRACOLoader", "draco/gltf"));
       this._gltfLoader.setDRACOLoader(this._dracoLoader);
 
       this._ktx2Loader = new KTX2Loader();
