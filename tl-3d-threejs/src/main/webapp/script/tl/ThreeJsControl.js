@@ -2756,8 +2756,9 @@ class ThreeJsControl {
     // Create placeholder instanced meshes
     this.scope.createInstancedMeshes(this);
 
-    // Create floors
-    this.skyboxManager.createFactoryFloors(null);
+    // The floors belong to the room of the skybox, built and fitted to the scene by the
+    // SkyboxManager (see createBoundingBox()). Creating them here dropped the shown floors when the
+    // scene was loaded again.
 
     await this.scope.loadAssets(this).then((loaded) => {
       // Aborted by a reload or by dispose(); the reload completes the scene setup.
