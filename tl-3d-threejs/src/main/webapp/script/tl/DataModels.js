@@ -826,6 +826,12 @@ export class Scope {
       }
       this.createImpostorMesh(ctrl, assetKey, this.instanceGroups.get(assetKey));
       ctrl.invalidate();
+    }).catch((error) => {
+      console.error("3D viewer: generating the impostors failed.", error);
+    }).finally(() => {
+      if (this._impostorAbortController === abortController) {
+        this._impostorAbortController = null;
+      }
     });
   }
 
@@ -869,19 +875,24 @@ export class Scope {
         // The scene was reloaded meanwhile, the manager is disposed or replaced.
         return;
       }
-      await impostorManager.generateImpostorForAsset(assetKey, gltf, layoutInverse);
+      const generated = await impostorManager.generateImpostorForAsset(
+        assetKey,
+        gltf,
+        layoutInverse,
+      );
       if (signal?.aborted) {
         return;
       }
-      onGenerated?.(assetKey);
+      if (generated) {
+        onGenerated?.(assetKey);
+      }
+      // Otherwise the WebGL context has been lost: its restoration generates the missing
+      // impostors again (see regenerateImpostors()), until then the instances are drawn in full.
     }
 
     // Shared render target is no longer needed after all impostors are generated
     impostorManager.disposeSharedRenderTarget();
     this.releaseInstancedGltfGeometries(ctrl);
-    if (this._impostorAbortController?.signal === signal) {
-      this._impostorAbortController = null;
-    }
   }
 
   /**

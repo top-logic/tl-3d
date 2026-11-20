@@ -253,16 +253,19 @@ export class ImpostorManager {
    */
   /**
    * Generates the impostor of the given asset. Calls are processed one after the other: they
-   * share the render target.
+   * share the render target. A failed call does not stop the ones queued after it.
    *
-   * @returns a promise that resolves when the impostor data is stored (or the manager has been
-   *          disposed meanwhile).
+   * @param layoutInverse Inverse of the layout point transformation of the asset (moves the
+   *        model as in the normal rendering), or null.
+   * @returns a promise that resolves to true when the impostor data is stored, false if it could
+   *          not be generated (context lost meanwhile, manager disposed).
    */
   generateImpostorForAsset(assetKey, gltf, layoutInverse = null) {
-    this._queue = (this._queue ?? Promise.resolve()).then(() =>
-      this.disposed ? undefined : this.renderImpostor(assetKey, gltf, layoutInverse),
+    const result = (this._queue ?? Promise.resolve()).then(() =>
+      this.disposed ? false : this.renderImpostor(assetKey, gltf, layoutInverse),
     );
-    return this._queue;
+    this._queue = result.catch(() => {});
+    return result;
   }
 
   async renderImpostor(assetKey, gltf, layoutInverse) {
@@ -433,6 +436,7 @@ export class ImpostorManager {
       centerOffset: center,
       faceCornerUVData,
     });
+    return true;
   }
 
   /** Releases the impostors of all assets except the given ones. */
