@@ -629,6 +629,9 @@ class ThreeJsControl {
           // Update the octree if any instanced matrices changed
           if (instancesMoved) {
             outer.updateSceneOctree(outer.selection);
+            // The server does not send the own change back: move the snapping points of the
+            // instances here (see applySceneChanges()).
+            outer.refreshInstancedSnappingPoints();
           }
           outer._instanceSnapshots = {};
         } else {
@@ -690,6 +693,9 @@ class ThreeJsControl {
 
             // Instance positions have changed
             outer.updateSceneOctree([sharedObject]);
+            // The server does not send the own change back: move the snapping points of the
+            // instances here (see applySceneChanges()).
+            outer.refreshInstancedSnappingPoints();
           } else {
             // REGULAR (non-instanced) SINGLE OBJECT MODE
             const updatedMatrix = object.matrix.clone();
@@ -703,6 +709,9 @@ class ThreeJsControl {
               if (sharedObject instanceof GroupNode && outer.hasInstancedDescendants(sharedObject)) {
                 sharedObject.recomputeInstancedChildrenMatrices(outer.scope);
                 outer.updateSceneOctree([sharedObject]);
+                // The server does not send the own change back: move the snapping points of the
+                // instances here (see applySceneChanges()).
+                outer.refreshInstancedSnappingPoints();
               }
             }
           }
