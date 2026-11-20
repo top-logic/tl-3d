@@ -9,6 +9,26 @@ import { instanceKey, refreshDisplay } from "./DataModels.js";
  * Recursively cleans up a removed node: detaches non-instanced Three.js nodes
  * from the scene and hides instanced nodes in the GPU texture.
  */
+/**
+ * Removes the scene node, its asset and its points from the registry of the scope: the server
+ * does not refer to them any more (IDs are not reused). Otherwise every replaced subtree would
+ * stay there until the scene is loaded again.
+ */
+function forgetRemovedNode(scope, node) {
+  const forget = (object) => {
+    if (object != null && scope.objects[object.id] === object) {
+      delete scope.objects[object.id];
+    }
+  };
+  forget(node);
+  if (node.asset) {
+    forget(node.asset);
+    forget(node.asset.layoutPoint);
+    node.asset.snappingPoints?.forEach(forget);
+  }
+  node.contents?.forEach((child) => forgetRemovedNode(scope, child));
+}
+
 function cleanUpRemovedNode(scope, node) {
   if (node.willBeInstanced) {
     scope.instanceManager.setInstanceHidden(node.assetKey, node.instanceID, true);
@@ -374,6 +394,7 @@ export class RemoveElement extends ListUpdate {
     // so only what was not transferred is cleaned up here.
     if (this.property === "contents" && removedElement) {
       cleanUpRemovedNode(scope, removedElement);
+      forgetRemovedNode(scope, removedElement);
     }
   }
 

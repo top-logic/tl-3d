@@ -772,8 +772,9 @@ export class Scope {
           delete gltf.parser;
           this.gltfs[url] = gltf;
           for (const asset of assets) {
-            // Skip assets that have been removed from the scene meanwhile.
-            if (this.objects[asset.id] === asset && !ctrl.disposed) {
+            // Skip assets that have been removed from the scene meanwhile (a replaced asset
+            // hands the model to its replacement, see GltfAsset.takeOver()).
+            if ((this.objects[asset.id] === asset || asset.replacedBy) && !ctrl.disposed) {
               asset.setGLTF(gltf, ctrl);
             }
           }
