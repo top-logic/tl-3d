@@ -288,19 +288,7 @@ export class SkyboxManager {
     this.factoryFloors?.forEach((floor) => this.disposeObject(floor));
     this.factoryFloors = [];
 
-    // Get floor levels from scene graph
-    const floorLevels = this.getFloorLevels();
-
-    let floorsToCreate = [];
-
-    if (floorLevels.length > 0) {
-      floorsToCreate = floorLevels;
-    } else {
-      // Use numberOfFloors from scene graph or default to 1
-      const numberOfFloors = this.control.sceneGraph?.numberOfFloors || 1;
-
-      floorsToCreate = Array.from({ length: numberOfFloors }, (_, i) => i);
-    }
+    const floorsToCreate = Array.from({ length: this.numberOfFloors() }, (_, i) => i);
 
     const floorSizes = this.floorSizes;
 
@@ -343,29 +331,6 @@ export class SkyboxManager {
 
       this.factoryFloors.push(floor);
     }
-  }
-
-  getFloorLevels() {
-    // Extract floor levels from scene graph
-    const floorLevels = [];
-    if (this.control.sceneGraph && this.control.sceneGraph.root) {
-      const findFloors = (node) => {
-        if (node.name && node.name.startsWith("Floor ")) {
-          // Extract floor number from name (e.g., "Floor 0", "Floor 1")
-          const floorNumber = parseInt(node.name.split(" ")[1]);
-          if (!isNaN(floorNumber)) {
-            floorLevels.push(floorNumber);
-          }
-        }
-        // Recursively search in contents/children
-        if (node.contents) node.contents.forEach(findFloors);
-        if (node.children) node.children.forEach(findFloors);
-      };
-      findFloors(this.control.sceneGraph.root);
-    }
-
-    // Remove duplicates and sort
-    return [...new Set(floorLevels)].sort((a, b) => a - b);
   }
 
   // Getter methods for accessing from ThreeJsControl
