@@ -94,6 +94,7 @@ function raycastPickable(raycaster, roots, excluded) {
       !object.visible ||
       object.userData.isInstancedMesh ||
       object.userData.isImpostorMesh ||
+      object.userData.isSnappingPointMarkers ||
       excluded.includes(object)
     ) {
       return;
