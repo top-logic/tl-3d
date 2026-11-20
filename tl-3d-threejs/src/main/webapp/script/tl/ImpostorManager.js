@@ -289,7 +289,9 @@ export class ImpostorManager {
     modelClone.updateMatrixWorld(true);
 
     // Compute bounding box and sphere
-    const boundingBox = new Box3().setFromObject(modelClone);
+    // Precise (from the vertices), like the box of the instanced geometry the impostor stands for
+    // (InstancedMeshManager): the box of rotated meshes in the GLTF is larger otherwise.
+    const boundingBox = new Box3().setFromObject(modelClone, true);
     const boundingSphere = new Sphere();
     boundingBox.getBoundingSphere(boundingSphere);
 
@@ -302,7 +304,7 @@ export class ImpostorManager {
       modelClone.updateMatrixWorld(true);
 
       // Recompute bounding box/sphere after centering
-      boundingBox.setFromObject(modelClone);
+      boundingBox.setFromObject(modelClone, true);
       boundingBox.getBoundingSphere(boundingSphere);
     }
 
