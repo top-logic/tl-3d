@@ -102,6 +102,8 @@ export class InstancedSnappingPoints {
     );
     const material = new MeshBasicMaterial({ color: 0xffffff });
     this.mesh = new InstancedMesh(geometry, material, entries.length);
+    // Markers only: not picked by clicks, not made transparent with the parts.
+    this.mesh.userData.isSnappingPointMarkers = true;
     for (let i = 0; i < entries.length; i++) {
       this.mesh.setMatrixAt(i, this.sphereMatrix(i, 1));
       this.mesh.setColorAt(i, GREEN_COLOR);

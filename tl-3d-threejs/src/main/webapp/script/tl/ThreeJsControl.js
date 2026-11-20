@@ -2908,16 +2908,37 @@ class ThreeJsControl {
     }
   }
 
+  /**
+   * Calls the given function for each object of the parts that has its own materials: not the
+   * environment (skybox, floors, axes, gizmos, workplane), instanced meshes (made transparent per
+   * instance) and point markers (shared materials).
+   */
+  forEachPartMesh(fn) {
+    for (const root of [this.zUpRoot, this.multiTransformGroup]) {
+      root.traverse((object) => {
+        if (
+          !object.material ||
+          object.userData.isInstancedMesh ||
+          object.userData.isImpostorMesh ||
+          object.userData.isSnappingPointMarkers ||
+          isPointMarker(object) ||
+          object === this.workplane ||
+          this.isWorkplaneChild(object)
+        ) {
+          return;
+        }
+        fn(object);
+      });
+    }
+  }
+
   clearObjectsTransparency() {
-    this.scene.traverse((object) => {
-      if (object.userData.isInstancedMesh || object.userData.isImpostorMesh) return;
-      if (object.material) {
-        this.getMaterials(object).forEach((material) => {
-          if (material.transparent && material.opacity < 1.0) {
-            this.setObjectTransparency(material, null);
-          }
-        });
-      }
+    this.forEachPartMesh((object) => {
+      this.getMaterials(object).forEach((material) => {
+        if (material.userData.originalProperties) {
+          this.setObjectTransparency(material, null);
+        }
+      });
     });
 
     // Reset all instance opacities to 1.0 (skip impostors — they share the base asset's texture)
@@ -2942,25 +2963,18 @@ class ThreeJsControl {
       });
 
       // Make non-instanced objects transparent, the selected ones opaque
-      this.scene.traverse((object) => {
-        if (object.userData.isInstancedMesh || object.userData.isImpostorMesh) return;
-        if (
-          object.material &&
-          object !== this.workplane &&
-          !this.isWorkplaneChild(object)
-        ) {
-          const selected = selectedIds.has(object.id);
-          this.getMaterials(object).forEach((material) => {
-            if (selected) {
-              // Restore only materials made transparent before.
-              if (material.userData.originalProperties) {
-                this.setObjectTransparency(material, null);
-              }
-            } else {
-              this.setObjectTransparency(material, TRANSPARENCY_LEVEL);
+      this.forEachPartMesh((object) => {
+        const selected = selectedIds.has(object.id);
+        this.getMaterials(object).forEach((material) => {
+          if (selected) {
+            // Restore only materials made transparent before.
+            if (material.userData.originalProperties) {
+              this.setObjectTransparency(material, null);
             }
-          });
-        }
+          } else {
+            this.setObjectTransparency(material, TRANSPARENCY_LEVEL);
+          }
+        });
       });
 
       // Collect selected instanced PartNode keys for quick lookup
