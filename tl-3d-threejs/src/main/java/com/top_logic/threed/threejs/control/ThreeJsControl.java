@@ -108,13 +108,19 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 
 		private Map<Observable, List<SceneNode>> _upcomingSelectionChange = new HashMap<>();
 
+		/** The node edited by the gizmo fields, see {@link #registerTxListener(SceneNode)}. */
+		private SceneNode _gizmoNode;
+
+		/** The gizmo node and its ancestors: a change of their transformation moves the node. */
+		private final List<SceneNode> _observedNodes = new ArrayList<>();
+
 		private Listener transformationListener = new Listener() {
 			
 			@Override
 			public void afterChanged(Observable obj, String property) {
 				switch (property) {
 					case ConnectionPoint.TRANSFORM__PROP: {
-						updateGizmoControl((SceneNode) obj);
+						updateGizmoControl(_gizmoNode);
 					}
 				}
 			}
@@ -135,30 +141,34 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 		}
 
 		void detach(SceneGraph graph) {
-			List<SceneNode> selection = graph.getSelection();
-			selection.forEach(this::unregisterTXListener);
+			unregisterTxListeners();
 
 			graph.unregisterListener(this);
 		}
 
 		private void registerTxListener(SceneNode node) {
+			unregisterTxListeners();
+			_gizmoNode = node;
 			updateGizmoControl(node);
-			if (node != null) {
-				node.registerListener(transformationListener);
+			for (ScenePart part = node; part instanceof SceneNode ancestor; part = ancestor.getParent()) {
+				ancestor.registerListener(transformationListener);
+				_observedNodes.add(ancestor);
 			}
-
 		}
 
-		private void unregisterTXListener(SceneNode node) {
-			node.unregisterListener(transformationListener);
+		private void unregisterTxListeners() {
+			for (SceneNode node : _observedNodes) {
+				node.unregisterListener(transformationListener);
+			}
+			_observedNodes.clear();
+			_gizmoNode = null;
 		}
 
 		@Override
 		public void afterChanged(Observable obj, String property) {
 			switch (property) {
 				case SceneGraph.SELECTION__PROP: {
-					List<SceneNode> oldSelection = _upcomingSelectionChange.remove(obj);
-					oldSelection.forEach(this::unregisterTXListener);
+					_upcomingSelectionChange.remove(obj);
 					SceneNode gizmoNode = findGizmoNode(((SceneGraph) obj).getSelection());
 					registerTxListener(gizmoNode);
 				}
@@ -425,15 +435,16 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 				_gizmoControl.setModel(null);
 				return;
 		}
+		_gizmoControl.setModel(absoluteParentTransformation(node).after(localTX));
+		// The placement of the parent at the time of the input: an ancestor may have moved since
+		// the node was selected.
+		_gizmoControl.setConsumer(
+			tx -> SceneUtils.setTransform(node, absoluteParentTransformation(node).inverse().after(tx)));
+	}
+
+	private static Transformation absoluteParentTransformation(SceneNode node) {
 		ScenePart parent = node.getParent();
-		Transformation absoluteParentTX;
-		if (parent != null) {
-			absoluteParentTX = SceneUtils.getAbsoluteTransformation(parent);
-		} else {
-			absoluteParentTX = Transformation.identity();
-		}
-		_gizmoControl.setModel(absoluteParentTX.after(localTX));
-		_gizmoControl.setConsumer(tx -> SceneUtils.setTransform(node, absoluteParentTX.inverse().after(tx)));
+		return parent != null ? SceneUtils.getAbsoluteTransformation(parent) : Transformation.identity();
 	}
 
 	private SceneNode findGizmoNode(List<SceneNode> selection) {
