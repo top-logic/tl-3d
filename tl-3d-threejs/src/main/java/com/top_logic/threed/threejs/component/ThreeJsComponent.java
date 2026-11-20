@@ -11,6 +11,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -514,9 +515,10 @@ public class ThreeJsComponent extends BuilderComponent
 				try {
 					Set<?> formerlySelectedObjects = event.getOldSelection();
 					Set<?> selectedObjects = event.getNewSelection();
-					Set<?> newElements = new HashSet<>(selectedObjects);
+					// Ordered: the first selected node is the pivot of the gizmo of a multi-selection.
+					Set<?> newElements = new LinkedHashSet<>(selectedObjects);
 					newElements.removeAll(formerlySelectedObjects);
-					Set<?> removedElements = new HashSet<>(formerlySelectedObjects);
+					Set<?> removedElements = new LinkedHashSet<>(formerlySelectedObjects);
 					removedElements.removeAll(selectedObjects);
 					List<SceneNode> selection = scene.getSelection();
 					selection.removeAll(removedElements);
@@ -794,7 +796,7 @@ public class ThreeJsComponent extends BuilderComponent
 	}
 
 	private void internalSetSelection(Object newValue) {
-		_selectionModel.setSelection(addNodesForBusinessObjects(newValue, new HashSet<>()));
+		_selectionModel.setSelection(addNodesForBusinessObjects(newValue, new LinkedHashSet<>()));
 		if (_control != null) {
 			setCoordinateSystems(newValue);
 		}
@@ -822,7 +824,7 @@ public class ThreeJsComponent extends BuilderComponent
 		// Selection was changed in the UI.
 		Set<?> selectedObjects = event.getNewSelection();
 		if (_selectionModel.isMultiSelectionSupported()) {
-			Set<Object> newSelection = new HashSet<>();
+			Set<Object> newSelection = new LinkedHashSet<>();
 			for (Object selectedNode : selectedObjects) {
 				Object nodeModel = ((SceneNode) selectedNode).getUserData();
 				newSelection.add(nodeModel);
