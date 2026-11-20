@@ -1604,6 +1604,45 @@ export class GroupNode extends SharedObject {
   }
 }
 
+/**
+ * Applies colour and visibility of a node that has taken over the 3D objects and instances of a
+ * replaced node (see InsertElement.updateNodeReferences()): the replacement may have other
+ * values than the replaced node.
+ */
+export function refreshDisplay(scope, node) {
+  let inheritedColor = null;
+  for (let ancestor = node.parent; ancestor; ancestor = ancestor.parent) {
+    if (ancestor.color) {
+      inheritedColor = ancestor.color;
+      break;
+    }
+  }
+  const visit = (n, parentColor) => {
+    const color = n.color || parentColor;
+    if (n.willBeInstanced && n.assetKey != null) {
+      if (color) {
+        scope.instanceManager.setInstanceColor(n.assetKey, n.instanceID, color);
+      } else {
+        scope.instanceManager.clearInstanceColor(n.assetKey, n.instanceID);
+      }
+      scope.instanceManager.setInstanceHidden(n.assetKey, n.instanceID, isEffectivelyHidden(n));
+      return;
+    }
+    if (n.node) {
+      n.node.userData.color = n.color || null;
+      n.node.visible = !n.hidden;
+    } else if (!n.hidden) {
+      // The replaced node was hidden and not built.
+      buildWhenShown(n);
+    }
+    n.contents?.forEach((child) => visit(child, color));
+  };
+  visit(node, inheritedColor);
+  if (node.node) {
+    scope.ctrl.restoreColor(node.node);
+  }
+}
+
 export class PartNode extends SharedObject {
   constructor(id) {
     super(id);

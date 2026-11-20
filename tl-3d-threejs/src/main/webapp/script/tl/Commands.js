@@ -3,7 +3,7 @@
  * Contains all command classes used for scene modifications
  */
 import { INCREMENTAL_ADD_RELOAD_THRESHOLD } from "./Constants.js";
-import { instanceKey } from "./DataModels.js";
+import { instanceKey, refreshDisplay } from "./DataModels.js";
 
 /**
  * Recursively cleans up a removed node: detaches non-instanced Three.js nodes
@@ -121,6 +121,8 @@ export class InsertElement extends ListUpdate {
       // Update 3D object references if this is a replacement
       if (!this.updateNodeReferences(scope, oldElement, newElement)) {
         this.needsFullReload = true;
+      } else {
+        refreshDisplay(scope, newElement);
       }
     } else if (target.node) {
       // Appended element (not sent by the server today): build it, so that it does not stay
