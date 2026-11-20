@@ -517,7 +517,8 @@ class ThreeJsControl {
               // Snapshot instanced descendant matrices for GroupNodes
               const sharedNode = outer.selection.find((s) => s.node === node);
               if (sharedNode instanceof GroupNode && outer.hasInstancedDescendants(sharedNode)) {
-                node.userData.dragStartMatrix = node.matrixWorld.clone();
+                // In zUpRoot-local space, like the instance matrices.
+                node.userData.dragStartMatrix = outer.zUpLocalMatrix(node);
                 outer._instanceSnapshots[node.id] = outer.snapshotInstancedDescendantMatrices(sharedNode);
               }
             }
@@ -571,18 +572,23 @@ class ThreeJsControl {
             .filter(Boolean);
 
           // Recompute GPU matrices for instanced descendants of any GroupNodes
-          // (notifyTransform has already updated the data model transforms)
+          // (notifyTransform has already updated the data model transforms), and move the
+          // instances of selected instanced parts to their proxies.
+          let instancesMoved = Object.keys(outer._instanceSnapshots).length > 0;
           for (const node of outer.multiTransformGroup.children) {
             const sharedNode = outer.selection.find((s) => s.node === node);
             if (sharedNode instanceof GroupNode && outer.hasInstancedDescendants(sharedNode)) {
               sharedNode.recomputeInstancedChildrenMatrices(outer.scope);
+            } else if (node.userData.isInstanceProxy) {
+              outer.syncProxyInstance(node);
+              instancesMoved = true;
             }
           }
 
           outer.sendSceneChanges(commands);
 
           // Update the octree if any instanced matrices changed
-          if (Object.keys(outer._instanceSnapshots).length > 0) {
+          if (instancesMoved) {
             outer.updateSceneOctree(outer.selection);
           }
           outer._instanceSnapshots = {};
@@ -1821,7 +1827,31 @@ class ThreeJsControl {
    * @param {Object3D} object - The dragged object (a single node or multiTransformGroup)
    * @param {Object} snapshots - Map of node.id or "_single" -> snapshot from snapshotInstancedDescendantMatrices
    */
+  /** The matrix of the given object relative to zUpRoot (the space of the instance matrices). */
+  zUpLocalMatrix(object) {
+    this.zUpRoot.updateMatrixWorld(true);
+    object.updateMatrixWorld(true);
+    return this.zUpRoot.matrixWorld.clone().invert().multiply(object.matrixWorld);
+  }
+
+  /** Moves the instance of an instanced part to its proxy (e.g. inside a moved multi-selection). */
+  syncProxyInstance(proxy) {
+    this.scope.instanceManager.updateInstanceMatrix(
+      proxy.userData.assetKey,
+      proxy.userData.instanceID,
+      this.zUpLocalMatrix(proxy),
+    );
+  }
+
   _livePreviewInstancedDescendants(object, snapshots) {
+    if (object === this.multiTransformGroup) {
+      // Selected instanced parts are moved by their proxies.
+      for (const node of object.children) {
+        if (node.userData.isInstanceProxy) {
+          this.syncProxyInstance(node);
+        }
+      }
+    }
     if (!snapshots || Object.keys(snapshots).length === 0) return;
 
     if (object === this.multiTransformGroup) {
@@ -1831,8 +1861,7 @@ class ThreeJsControl {
         if (!snap) continue;
         const startMatrix = node.userData.dragStartMatrix;
         if (!startMatrix) continue;
-        node.updateMatrixWorld(true);
-        const delta = node.matrixWorld.clone().multiply(startMatrix.clone().invert());
+        const delta = this.zUpLocalMatrix(node).multiply(startMatrix.clone().invert());
         this.applyDeltaToInstanceSnapshots(delta, snap);
       }
     } else {
