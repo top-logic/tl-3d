@@ -535,6 +535,11 @@ class ThreeJsControl {
         outer.zUpRoot.updateMatrixWorld(true);
 
         const object = event.target.object;
+        if (!object) {
+          // The gizmo has been detached meanwhile: nothing to transform.
+          outer._instanceSnapshots = {};
+          return;
+        }
 
         if (object === outer.multiTransformGroup) {
           // MULTI-SELECT MODE
