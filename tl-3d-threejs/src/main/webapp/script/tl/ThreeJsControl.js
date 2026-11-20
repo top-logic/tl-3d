@@ -2733,6 +2733,10 @@ class ThreeJsControl {
   async loadScene(retried = false) {
     // Always the current state (the URL is the same when the scene is loaded again).
     const dataResponse = await fetch(this.dataUrl, { cache: "no-store" });
+    if (this.disposed) {
+      // Closed while the data was requested: build nothing, start no loaders.
+      return;
+    }
     if (!dataResponse.ok) {
       throw new Error(
         `Scene data: HTTP ${dataResponse.status} ${dataResponse.statusText}`,
@@ -2746,6 +2750,9 @@ class ThreeJsControl {
     // request and the AJAX requests are independent), see applySceneChanges().
     this.sceneRevision = dataRevision;
     const dataJson = await dataResponse.json();
+    if (this.disposed) {
+      return;
+    }
 
     this.sceneGraph = this.scope.loadJson(dataJson);
     this.hideLoadError();
