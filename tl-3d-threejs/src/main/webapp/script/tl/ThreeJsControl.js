@@ -71,6 +71,19 @@ function snapToGridLine(value) {
   return Math.abs(value - nearest) <= GRID_SNAP_THRESHOLD ? nearest : value;
 }
 
+/**
+ * Logs an error in the console and in the log of the server: errors the viewer recovers from
+ * (e.g. by loading the scene again) would otherwise not be noticed.
+ */
+function reportError(message, error) {
+  console.error(message, error);
+  try {
+    globalThis.services?.log?.error(message, String(error?.stack ?? error));
+  } catch (ignored) {
+    // Logging must not break the viewer.
+  }
+}
+
 /** Whether the given object and all its ancestors are visible. */
 function isShown(object) {
   for (let o = object; o != null; o = o.parent) {
@@ -2164,7 +2177,7 @@ class ThreeJsControl {
     if (this._resync || this.disposed) {
       return this._resync;
     }
-    console.error("3D viewer: a scene change failed, the scene is loaded again.", reason);
+    reportError("3D viewer: a scene change failed, the scene is loaded again.", reason);
     this._resync = this.reloadScene()
       .catch((error) => this.showLoadError(error))
       .finally(() => {
@@ -2681,7 +2694,7 @@ class ThreeJsControl {
       if (retried) {
         throw error;
       }
-      console.error("3D viewer: a scene change failed, the scene is loaded again.", error);
+      reportError("3D viewer: a scene change failed, the scene is loaded again.", error);
       this.resetScope();
       return this.loadScene(true);
     }
