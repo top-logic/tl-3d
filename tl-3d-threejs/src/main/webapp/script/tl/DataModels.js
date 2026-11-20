@@ -599,6 +599,10 @@ export class Scope {
     // the instanced meshes are no longer shown.
     this.clearStaleGltfs(new Set());
     this.instanceManager.dispose();
+    // The model materials, placeholders and point markers of the parts.
+    for (const asset of this.assets) {
+      asset.dispose();
+    }
   }
 
   /**
@@ -1132,11 +1136,10 @@ export class SceneGraph extends SharedObject {
     collectReachable(this.root);
     reachableIds.add(this.id);
 
-    // Dispose GPU resources for OLD assets (those not in the new scene)
-    for (const obj of Object.values(scope.objects)) {
-      if (obj instanceof GltfAsset && !reachableIds.has(obj.id)) {
-        obj.dispose();
-      }
+    // Release the 3D objects of all assets (model materials, placeholders, point markers): the
+    // scene is built again, also for the assets that are still shown.
+    for (const asset of scope.assets) {
+      asset.dispose();
     }
     scope.instanceManager.dispose();
     this.ctrl.resetSceneOctree();
