@@ -405,25 +405,35 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 	}
 
 	private void updateGizmoControl(SceneNode node) {
+		// The fields must never change the formerly selected node.
+		_gizmoControl.setConsumer(null);
 		if (node == null) {
-			_gizmoControl.setConsumer(null);
 			_gizmoControl.setModel(null);
-		} else {
-			List<Double> transform = node.getTransform();
-			if (transform.size() == 12) {
-				_gizmoControl.setConsumer(null);
-				ScenePart parent = node.getParent();
-				Transformation absoluteParentTX;
-				if (parent != null) {
-					absoluteParentTX = SceneUtils.getAbsoluteTransformation(parent);
-				} else {
-					absoluteParentTX = Transformation.identity();
-				}
-				_gizmoControl.setModel(absoluteParentTX.after(TransformationUtil.fromList(transform)));
-				_gizmoControl
-					.setConsumer(tx -> SceneUtils.setTransform(node, absoluteParentTX.inverse().after(tx)));
-			}
+			return;
 		}
+		List<Double> transform = node.getTransform();
+		Transformation localTX;
+		switch (transform.size()) {
+			case 0:
+				// No transformation (e.g. a group): placed like its parent.
+				localTX = Transformation.identity();
+				break;
+			case 12:
+				localTX = TransformationUtil.fromList(transform);
+				break;
+			default:
+				_gizmoControl.setModel(null);
+				return;
+		}
+		ScenePart parent = node.getParent();
+		Transformation absoluteParentTX;
+		if (parent != null) {
+			absoluteParentTX = SceneUtils.getAbsoluteTransformation(parent);
+		} else {
+			absoluteParentTX = Transformation.identity();
+		}
+		_gizmoControl.setModel(absoluteParentTX.after(localTX));
+		_gizmoControl.setConsumer(tx -> SceneUtils.setTransform(node, absoluteParentTX.inverse().after(tx)));
 	}
 
 	private SceneNode findGizmoNode(List<SceneNode> selection) {
