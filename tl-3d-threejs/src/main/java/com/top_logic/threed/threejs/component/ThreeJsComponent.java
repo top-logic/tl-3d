@@ -912,12 +912,16 @@ public class ThreeJsComponent extends BuilderComponent
 	}
 
 	HandlerResult applyTransformation() {
-		HandlerResult result = applyTransformation(_transformedNodes);
-		if (result.isSuccess()) {
-			// Reset changed nodes.
-			_transformedNodes.clear();
-		}
-		return result;
+		// A copy: applying the transformations may replace nodes (see update()).
+		return applyTransformation(new HashSet<>(_transformedNodes));
+	}
+
+	/**
+	 * Forgets the transformations made in the viewer, after {@link #applyTransformation()} has
+	 * stored them (the transaction is committed). If the commit fails, they can be applied again.
+	 */
+	void transformationsApplied() {
+		_transformedNodes.clear();
 	}
 
 	/**
@@ -981,9 +985,11 @@ public class ThreeJsComponent extends BuilderComponent
 			ResKey customMessage = getCustomCommitMessage(someArguments);
 			ResKey message = customMessage == null ? I18NConstants.APPLIED_TRANSFORMATIONS : customMessage;
 			try (Transaction tx = beginTransaction(model, message)) {
-				HandlerResult result = ((ThreeJsComponent) aComponent).applyTransformation();
+				ThreeJsComponent component = (ThreeJsComponent) aComponent;
+				HandlerResult result = component.applyTransformation();
 				if (result.isSuccess()) {
 					tx.commit();
+					component.transformationsApplied();
 				}
 				return result;
 			}
