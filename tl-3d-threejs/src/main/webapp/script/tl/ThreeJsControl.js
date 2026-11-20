@@ -1116,9 +1116,7 @@ class ThreeJsControl {
         const position = new Vector3();
         otherPoint.node.getWorldPosition(position);
 
-        const distance = this.useScreenSpaceSnapping
-          ? this.getScreenSpaceDistance(selectedWorldPosition, position)
-          : selectedWorldPosition.distanceTo(position);
+        const distance = this.snappingDistance(selectedWorldPosition, position);
 
         if (distance < closestDistance) {
           if (this.isPositionOccupied(position, excludedObjects, excludedNodes)) {
@@ -1143,9 +1141,7 @@ class ThreeJsControl {
       const position = new Vector3()
         .setFromMatrixPosition(entries[i].matrix)
         .applyMatrix4(parentMatrixWorld);
-      const distance = this.useScreenSpaceSnapping
-        ? this.getScreenSpaceDistance(selectedWorldPosition, position)
-        : selectedWorldPosition.distanceTo(position);
+      const distance = this.snappingDistance(selectedWorldPosition, position);
       if (distance < closestDistance) {
         if (this.isPositionOccupied(position, excludedObjects, excludedNodes)) {
           continue;
@@ -1171,6 +1167,29 @@ class ThreeJsControl {
   throttledFindClosestSnappingPoint = throttle((selectedObject) => {
     return this.findClosestSnappingPoint(selectedObject);
   }, 100);
+
+  /**
+   * The distance between the dragged object and a snapping point that decides about snapping:
+   * on the screen (in CSS pixels), or in the scene. On the screen, points far in front of or
+   * behind the object are not considered: they may appear close to it, but snapping would move
+   * the object far into the depth.
+   */
+  snappingDistance(objectPosition, pointPosition) {
+    if (!this.useScreenSpaceSnapping) {
+      return objectPosition.distanceTo(pointPosition);
+    }
+    const cameraPosition = this.camera.getWorldPosition(new Vector3());
+    const viewDirection = this.camera.getWorldDirection(new Vector3());
+    const objectDepth = objectPosition.clone().sub(cameraPosition).dot(viewDirection);
+    const pointDepth = pointPosition.clone().sub(cameraPosition).dot(viewDirection);
+    if (
+      pointDepth <= this.camera.near ||
+      Math.abs(pointDepth - objectDepth) > SNAP_MAX_DEPTH_RATIO * Math.abs(objectDepth)
+    ) {
+      return Infinity;
+    }
+    return this.getScreenSpaceDistance(objectPosition, pointPosition);
+  }
 
   /**
    * Marks the snapping point closest to the dragged object, as found by
@@ -3081,6 +3100,12 @@ const VIEW_OFFSET = 0.45;
  * far plane lies behind the content, so the depth resolution stays sufficient.
  */
 const NEAR_PLANE_INSIDE_MAX = 100;
+
+/**
+ * Largest difference in depth (distance along the view direction) between a dragged object and a
+ * snapping point it snaps to, relative to the depth of the object.
+ */
+const SNAP_MAX_DEPTH_RATIO = 0.25;
 
 /** Marks inserted or removed elements in the changes collected by applySceneCommands(). */
 const STRUCTURE_CHANGE = "#structure";
