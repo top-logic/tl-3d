@@ -191,9 +191,12 @@ class ThreeJsControl {
 
     this.loadErrorMessage = initialState.loadErrorMessage;
     this.loadScene()
+      // A change during the loading may have started loading the scene again.
+      .then(() => this.resyncDone())
       .then(() =>
         setTimeout(() => {
-          if (this.disposed) {
+          // No scene, if loading it again failed (the error is shown).
+          if (this.disposed || !this.sceneGraph) {
             return;
           }
           this.createBoundingBox();
@@ -2096,44 +2099,57 @@ class ThreeJsControl {
    * (and resets its references, see ThreeJsControl.handleContent() on the server); changes that
    * arrive meanwhile are applied by their revision (see loadScene()).
    */
-  async resyncScene(reason) {
-    if (this._resyncing || this.disposed) {
+  resyncScene(reason) {
+    if (this._resync || this.disposed) {
+      return this._resync;
+    }
+    console.error("3D viewer: a scene change failed, the scene is loaded again.", reason);
+    this._resync = this.reloadScene()
+      .catch((error) => this.showLoadError(error))
+      .finally(() => {
+        this._resync = null;
+      });
+    return this._resync;
+  }
+
+  /** Waits until no resynchronisation (see resyncScene()) is running. */
+  async resyncDone() {
+    while (this._resync) {
+      await this._resync;
+    }
+  }
+
+  /** Drops the scene and its data model: a new data model is loaded. */
+  resetScope() {
+    this.selection = [];
+    this.updateTransformControls();
+    this.scope.dispose();
+    this.impostorManager?.dispose();
+    this.impostorManager = null;
+    this.resetSceneOctree();
+    this.instancedSnappingPoints.dispose();
+    this.zUpRoot.clear();
+    this.multiTransformGroup.clear();
+
+    this.scope = new Scope();
+    this.scope.ctrl = this;
+    this.renderManager.setInstanceManager(this.scope.instanceManager);
+    this.scope.instanceManager.setTransparentMode(this.areObjectsTransparent);
+    this.sceneGraph = null;
+    this.pendingChanges = [];
+  }
+
+  async reloadScene() {
+    this.resetScope();
+    await this.loadScene();
+    if (this.disposed) {
       return;
     }
-    this._resyncing = true;
-    console.error("3D viewer: a scene change failed, the scene is loaded again.", reason);
-    try {
-      this.selection = [];
-      this.updateTransformControls();
-      this.scope.dispose();
-      this.impostorManager?.dispose();
-      this.impostorManager = null;
-      this.resetSceneOctree();
-      this.instancedSnappingPoints.dispose();
-      this.zUpRoot.clear();
-      this.multiTransformGroup.clear();
-
-      this.scope = new Scope();
-      this.scope.ctrl = this;
-      this.renderManager.setInstanceManager(this.scope.instanceManager);
-      this.scope.instanceManager.setTransparentMode(this.areObjectsTransparent);
-      this.sceneGraph = null;
-      this.pendingChanges = [];
-
-      await this.loadScene();
-      if (this.disposed) {
-        return;
-      }
-      this.createBoundingBox();
-      // The workplane was a child of the cleared root.
-      this.toggleWorkplane(this.isWorkplaneVisible);
-      this.refreshInstancedSnappingPoints();
-      this.invalidate();
-    } catch (error) {
-      this.showLoadError(error);
-    } finally {
-      this._resyncing = false;
-    }
+    this.createBoundingBox();
+    // The workplane was a child of the cleared root.
+    this.toggleWorkplane(this.isWorkplaneVisible);
+    this.refreshInstancedSnappingPoints();
+    this.invalidate();
   }
 
   /**
