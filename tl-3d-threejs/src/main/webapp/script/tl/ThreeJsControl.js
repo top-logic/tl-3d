@@ -736,9 +736,7 @@ class ThreeJsControl {
         // Live preview: update instanced descendants for a single GroupNode
         this._livePreviewInstancedDescendants(selectedObject, this._instanceSnapshots);
 
-        this.setSnappingHighlight(
-          this.throttledFindClosestSnappingPoint(selectedObject),
-        );
+        this.throttledSnappingHighlight(selectedObject);
       }
       this.invalidate();
     });
@@ -1163,9 +1161,15 @@ class ThreeJsControl {
         };
   }
 
-  // throttled version of findClosestSnappingPoint
-  throttledFindClosestSnappingPoint = throttle((selectedObject) => {
-    return this.findClosestSnappingPoint(selectedObject);
+  /**
+   * Marks the snapping point closest to the dragged object, at most every 100 ms. The last call
+   * of a series is executed late, so that the mark shows the point for the final position.
+   */
+  throttledSnappingHighlight = throttle((selectedObject) => {
+    // The delayed call may come after the drag has ended (which removes the mark).
+    if (this.translateControls?.dragging) {
+      this.setSnappingHighlight(this.findClosestSnappingPoint(selectedObject));
+    }
   }, 100);
 
   /**

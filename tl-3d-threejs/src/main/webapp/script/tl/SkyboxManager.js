@@ -105,8 +105,7 @@ export class SkyboxManager {
     if (!this.skybox || !this.environmentBackground) {
       return;
     }
-    const signature = this.roomSignature();
-    if (signature === this._roomSignature) {
+    if (!this.roomNeedsRebuild()) {
       return;
     }
     this.createEnvironmentCube(this.skybox);
@@ -119,13 +118,37 @@ export class SkyboxManager {
     }
   }
 
-  /** What the room depends on: the bounds of the scene and its floors. */
-  roomSignature() {
+  /**
+   * Whether the room no longer fits the scene: the scene has grown out of the room built for it
+   * (it may grow into the padding of the floors by a quarter), has become much smaller, or has
+   * another number of floors. Building the room creates new textures for all floors, so moving a
+   * part a little must not do it.
+   */
+  roomNeedsRebuild() {
     const box = this.control.boundingBox;
-    const bounds = box && !box.isEmpty()
-      ? [...box.min.toArray(), ...box.max.toArray()].map(Math.round).join(",")
-      : "empty";
-    return bounds + "|" + this.getFloorLevels().join(",");
+    const built = this._roomBox;
+    if (this.numberOfFloors() !== this._roomFloors) {
+      return true;
+    }
+    const hasContent = !!box && !box.isEmpty();
+    const hadContent = !!built && !built.isEmpty();
+    if (!hasContent || !hadContent) {
+      return hasContent !== hadContent;
+    }
+    const allowed = built
+      .clone()
+      .expandByVector(new Vector3(FLOOR_PADDING / 4, 0, FLOOR_PADDING / 4));
+    if (!allowed.containsBox(box)) {
+      return true;
+    }
+    const size = box.getSize(new Vector3());
+    const builtSize = built.getSize(new Vector3());
+    return size.x < builtSize.x / 2 || size.z < builtSize.z / 2;
+  }
+
+  /** Number of floors of the room. */
+  numberOfFloors() {
+    return this.control.sceneGraph?.numberOfFloors || 1;
   }
 
   createFloorTextTexture(text, backgroundImage = null) {
@@ -257,7 +280,8 @@ export class SkyboxManager {
     this.environmentBackground?.position.set(center.x, cubeYposition, center.z);
 
     this.createFactoryFloors(skybox);
-    this._roomSignature = this.roomSignature();
+    this._roomBox = this.control.boundingBox?.clone() ?? null;
+    this._roomFloors = this.numberOfFloors();
   }
 
   createFactoryFloors(skybox) {
