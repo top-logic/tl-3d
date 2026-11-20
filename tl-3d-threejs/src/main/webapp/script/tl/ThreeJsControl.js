@@ -336,6 +336,11 @@ class ThreeJsControl {
       (event) => event.isPrimary && this.onMouseUp(event),
       { signal },
     );
+    // The gizmo does not handle a cancelled pointer (system gesture, pen leaving the screen):
+    // its drag would never end.
+    for (const type of ["pointercancel", "lostpointercapture"]) {
+      this.canvas.addEventListener(type, () => this.finishGizmoDrag(), { signal });
+    }
 
     // The browser may drop the WebGL context (GPU reset, driver update, too many contexts,
     // a mobile device in the background). three.js keeps the context restorable and sets up
@@ -721,6 +726,7 @@ class ThreeJsControl {
         this.clearSnappingHighlight();
         // The object may have left the bounds (zoomOut, clipping planes).
         this.createBoundingBox();
+        this.applyChangesDuringDrag();
       }
     });
 
@@ -775,6 +781,7 @@ class ThreeJsControl {
       } else {
         // The rotated object may reach beyond the bounds (zoomOut, clipping planes).
         this.createBoundingBox();
+        this.applyChangesDuringDrag();
       }
     });
     this.rotateControls.addEventListener("objectChange", (event) => {
@@ -951,9 +958,24 @@ class ThreeJsControl {
   }
 
   deactivateControl() {
+    // A drag must end before the gizmo is detached: a disabled gizmo ignores the release of the
+    // pointer and would stay in the dragging state (with the camera controls switched off).
+    this.finishGizmoDrag();
     this.transformControls.enabled = false;
     this.transformControls.detach();
     this.invalidate();
+  }
+
+  /**
+   * Ends a running drag of a gizmo as if the pointer had been released: the transformation so far
+   * is applied and sent.
+   */
+  finishGizmoDrag() {
+    for (const gizmo of [this.translateControls, this.rotateControls]) {
+      if (gizmo?.dragging) {
+        gizmo.pointerUp(null);
+      }
+    }
   }
 
   toggleEditMode(editing) {
@@ -2122,6 +2144,13 @@ class ThreeJsControl {
    *        by loadScene() contains the changes up to its revision.
    */
   applySceneChanges(changesString, revision) {
+    if (this.translateControls?.dragging || this.rotateControls?.dragging) {
+      // Applied when the drag has ended (see applyChangesDuringDrag()): a change of the
+      // selection or the transformation would detach the gizmo from the dragged object.
+      this._changesDuringDrag = this._changesDuringDrag ?? [];
+      this._changesDuringDrag.push([changesString, revision]);
+      return;
+    }
     if (this.sceneGraph == null) {
       // The scene data is still loading (see loadScene()); a failed load has no buffer.
       this.pendingChanges?.push({ changes: changesString, revision });
@@ -2165,6 +2194,13 @@ class ThreeJsControl {
       // The data model may be half patched; later changes refer to the state of the server.
       this.resyncScene(ex);
     }
+  }
+
+  /** Applies the changes of the server that arrived while a gizmo was dragged. */
+  applyChangesDuringDrag() {
+    const changes = this._changesDuringDrag;
+    this._changesDuringDrag = null;
+    changes?.forEach(([changesString, revision]) => this.applySceneChanges(changesString, revision));
   }
 
   /**
