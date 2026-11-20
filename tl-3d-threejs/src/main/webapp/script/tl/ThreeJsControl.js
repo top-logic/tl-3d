@@ -1865,6 +1865,16 @@ class ThreeJsControl {
     partNode.node = proxy;
   }
 
+  /** Creates the proxies of the selected instanced parts again, from their current instances. */
+  recreateInstanceProxies() {
+    for (const partNode of this.selection) {
+      if (partNode.willBeInstanced && partNode.node?.userData.isInstanceProxy) {
+        this.removeInstanceProxy(partNode);
+        this.createInstanceProxy(partNode);
+      }
+    }
+  }
+
   /**
    * Remove a previously created instance proxy and clear the partNode.node ref.
    */
@@ -2197,6 +2207,11 @@ class ThreeJsControl {
         // whole scene.
         if (colors || changed.has("selection") || changed.has("hidden")) {
           this.applySelection(this.sceneGraph.selection);
+        }
+        if (structure || changed.has("transform")) {
+          // An ancestor of a selected instanced part may have moved: its proxy and the
+          // transformation of its parents stored there are outdated.
+          this.recreateInstanceProxies();
         }
         if (structure || changed.has("selection") || changed.has("transform")) {
           this.updateTransformControls();
