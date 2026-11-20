@@ -226,7 +226,10 @@ class ThreeJsControl {
     if (this.disposed || !this.container) {
       return;
     }
+    // One message, removed when a scene has been loaded (see hideLoadError()).
+    this.hideLoadError();
     const message = document.createElement("div");
+    this.loadErrorElement = message;
     message.className = "tl3dLoadError";
     message.textContent = this.loadErrorMessage || String(error);
     Object.assign(message.style, {
@@ -242,6 +245,12 @@ class ThreeJsControl {
       zIndex: "1001",
     });
     this.container.append(message);
+  }
+
+  /** Removes the message of showLoadError(), e.g. when the scene has been loaded again. */
+  hideLoadError() {
+    this.loadErrorElement?.remove();
+    this.loadErrorElement = null;
   }
 
   initScene() {
@@ -2612,6 +2621,7 @@ class ThreeJsControl {
     const dataJson = await dataResponse.json();
 
     this.sceneGraph = this.scope.loadJson(dataJson);
+    this.hideLoadError();
 
     // Without an await in between, so that no further change can come in meanwhile. The 3D scene
     // is built afterwards, so the commands only need to change the data model.
