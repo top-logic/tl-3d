@@ -754,6 +754,22 @@ public class ThreeJsComponent extends BuilderComponent
 			newNode.visit(_addToIndex, parent);
 		}
 
+		// The new nodes are built visible: hide those the hidden channel still lists.
+		for (Object hiddenElement : CollectionUtil.asSet(hiddenChannel().get())) {
+			SceneNode hiddenNode = nodeOfPath(hiddenElement);
+			if (hiddenNode != null && isInSubtree(hiddenNode, newNode)) {
+				hiddenNode.setHidden(true);
+			}
+		}
+	}
+
+	private boolean isInSubtree(SceneNode node, SceneNode subtreeRoot) {
+		for (SceneNode current = node; current != null; current = _parentNodes.get(current)) {
+			if (current == subtreeRoot) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -856,23 +872,26 @@ public class ThreeJsComponent extends BuilderComponent
 	}
 
 	private void setHiddenForNodeOfPath(Object boPath, boolean newHidden) {
-		SceneNode node;
-		if (boPath instanceof Collection<?>) {
-			Collection<?> path = (Collection<?>) boPath;
-			if (path.isEmpty()) {
-				node = null;
-			} else {
-				Object lastBO = CollectionUtil.getLast(path);
-				node = _nodeByModel.get(lastBO);
-			}
-		} else {
-			node = null;
-		}
+		SceneNode node = nodeOfPath(boPath);
 		if (node != null) {
 			node.setHidden(newHidden);
 		} else {
 			InfoService.showError(I18NConstants.ERROR_NOT_VALID_HIDDEN_CHANNEL_VALUE__VALUE.fill(boPath));
 		}
+	}
+
+	/**
+	 * The node of the last business object of the given path (a value of the hidden channel), or
+	 * <code>null</code>.
+	 */
+	private SceneNode nodeOfPath(Object boPath) {
+		if (boPath instanceof Collection<?>) {
+			Collection<?> path = (Collection<?>) boPath;
+			if (!path.isEmpty()) {
+				return _nodeByModel.get(CollectionUtil.getLast(path));
+			}
+		}
+		return null;
 	}
 
 	private List<CoordinateSystemProvider> getGlobalCoordinateSystems(Collection<?> selectedObjects) {
