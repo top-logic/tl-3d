@@ -2570,7 +2570,8 @@ class ThreeJsControl {
     this.scene?.clear();
   }
 
-  async loadScene() {
+  /** @param retried Whether the data is loaded again after a failed change. */
+  async loadScene(retried = false) {
     // Always the current state (the URL is the same when the scene is loaded again).
     const dataResponse = await fetch(this.dataUrl, { cache: "no-store" });
     if (!dataResponse.ok) {
@@ -2590,11 +2591,22 @@ class ThreeJsControl {
     // is built afterwards, so the commands only need to change the data model.
     const pendingChanges = this.pendingChanges;
     this.pendingChanges = null;
-    for (const { changes, revision } of pendingChanges) {
-      // Without revisions (NaN), every change is applied.
-      if (!(Number(revision) <= dataRevision)) {
-        this.applySceneCommands(changes);
+    try {
+      for (const { changes, revision } of pendingChanges) {
+        // Without revisions (NaN), every change is applied.
+        if (!(Number(revision) <= dataRevision)) {
+          this.applySceneCommands(changes);
+        }
       }
+    } catch (error) {
+      // The data model may be half patched. Nothing is built yet: load the data again, it
+      // contains the changes up to then (once, a second failure is reported).
+      if (retried) {
+        throw error;
+      }
+      console.error("3D viewer: a scene change failed, the scene is loaded again.", error);
+      this.resetScope();
+      return this.loadScene(true);
     }
 
     // Analyse for instancing
