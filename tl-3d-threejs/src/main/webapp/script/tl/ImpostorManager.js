@@ -38,6 +38,8 @@ export class ImpostorManager {
 
     // Map of assetKey -> {colorTexture, centerOffset, faceCornerUVData}
     this.impostorData = new Map();
+    // Counts the losses of the WebGL context, see onContextLost().
+    this.contextGeneration = 0;
 
     // The 26 cardinal directions (6 faces + 12 edges + 8 vertices)
     this.directions = this.generateCardinalDirections();
@@ -248,9 +250,13 @@ export class ImpostorManager {
   }
 
   /**
-   * @param layoutInverse Inverse of the layout point transformation of the asset (moves the
-   *        model as in the normal rendering), or null.
+   * The WebGL context has been lost: impostors being rendered must not be stored, their atlas
+   * would be empty (rendering into a lost context does nothing).
    */
+  onContextLost() {
+    this.contextGeneration++;
+  }
+
   /**
    * Generates the impostor of the given asset. Calls are processed one after the other: they
    * share the render target. A failed call does not stop the ones queued after it.
@@ -269,10 +275,10 @@ export class ImpostorManager {
   }
 
   async renderImpostor(assetKey, gltf, layoutInverse) {
-    // Dispose old data if this asset was previously captured
-    const existingData = this.impostorData.get(assetKey);
-    if (existingData?.colorTexture) {
-      existingData.colorTexture.dispose();
+    const generation = this.contextGeneration;
+    const gl = this.renderer.getContext();
+    if (gl.isContextLost()) {
+      return false;
     }
 
     // Clone model
@@ -399,16 +405,22 @@ export class ImpostorManager {
     // shared render target for the next asset instead of keeping one per asset.
     // Read back without stalling the main thread: the GPU finishes the 26 passes meanwhile.
     const pixels = new Uint8Array(atlasWidth * atlasHeight * 4);
-    await this.renderer.readRenderTargetPixelsAsync(
-      atlasTarget,
-      0,
-      0,
-      atlasWidth,
-      atlasHeight,
-      pixels,
-    );
-    if (this.disposed) {
-      return;
+    try {
+      await this.renderer.readRenderTargetPixelsAsync(
+        atlasTarget,
+        0,
+        0,
+        atlasWidth,
+        atlasHeight,
+        pixels,
+      );
+    } catch (error) {
+      // The context was lost while the GPU worked on the read back.
+      return false;
+    }
+    if (this.disposed || generation !== this.contextGeneration || gl.isContextLost()) {
+      // The atlas was (partly) rendered into a lost context and is empty.
+      return false;
     }
     const colorTexture = new DataTexture(
       pixels,
@@ -431,6 +443,8 @@ export class ImpostorManager {
       colorTexture.onUpdate = null;
     };
 
+    // Replace the former atlas, if this asset was captured before.
+    this.impostorData.get(assetKey)?.colorTexture?.dispose();
     this.impostorData.set(assetKey, {
       colorTexture,
       centerOffset: center,

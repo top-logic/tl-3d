@@ -316,6 +316,7 @@ class ThreeJsControl {
         // Disposing the control drops the context on purpose.
         if (!this.disposed) {
           console.warn("3D viewer: WebGL context lost, waiting for its restoration.");
+          this.impostorManager?.onContextLost();
         }
       },
       { signal },

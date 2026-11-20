@@ -930,44 +930,31 @@ export class Scope {
    *
    * Called when the WebGL context has been restored: three.js uploads geometries and
    * textures again, but the atlases exist on the GPU only (their pixels are dropped after the
-   * upload).
+   * upload). A generation running during the loss is restarted, the impostors it could not
+   * render are generated as well.
    */
-  async regenerateImpostors(ctrl) {
+  regenerateImpostors(ctrl) {
     const impostorManager = ctrl.impostorManager;
     if (!impostorManager || !this.instanceGroups) {
       return;
     }
+    const generating =
+      this._impostorAbortController && !this._impostorAbortController.signal.aborted;
+    this._impostorAbortController?.abort();
+    this._impostorAbortController = null;
+
     // The atlases belong to the lost context (nothing to release). Until an atlas is rendered
     // again, its asset has no impostor mesh and the render loop draws the instances in full.
-    const regenerate = [];
-    for (const [assetKey, group] of this.instanceGroups) {
-      if (!impostorManager.impostorData.has(assetKey)) {
-        // Not yet generated, the loading pipeline still does that.
-        continue;
-      }
-      impostorManager.impostorData.delete(assetKey);
+    const used = generating || impostorManager.impostorData.size > 0;
+    impostorManager.impostorData.clear();
+    for (const assetKey of this.instanceGroups.keys()) {
       this.instanceManager.removeImpostorMesh(assetKey, false);
-      const gltf = this.gltfs[gltfUrlOf(ctrl, group.asset)];
-      if (gltf) {
-        regenerate.push([assetKey, group, gltf]);
-      }
     }
     ctrl.invalidate();
 
-    for (const [assetKey, group, gltf] of regenerate) {
-      await impostorManager.generateImpostorForAsset(
-        assetKey,
-        gltf,
-        layoutPointInverse(group.asset),
-      );
-      if (ctrl.disposed || ctrl.impostorManager !== impostorManager) {
-        return;
-      }
-      this.createImpostorMesh(ctrl, assetKey, group);
-      ctrl.invalidate();
+    if (used) {
+      this.ensureImpostors(ctrl);
     }
-    impostorManager.disposeSharedRenderTarget();
-    this.releaseInstancedGltfGeometries(ctrl);
   }
 
   setGLTF(ctrl, url, assetsByURL) {
