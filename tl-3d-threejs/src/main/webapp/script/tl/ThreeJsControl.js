@@ -2328,6 +2328,16 @@ class ThreeJsControl {
           next[1].i === cmdProps.i + 1;
       }
 
+      if (
+        (command[0] !== "S" || cmdProps["p"] === "transform" || cmdProps["p"] === "parent") &&
+        this.multiTransformGroup.children.length > 0
+      ) {
+        // The 3D objects of a multi-selection hang in the group moved by the gizmo: put them
+        // back to their parents, the transformations of the data model are relative to these.
+        // applySceneChanges() builds the group again (updateTransformControls()).
+        this.restoreMultiGroup();
+      }
+
       change.shift();
       cmd.loadJson(cmdProps, change);
       cmd.apply(this.scope);
