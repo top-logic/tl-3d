@@ -304,6 +304,8 @@ class ThreeJsControl {
     // update objects' size when the size of the canvas changes
     this.resizeObserver = this.createResizeObserver(this.canvas);
     this.resizeObserver.observe(this.canvas);
+    // The canvas has a fixed size in pixels: growing is only noticed at the container.
+    this.resizeObserver.observe(container);
     // Removed in dispose(): three.js may keep the canvas (and with it its listeners) alive after
     // the renderer is disposed (a module wide texture caches the WebGL texture of each
     // renderer), the listeners must not keep this control and its scene alive.
@@ -1602,12 +1604,16 @@ class ThreeJsControl {
     // A throttled call may arrive after the control has been disposed.
     if (!this.container || this.disposed) return;
 
-    this.renderer.setSize(
-      this.container.clientWidth,
-      this.container.clientHeight,
-    );
-    this.camera.aspect =
-      this.container.clientWidth / this.container.clientHeight;
+    const width = this.container.clientWidth;
+    const height = this.container.clientHeight;
+    // The observers also report changes of the style or classes that keep the size: setSize()
+    // would discard the drawing buffer each time.
+    if (width === this._rendererWidth && height === this._rendererHeight) return;
+    this._rendererWidth = width;
+    this._rendererHeight = height;
+
+    this.renderer.setSize(width, height);
+    this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
 
     // Update navigation cube size if it exists
