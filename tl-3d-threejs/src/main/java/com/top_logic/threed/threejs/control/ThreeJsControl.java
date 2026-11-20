@@ -613,11 +613,6 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 	 */
 	static void applyClientChanges(DefaultScope scope, String changes) {
 		try {
-			if (!scope.hasChanges()) {
-				scope.applyChanges(new JsonReader(new StringR(changes)));
-				return;
-			}
-
 			Set<SharedGraphNode> dirty = new HashSet<>(scope.getDirty());
 			for (Object entry : (List<?>) JSON.fromString(changes)) {
 				List<?> header = (List<?>) ((List<?>) entry).get(0);
@@ -628,7 +623,8 @@ public class ThreeJsControl extends AbstractControl implements ContentHandler {
 
 				SharedGraphNode node = scope.index().get(id);
 				if (node == null) {
-					// Removed on the server, the client is informed by the pending changes.
+					// Removed on the server (the client is informed by the pending changes), or
+					// sent before the client loaded the scene data again (the scope has new IDs).
 					continue;
 				}
 				if (!dirty.contains(node)) {
