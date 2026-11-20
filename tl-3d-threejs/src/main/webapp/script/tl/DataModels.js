@@ -591,11 +591,14 @@ export class Scope {
     this._ktx2Loader = null;
   }
 
-  /** Stops loading and releases the decoder. Called when the control is disposed. */
+  /**
+   * Stops loading and releases the decoder (when the decodings still running have ended).
+   * Called when the control is disposed and when the scene is loaded again.
+   */
   dispose() {
     this.disposed = true;
     this.abortAssetLoading();
-    this.releaseDecoders();
+    this.releaseDecodersWhenIdle();
     // The GLTFs with their images (ImageBitmaps are not garbage collected by themselves) and
     // the instanced meshes are no longer shown.
     this.clearStaleGltfs(new Set());
@@ -628,8 +631,12 @@ export class Scope {
 
     const gltfLoader = this.gltfLoader(ctrl.renderer);
 
+    // An aborted pipeline ends at once, it does not wait for the decodings it started.
+    const aborted = new Promise((resolve) =>
+      signal.addEventListener("abort", resolve, { once: true }),
+    );
     const loadUrl = (url) => {
-      return gltfLoader.loadAsync(url).then(
+      const loading = this.trackDecoding(gltfLoader.loadAsync(url)).then(
         (gltf) => {
           if (signal.aborted) {
             // Not used by the scene that replaced this one.
@@ -649,6 +656,7 @@ export class Scope {
           console.error(msg);
         },
       );
+      return Promise.race([loading, aborted]);
     };
 
     const assetsByURL = Map.groupBy(this.assets, (asset) =>
@@ -696,11 +704,26 @@ export class Scope {
       });
   }
 
-  /** Releases the decoders unless a loading pipeline or an additional loading is running. */
+  /**
+   * Releases the decoders unless a loading pipeline or an additional loading is running, or a
+   * decoding has not ended: a decoding in a terminated worker would never end.
+   */
   releaseDecodersWhenIdle() {
-    if (!this._pipelineRunning && !this._additionalLoads) {
+    if (
+      (this.disposed || (!this._pipelineRunning && !this._additionalLoads)) &&
+      !this._decodings
+    ) {
       this.releaseDecoders();
     }
+  }
+
+  /** Counts the given loading as running decoding until it has ended (see releaseDecodersWhenIdle()). */
+  trackDecoding(loading) {
+    this._decodings = (this._decodings ?? 0) + 1;
+    return loading.finally(() => {
+      this._decodings--;
+      this.releaseDecodersWhenIdle();
+    });
   }
 
   /**
@@ -738,8 +761,7 @@ export class Scope {
   /** Loads a GLTF that a loading pipeline did not load and shows it in the given assets. */
   loadAdditionalGLTF(ctrl, url, assets) {
     this._additionalLoads = (this._additionalLoads ?? 0) + 1;
-    this.gltfLoader(ctrl.renderer)
-      .loadAsync(url)
+    this.trackDecoding(this.gltfLoader(ctrl.renderer).loadAsync(url))
       .then(
         (gltf) => {
           if (this.disposed) {
