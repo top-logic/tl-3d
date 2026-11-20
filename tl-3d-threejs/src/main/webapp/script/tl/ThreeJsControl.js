@@ -742,6 +742,8 @@ class ThreeJsControl {
     // The highlighted handle under the pointer and the start of a drag change the picture.
     this.translateControls.addEventListener("change", () => this.invalidate());
     this.translateControls.addEventListener("dragging-changed", (event) => {
+      // See partPositions().
+      this._partPositions = null;
       if (event.value) {
         this.gizmoDragged = true;
       } else {
@@ -1178,7 +1180,7 @@ class ThreeJsControl {
         const distance = this.snappingDistance(selectedWorldPosition, position);
 
         if (distance < closestDistance) {
-          if (this.isPositionOccupied(position, excludedObjects, excludedNodes)) {
+          if (this.isPositionOccupied(position, excludedObjects, excludedNodes, otherObject)) {
             continue;
           }
 
@@ -1202,7 +1204,9 @@ class ThreeJsControl {
         .applyMatrix4(parentMatrixWorld);
       const distance = this.snappingDistance(selectedWorldPosition, position);
       if (distance < closestDistance) {
-        if (this.isPositionOccupied(position, excludedObjects, excludedNodes)) {
+        if (
+          this.isPositionOccupied(position, excludedObjects, excludedNodes, entries[i].partNode)
+        ) {
           continue;
         }
         closestDistance = distance;
@@ -1432,37 +1436,52 @@ class ThreeJsControl {
    * Whether a part (other than the excluded 3D objects and scene nodes) is placed at the given
    * world position, i.e. a snapping point there is occupied.
    */
-  isPositionOccupied(position, excludedObjects, excludedNodes) {
+  /**
+   * Whether a part other than the owner of the snapping point (its 3D object or its instanced
+   * part node) stands at the given position: the point is occupied then.
+   */
+  isPositionOccupied(position, excludedObjects, excludedNodes, owner) {
     const checkRadius = 50;
+    return this.partPositions(excludedObjects, excludedNodes).some(
+      (part) => part.owner !== owner && part.position.distanceTo(position) < checkRadius,
+    );
+  }
+
+  /**
+   * The origins (world positions) of all shown parts except the dragged ones, with their 3D
+   * object or instanced part node as owner. While a gizmo is dragged, the other parts do not
+   * move: the list is collected once per drag instead of for every candidate point.
+   */
+  partPositions(excludedObjects, excludedNodes) {
+    const dragging = this.translateControls?.dragging;
+    if (dragging && this._partPositions) {
+      return this._partPositions;
+    }
+    const positions = [];
 
     // Instanced parts have no 3D objects; their positions are the instance matrices.
     const instanceManager = this.scope.instanceManager;
     const parentMatrixWorld = this.zUpRoot.matrixWorld;
-    const instancePosition = new Vector3();
     for (const [assetKey, data] of instanceManager.managedMeshes) {
       if (assetKey.endsWith("_impostor")) continue;
       for (const instance of data.instanceData) {
         if (!instance.partNode || excludedNodes.has(instance.partNode)) continue;
         if (instanceManager.isInstanceHidden(assetKey, instance.id)) continue;
-        instancePosition
-          .setFromMatrixPosition(instance.matrix)
-          .applyMatrix4(parentMatrixWorld);
-        if (instancePosition.distanceTo(position) < checkRadius) {
-          return true;
-        }
+        positions.push({
+          owner: instance.partNode,
+          position: new Vector3()
+            .setFromMatrixPosition(instance.matrix)
+            .applyMatrix4(parentMatrixWorld),
+        });
       }
     }
-
-    // Find all objects near this connection point
-    const nearbyObjects = [];
 
     this.zUpRoot.traverse((node) => {
       // Skip the objects being moved (traverse visits their descendants, too)
       if (excludedObjects.has(node)) {
         return;
       }
-
-      // Skip spheres and other non-snappable objects
+      // Only the 3D objects of parts.
       if (
         node.userData?.isSphere ||
         node.userData?.isGrid ||
@@ -1471,22 +1490,13 @@ class ThreeJsControl {
       ) {
         return;
       }
-
-      // Check if this object is close to the connection point
-      const nodePosition = new Vector3();
-      node.getWorldPosition(nodePosition);
-
-      // Use 3D distance for proximity check
-      const distance = position.distanceTo(nodePosition);
-
-      if (distance < checkRadius) {
-        nearbyObjects.push(node);
-      }
+      positions.push({ owner: node, position: node.getWorldPosition(new Vector3()) });
     });
 
-    const isOccupied = nearbyObjects.length > 0;
-    return isOccupied;
+    this._partPositions = dragging ? positions : null;
+    return positions;
   }
+
 
   snapObject(selectedObj) {
     // Not throttled: the decision must be based on the position where the object was released.
