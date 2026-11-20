@@ -122,6 +122,12 @@ export class InsertElement extends ListUpdate {
       if (!this.updateNodeReferences(scope, oldElement, newElement)) {
         this.needsFullReload = true;
       } else {
+        if (newElement.contents) {
+          // A group takes over the 3D object of the replaced group without comparing the
+          // transformation (only parts are compared, see fingerprint()): its place may have
+          // changed, e.g. in another view. Moves the 3D object and the instances below.
+          newElement.setProperty(scope, "transform", newElement.transform);
+        }
         refreshDisplay(scope, newElement);
       }
     } else if (target.node) {
