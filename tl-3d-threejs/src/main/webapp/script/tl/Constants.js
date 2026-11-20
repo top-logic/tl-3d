@@ -27,7 +27,11 @@ export const OPTIMIZED_PIXEL_RATIO = Math.min(window.devicePixelRatio, 1.7);
 export const ANTIALIAS_MAX_PIXEL_RATIO = 1.5;
 export const GRID_SMALL_CELL = 500;
 export const SNAP_THRESHOLD = 50;
-export const GRID_SNAP_THRESHOLD = 200;
+/**
+ * Distance (mm) up to which a dragged object snaps to a grid line of the workplane, and onto the
+ * workplane itself: a tenth of a grid cell, so that objects can still be placed freely near it.
+ */
+export const GRID_SNAP_THRESHOLD = 50;
 export const FLOOR_PADDING = 20000;
 /** Height of a floor of the skybox room (distance between two floors), in mm. */
 export const FLOOR_HEIGHT = 15000;

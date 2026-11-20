@@ -510,6 +510,7 @@ class ThreeJsControl {
 
             // The gizmo moves the group, not its children: the step size applies to the group.
             object.userData.dragStartPosition = object.position.clone();
+            lastMatrix.copy(object.matrix);
 
             for (const node of outer.multiTransformGroup.children) {
               lastWorldMatrixes[node.id] = node.matrixWorld.clone();
@@ -526,12 +527,20 @@ class ThreeJsControl {
             return;
           }
 
+          if (object.matrix.equals(lastMatrix)) {
+            // A click on the gizmo without moving it changes nothing.
+            outer._instanceSnapshots = {};
+            return;
+          }
+
           // Apply step snapping to the movement of the group
           outer.snapToStepSize(object);
           object.updateMatrixWorld(true);
 
-          // Apply grid snapping to each object in multi-select if both workplane and edit mode are enabled
+          // Apply grid snapping to each object in multi-select if both workplane and edit mode are
+          // enabled. Not when rotating: the objects keep their places.
           if (
+            event.target !== outer.rotateControls &&
             outer.isWorkplaneVisible &&
             outer.isEditMode &&
             outer.snapToWorkplaneEnabled
@@ -615,7 +624,17 @@ class ThreeJsControl {
             return;
           }
 
-          outer.snapObject(object);
+          if (currentMatrix.equals(lastMatrix)) {
+            // A click on the gizmo without moving it changes nothing (and does not snap).
+            outer._instanceSnapshots = {};
+            return;
+          }
+
+          // Rotating keeps the place of the object: snapping would take over the orientation of
+          // the snapping point the object sits on, and undo the rotation.
+          if (event.target !== outer.rotateControls) {
+            outer.snapObject(object);
+          }
 
           const sharedObject = outer.selection[0];
 
@@ -1264,10 +1283,8 @@ class ThreeJsControl {
       .applyMatrix4(workplaneMatrix.clone().invert());
 
     const distanceToWorkplane = Math.abs(positionOnWorkplane.z);
-    const MAX_SNAP_DISTANCE = 200;
-
     // An object released near the workplane is put onto it and snapped to the grid.
-    if (distanceToWorkplane <= MAX_SNAP_DISTANCE) {
+    if (distanceToWorkplane <= GRID_SNAP_THRESHOLD) {
       positionOnWorkplane.z = 0;
       if (this.isWorkplaneVisible && this.isEditMode) {
         // Snap to the nearby grid lines.
