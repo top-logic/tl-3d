@@ -1323,21 +1323,17 @@ class ThreeJsControl {
     const startPos = obj.userData.dragStartPosition;
 
     if (startPos && translateStepSize > 0) {
-      const stepsX = Math.round(
-        (obj.position.x - startPos.x) / translateStepSize,
+      // In steps along the local axes the gizmo moves the object on (local space): rounding
+      // the coordinates of the parent would make the steps of a rotated object longer and move
+      // it off the dragged axis.
+      const toLocal = obj.quaternion.clone().invert();
+      const offset = obj.position.clone().sub(startPos).applyQuaternion(toLocal);
+      offset.set(
+        Math.round(offset.x / translateStepSize) * translateStepSize,
+        Math.round(offset.y / translateStepSize) * translateStepSize,
+        Math.round(offset.z / translateStepSize) * translateStepSize,
       );
-      const stepsY = Math.round(
-        (obj.position.y - startPos.y) / translateStepSize,
-      );
-      const stepsZ = Math.round(
-        (obj.position.z - startPos.z) / translateStepSize,
-      );
-
-      obj.position.set(
-        startPos.x + stepsX * translateStepSize,
-        startPos.y + stepsY * translateStepSize,
-        startPos.z + stepsZ * translateStepSize,
-      );
+      obj.position.copy(startPos).add(offset.applyQuaternion(obj.quaternion));
     }
 
     // The rotation is snapped by the rotate gizmo (see rotationSnap()): it rounds the angle about
