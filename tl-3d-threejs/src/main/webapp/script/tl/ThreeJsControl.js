@@ -1229,7 +1229,8 @@ class ThreeJsControl {
   }
 
   snapToStepSize(obj) {
-    const translateStepSize = this.sceneGraph.translateStepSize;
+    // No scene while it is loaded again (see resetScope()).
+    const translateStepSize = this.sceneGraph?.translateStepSize;
     const startPos = obj.userData.dragStartPosition;
 
     if (startPos && translateStepSize > 0) {
@@ -1597,6 +1598,9 @@ class ThreeJsControl {
   }
 
   onMouseUp(event) {
+    if (!this.sceneGraph) {
+      return; // The scene is still loading (or loaded again).
+    }
     if (this.clickButton != 0) {
       return; // Not click with middle mouse button.
     }
@@ -2521,7 +2525,7 @@ class ThreeJsControl {
     }
 
     this.disableEditing();
-    return this.sceneGraph.clearSelection();
+    return this.sceneGraph?.clearSelection() ?? null;
   }
 
   /**
