@@ -85,4 +85,20 @@ public class TestTransformation extends TestCase {
 		}
 
 	}
+
+	/**
+	 * A rotation about y by 90° whose matrix is slightly out of range by rounding errors (as
+	 * after normalizing a scaled matrix) yields angles, not NaN.
+	 */
+	public void testEulerAnglesNearGimbalLock() {
+		double g = -(1 + 1e-12);
+		Transformation tx = new Transformation(0, 0, 1, 0, 1, 0, g, 0, 0, 0, 0, 0);
+		assertEquals(PI / 2, tx.getRotationY(), EPSILON);
+		assertFalse(Double.isNaN(tx.getRotationX()));
+		assertFalse(Double.isNaN(tx.getRotationZ()));
+
+		Transformation almost = rotateY(PI / 2 - 1e-12);
+		assertEquals(PI / 2, almost.getRotationY(), EPSILON);
+		assertFalse(Double.isNaN(almost.getRotationX()));
+	}
 }

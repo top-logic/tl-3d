@@ -24,6 +24,13 @@ import com.top_logic.util.error.TopLogicException;
  */
 public class Transformation extends MapLike {
 
+	/**
+	 * Distance of the sine of the y rotation from ±1 up to which the rotation is treated as gimbal
+	 * lock (rotation about y by ±90°): compared exactly, rounding errors would lead to wrong
+	 * angles.
+	 */
+	private static final double GIMBAL_LOCK_TOLERANCE = 1e-9;
+
 	private static final Transformation IDENTITY = new Transformation(
 		1, 0, 0,
 		0, 1, 0,
@@ -183,10 +190,10 @@ public class Transformation extends MapLike {
 	 * @implSpec See https://eecs.qmul.ac.uk/~gslabaugh/publications/euler.pdf
 	 */
 	public double getRotationX() {
-		if (g() == -1) {
+		if (g() <= -1 + GIMBAL_LOCK_TOLERANCE) {
 			return atan2(b(), c());
 		}
-		if (g() == 1) {
+		if (g() >= 1 - GIMBAL_LOCK_TOLERANCE) {
 			return atan2(-b(), -c());
 		}
 		double cos = cos(theta());
@@ -205,10 +212,10 @@ public class Transformation extends MapLike {
 	 * @implSpec See https://eecs.qmul.ac.uk/~gslabaugh/publications/euler.pdf
 	 */
 	public double getRotationY() {
-		if (g() == -1) {
+		if (g() <= -1 + GIMBAL_LOCK_TOLERANCE) {
 			return PI / 2;
 		}
-		if (g() == 1) {
+		if (g() >= 1 - GIMBAL_LOCK_TOLERANCE) {
 			return -PI / 2;
 		}
 		return theta();
@@ -222,10 +229,10 @@ public class Transformation extends MapLike {
 	 * @implSpec See https://eecs.qmul.ac.uk/~gslabaugh/publications/euler.pdf
 	 */
 	public double getRotationZ() {
-		if (g() == -1) {
+		if (g() <= -1 + GIMBAL_LOCK_TOLERANCE) {
 			return 0;
 		}
-		if (g() == 1) {
+		if (g() >= 1 - GIMBAL_LOCK_TOLERANCE) {
 			return 0;
 		}
 		double cos = cos(theta());
@@ -237,7 +244,9 @@ public class Transformation extends MapLike {
 	}
 
 	private double theta() {
-		double asin = asin(g());
+		// Rounding errors (e.g. of a normalized matrix) may lead to values slightly out of range,
+		// for which asin() is NaN.
+		double asin = asin(max(-1, min(1, g())));
 		if (asin == 0.0) {
 			// Avoid display of -0.0
 			return 0.0;
