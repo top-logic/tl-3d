@@ -718,6 +718,8 @@ class ThreeJsControl {
       "dragging-changed",
       updateRenderTransform,
     );
+    // The highlighted handle under the pointer and the start of a drag change the picture.
+    this.translateControls.addEventListener("change", () => this.invalidate());
     this.translateControls.addEventListener("dragging-changed", (event) => {
       if (event.value) {
         this.gizmoDragged = true;
@@ -773,6 +775,7 @@ class ThreeJsControl {
       "dragging-changed",
       updateRenderTransform,
     );
+    this.rotateControls.addEventListener("change", () => this.invalidate());
     this.rotateControls.addEventListener("dragging-changed", (event) => {
       if (event.value) {
         this.gizmoDragged = true;
