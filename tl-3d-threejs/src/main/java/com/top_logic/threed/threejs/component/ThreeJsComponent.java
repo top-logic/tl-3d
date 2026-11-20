@@ -740,6 +740,9 @@ public class ThreeJsComponent extends BuilderComponent
 
 		SceneNode newNode = builder().createSubtree(object, this);
 		GroupNode parent = _parentNodes.get(sceneNode);
+		// Transformations made in the viewer and not yet applied belong to the replaced nodes: the
+		// replacement shows the stored state, "apply" must not write the former one.
+		_transformedNodes.removeIf(node -> isInSubtree(node, sceneNode));
 		if (parent == null) {
 			assert _scene.getRoot() == sceneNode : "Only the root node has no parent.";
 			_nodeByModel.clear();
